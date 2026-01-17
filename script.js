@@ -1,13 +1,10 @@
 // ============================================
 // CONFIGURAZIONE API BACKEND
 // ============================================
-// Rilevamento automatico: se il sito è aperto da localhost o file:// usa il backend locale,
-// altrimenti usa il backend su Render.
-// Per sviluppo locale: avvia il backend con: cd backend && uvicorn app:app --reload --port 8000
-const _host = typeof window !== 'undefined' ? window.location.hostname : '';
-const _isLocal = _host === 'localhost' || _host === '127.0.0.1' || _host === '';
-const API_BASE_URL = _isLocal ? 'http://localhost:8000' : 'https://getbusinessplan.onrender.com';
-if (typeof console !== 'undefined') console.log('[GetBusinessPlan] API Backend:', API_BASE_URL, _isLocal ? '(locale)' : '(Render)');
+// Backend su Render. La chiave OPENAI_API_KEY è configurata su Render.
+// Nota: sul piano free Render il servizio può andare in sleep; la prima richiesta dopo un po' di inattività può richiedere 1-2 minuti (cold start).
+const API_BASE_URL = 'https://getbusinessplan.onrender.com';
+if (typeof console !== 'undefined') console.log('[GetBusinessPlan] API Backend:', API_BASE_URL, '(Render)');
 
 // DOM Elements - will be initialized when DOM is ready
 let planModal;
@@ -1061,10 +1058,9 @@ async function generateWithAI(formData) {
                 errorMessage = 'Timeout: la richiesta ha impiegato troppo tempo (oltre 20 minuti).';
             } else if (fetchError.name === 'TypeError') {
                 if (fetchError.message.includes('Failed to fetch') || fetchError.message.includes('Load failed')) {
-                    errorMessage = 'Errore di connessione: impossibile raggiungere il backend API. Verifica:\n' +
-                        '- Che il backend Python sia in esecuzione\n' +
-                        '- Che l\'URL API_BASE_URL sia corretto\n' +
+                    errorMessage = 'Errore di connessione: impossibile raggiungere il backend su Render. Verifica:\n' +
                         '- La connessione internet\n' +
+                        '- Se il servizio era in pausa (cold start), riprova: la prima richiesta può richiedere 1-2 minuti\n' +
                         '- Eventuali problemi CORS';
                 } else {
                     errorMessage = `Errore di tipo: ${fetchError.message}`;
@@ -1152,7 +1148,7 @@ async function generateWithAI(formData) {
         
         // Mostra popup di errore se si tratta di un errore di connessione
         if (errorMessage.includes('Errore di connessione') || errorMessage.includes('Failed to fetch')) {
-            alert('❌ Errore di Connessione\n\n' + errorMessage + '\n\nVerifica che il backend Python sia in esecuzione.\nIl sistema utilizzerà un template predefinito per continuare.');
+            alert('❌ Errore di Connessione\n\n' + errorMessage + '\n\nSe il backend su Render era in pausa, riprova tra 1-2 minuti.\nIl sistema utilizzerà un template predefinito per continuare.');
         }
         
         // Fallback al template se la chiamata fallisce
@@ -2312,7 +2308,7 @@ async function generatePDF() {
         
     } catch (error) {
         console.error('Errore nella generazione PDF:', error);
-        alert('Errore nella generazione del PDF: ' + error.message + '\n\nVerifica che il backend Python sia in esecuzione.');
+        alert('Errore nella generazione del PDF: ' + error.message + '\n\nSe il backend su Render era in pausa, riprova tra 1-2 minuti.');
         downloadPdfBtn.disabled = false;
         downloadPdfBtn.textContent = 'Scarica PDF';
     }
@@ -2837,10 +2833,9 @@ async function generateAnalysisWithAI(data) {
                 errorMessage = 'Timeout: la richiesta ha impiegato troppo tempo (oltre 15 minuti).';
             } else if (fetchError.name === 'TypeError') {
                 if (fetchError.message.includes('Failed to fetch') || fetchError.message.includes('Load failed')) {
-                    errorMessage = 'Errore di connessione: impossibile raggiungere il backend API. Verifica:\n' +
-                        '- Che il backend Python sia in esecuzione\n' +
-                        '- Che l\'URL API_BASE_URL sia corretto\n' +
+                    errorMessage = 'Errore di connessione: impossibile raggiungere il backend su Render. Verifica:\n' +
                         '- La connessione internet\n' +
+                        '- Se il servizio era in pausa (cold start), riprova: la prima richiesta può richiedere 1-2 minuti\n' +
                         '- Eventuali problemi CORS';
                 } else {
                     errorMessage = `Errore di tipo: ${fetchError.message}`;
@@ -2925,7 +2920,7 @@ async function generateAnalysisWithAI(data) {
         
         // Mostra popup di errore
         if (errorMessage.includes('Errore di connessione') || errorMessage.includes('Failed to fetch')) {
-            alert('❌ Errore di Connessione\n\n' + errorMessage + '\n\nVerifica che il backend Python sia in esecuzione.');
+            alert('❌ Errore di Connessione\n\n' + errorMessage + '\n\nSe il backend su Render era in pausa, riprova tra 1-2 minuti.');
         } else {
             alert('❌ Errore nell\'analisi di mercato\n\n' + errorMessage);
         }
