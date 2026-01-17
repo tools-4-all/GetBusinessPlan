@@ -8,7 +8,6 @@ from reportlab.lib.units import cm
 from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, Table, TableStyle, Image, KeepTogether
 from reportlab.lib.enums import TA_JUSTIFY, TA_CENTER, TA_LEFT
-from reportlab.lib.shapes import Drawing
 from pathlib import Path
 import matplotlib
 matplotlib.use('Agg')  # Backend non interattivo per server
