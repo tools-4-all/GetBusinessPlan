@@ -328,9 +328,9 @@ async def generate_market_analysis(request: MarketAnalysisRequest):
             "temperature": prompt_config.get("temperature", 0.3)
         }
         
-        # Aggiungi tools (web_search)
-        if prompt_config.get("tools"):
-            request_body["tools"] = prompt_config["tools"]
+        # Nota: web_search non è supportato direttamente dall'API OpenAI standard
+        # Il modello userà la sua conoscenza aggiornata e il prompt chiede esplicitamente ricerche web
+        # Se in futuro OpenAI aggiunge supporto per web_search, si può riabilitare qui
         
         # Aggiungi response_format se presente
         if prompt_config.get("text", {}).get("format"):
