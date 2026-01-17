@@ -28,7 +28,11 @@ app.add_middleware(
 # Configurazione OpenAI
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 if not OPENAI_API_KEY:
-    raise ValueError("OPENAI_API_KEY non configurata nelle variabili d'ambiente")
+    raise ValueError("OPENAI_API_KEY non configurata nelle variabili d'ambiente. Vedi CONFIGURARE_API_KEY.md")
+
+# Verifica formato base della chiave (deve iniziare con sk-)
+if not OPENAI_API_KEY.startswith("sk-"):
+    print("⚠️ ATTENZIONE: La chiave API potrebbe non essere valida (dovrebbe iniziare con 'sk-')")
 
 client = OpenAI(api_key=OPENAI_API_KEY)
 
@@ -64,6 +68,16 @@ async def test_openai():
     """Endpoint di test per verificare la connessione OpenAI"""
     import datetime
     try:
+        # Verifica che la chiave sia configurata
+        if not OPENAI_API_KEY:
+            return {
+                "status": "error",
+                "openai_working": False,
+                "error": "OPENAI_API_KEY non configurata",
+                "help": "Configura OPENAI_API_KEY su Render. Vedi CONFIGURARE_API_KEY.md",
+                "timestamp": datetime.datetime.now().isoformat()
+            }
+        
         # Test con una chiamata semplice
         test_response = client.chat.completions.create(
             model="gpt-3.5-turbo",
@@ -74,13 +88,19 @@ async def test_openai():
             "status": "ok",
             "openai_working": True,
             "response": test_response.choices[0].message.content,
+            "api_key_format": "valid" if OPENAI_API_KEY.startswith("sk-") else "invalid",
             "timestamp": datetime.datetime.now().isoformat()
         }
     except Exception as e:
+        error_msg = str(e)
+        is_auth_error = "401" in error_msg or "invalid_api_key" in error_msg.lower() or "incorrect api key" in error_msg.lower()
+        
         return {
             "status": "error",
             "openai_working": False,
-            "error": str(e),
+            "error": error_msg,
+            "is_auth_error": is_auth_error,
+            "help": "Configura OPENAI_API_KEY su Render. Vedi CONFIGURARE_API_KEY.md" if is_auth_error else None,
             "timestamp": datetime.datetime.now().isoformat()
         }
 
