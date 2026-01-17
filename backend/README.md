@@ -34,17 +34,38 @@ uvicorn app:app --reload --host 0.0.0.0 --port 8000
 
 Il server sarà disponibile su `http://localhost:8000`
 
-## Deploy su Railway
+## Deploy su Render (Consigliato - Gratis)
+
+1. Crea un account su [render.com](https://render.com)
+
+2. Connetti il repository GitHub
+
+3. Crea un nuovo "Web Service"
+
+4. Configura:
+   - Root Directory: `backend`
+   - Build Command: `pip install -r requirements.txt && playwright install chromium`
+   - Start Command: `uvicorn app:app --host 0.0.0.0 --port $PORT`
+
+5. Aggiungi la variabile d'ambiente `OPENAI_API_KEY`
+
+6. Il deploy avverrà automaticamente ad ogni push
+
+**Vedi [RENDER_DEPLOY.md](../RENDER_DEPLOY.md) per istruzioni dettagliate.**
+
+## Deploy su Railway (Alternativa)
 
 1. Crea un account su [railway.app](https://railway.app)
 
 2. Connetti il repository GitHub
 
-3. Railway rileverà automaticamente che è un progetto Python
+3. Configura Root Directory: `backend`
 
 4. Aggiungi la variabile d'ambiente `OPENAI_API_KEY` nel dashboard Railway
 
 5. Il deploy avverrà automaticamente ad ogni push
+
+**Vedi [RAILWAY_DEPLOY.md](../RAILWAY_DEPLOY.md) per istruzioni dettagliate.**
 
 ## Endpoint API
 
