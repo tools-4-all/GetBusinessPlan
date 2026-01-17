@@ -1,16 +1,10 @@
 // ============================================
-// CONFIGURAZIONE API KEY OPENAI
+// CONFIGURAZIONE API BACKEND
 // ============================================
-// IMPORTANTE: Inserisci qui la tua chiave API OpenAI
-// Questa chiave verrà usata da tutti gli utenti del servizio
-// 
-// ATTENZIONE SICUREZZA: 
-// - In produzione, usa SEMPRE un backend per proteggere la chiave API
-// - Non esporre mai la chiave API nel codice frontend pubblico
-// - Considera l'uso di variabili d'ambiente o un server proxy
-//
-// Per ottenere una chiave API: https://platform.openai.com/api-keys
-const OPENAI_API_KEY = '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'; // ⬅️ SOSTITUISCI QUI CON LA TUA CHIAVE API
+// IMPORTANTE: Configura qui l'URL del backend Python
+// In sviluppo locale: http://localhost:8000
+// In produzione Render: https://getbusinessplan.onrender.com
+const API_BASE_URL = 'https://getbusinessplan.onrender.com'; // ⬅️ Backend Render
 
 // DOM Elements - will be initialized when DOM is ready
 let planModal;
@@ -522,26 +516,21 @@ async function generateBusinessPlanFromWizard() {
         // Aggiorna il messaggio di loading
         const loadingText = loadingState.querySelector('p');
         if (loadingText) {
-            const hasApiKey = OPENAI_API_KEY && OPENAI_API_KEY !== 'YOUR_OPENAI_API_KEY_HERE';
-            if (hasApiKey) {
-                loadingText.textContent = 'L\'AI sta generando il tuo business plan con GPT... Questo può richiedere 3-5 minuti. Attendi, non chiudere la pagina.';
-                
-                // Aggiungi un indicatore di progresso dopo 30 secondi
-                setTimeout(() => {
-                    if (loadingText && loadingState.style.display !== 'none') {
-                        loadingText.textContent = 'Generazione in corso... La richiesta è ancora attiva, attendi ancora qualche minuto.';
-                    }
-                }, 30000);
-                
-                // Aggiorna dopo 2 minuti
-                setTimeout(() => {
-                    if (loadingText && loadingState.style.display !== 'none') {
-                        loadingText.textContent = 'Generazione ancora in corso... Alcuni modelli richiedono più tempo. Attendi ancora.';
-                    }
-                }, 120000);
-            } else {
-                loadingText.textContent = 'Generazione del business plan in corso...';
-            }
+            loadingText.textContent = 'L\'AI sta generando il tuo business plan con GPT... Questo può richiedere 3-5 minuti. Attendi, non chiudere la pagina.';
+            
+            // Aggiungi un indicatore di progresso dopo 30 secondi
+            setTimeout(() => {
+                if (loadingText && loadingState.style.display !== 'none') {
+                    loadingText.textContent = 'Generazione in corso... La richiesta è ancora attiva, attendi ancora qualche minuto.';
+                }
+            }, 30000);
+            
+            // Aggiorna dopo 2 minuti
+            setTimeout(() => {
+                if (loadingText && loadingState.style.display !== 'none') {
+                    loadingText.textContent = 'Generazione ancora in corso... Alcuni modelli richiedono più tempo. Attendi ancora.';
+                }
+            }, 120000);
         }
     }
 
@@ -1037,143 +1026,58 @@ async function buildBusinessPlanPrompt(formData) {
     return prompt;
 }
 
-// Generazione Business Plan con GPT usando prompt.json
+// Generazione Business Plan tramite API Python Backend
 async function generateWithAI(formData) {
     console.log('=== INIZIO generateWithAI ===');
     console.log('Timestamp:', new Date().toISOString());
     console.log('FormData ricevuto:', formData);
+    console.log('API Base URL:', API_BASE_URL);
     
-    // Costruisci il prompt usando prompt.json
-    const promptConfig = await buildBusinessPlanPrompt(formData);
+    // Ottieni l'orizzonte temporale
+    const horizonMonths = formData.horizonMonths ? parseInt(formData.horizonMonths) : 24;
     
-    if (!promptConfig) {
-        console.warn('Prompt non disponibile, uso template fallback');
-        return generateBusinessPlan(formData);
-    }
-
-    // Usa la chiave API del servizio
-    const apiKey = OPENAI_API_KEY;
-    
-    if (!apiKey || apiKey === 'YOUR_OPENAI_API_KEY_HERE') {
-        console.warn('API Key non configurata. Configura OPENAI_API_KEY in script.js');
-        console.log('Uso template fallback - configura la tua API Key per usare GPT.');
-        const fallbackHTML = generateBusinessPlan(formData);
-        return fallbackHTML; // Stringa per compatibilità
-    }
-
     try {
-        // Prepara i messaggi per l'API OpenAI dal prompt.json
-        // Converte il formato input del prompt.json nel formato messages dell'API
-        const messages = promptConfig.input.map(msg => ({
-            role: msg.role,
-            content: msg.content.map(content => {
-                if (content.type === 'text') {
-                    return content.text;
-                }
-                return content;
-            }).join('')
-        }));
-
-        // Costruisci il requestBody usando SOLO i campi presenti nel prompt.json
-        // Nessun default, nessuna logica aggiuntiva - solo quello che c'è nel prompt.json
-        const requestBody = {
-            model: promptConfig.model,
-            messages: messages
-        };
-        
-        // Aggiungi reasoning se presente nel prompt.json E se il modello lo supporta
-        // reasoning è supportato solo per modelli o1
-        if (promptConfig.reasoning && promptConfig.model && promptConfig.model.startsWith('o1')) {
-            requestBody.reasoning = promptConfig.reasoning;
-        } else if (promptConfig.reasoning) {
-            console.warn('⚠️ Il parametro reasoning è presente nel prompt.json ma il modello', promptConfig.model, 'non lo supporta. Verrà ignorato.');
-        }
-        
-        // Aggiungi response_format se presente nel prompt.json
-        if (promptConfig.text?.format) {
-            requestBody.response_format = {
-                type: 'json_schema',
-                json_schema: {
-                    name: promptConfig.text.format.name,
-                    strict: promptConfig.text.format.strict,
-                    schema: promptConfig.text.format.schema
-                }
-            };
-        }
-        
-        // Aggiungi altri parametri se presenti nel prompt.json (temperature, max_tokens, ecc.)
-        // Solo se esplicitamente presenti, senza default
-        if (promptConfig.temperature !== undefined) {
-            requestBody.temperature = promptConfig.temperature;
-        }
-        if (promptConfig.max_tokens !== undefined) {
-            requestBody.max_tokens = promptConfig.max_tokens;
-        }
-        if (promptConfig.max_completion_tokens !== undefined) {
-            requestBody.max_completion_tokens = promptConfig.max_completion_tokens;
-        }
-
-        console.log('Chiamata API OpenAI con prompt.json...');
-        console.log('=== REQUEST BODY COMPLETO ===');
-        console.log('Model:', requestBody.model);
-        console.log('Temperature:', requestBody.temperature);
-        console.log('Max tokens/completion tokens:', requestBody.max_tokens || requestBody.max_completion_tokens);
-        console.log('Reasoning:', requestBody.reasoning || 'non presente');
-        console.log('Response format:', requestBody.response_format ? 'JSON Schema' : 'non presente');
-        console.log('Numero messaggi:', requestBody.messages.length);
-        console.log('Request body completo (senza API key):', JSON.stringify({
-            ...requestBody, 
-            messages: requestBody.messages.map(m => ({
-                ...m, 
-                content: typeof m.content === 'string' ? m.content.substring(0, 200) + '...' : m.content
-            }))
-        }, null, 2));
-        console.log('=== FINE REQUEST BODY ===');
-        
-        let response;
-        let responseText;
-        
-        console.log('Inizio chiamata fetch all\'API OpenAI...');
-        console.log('API Key presente:', !!apiKey, 'Lunghezza:', apiKey ? apiKey.length : 0);
-        console.log('Modello:', requestBody.model);
+        console.log('Chiamata API backend Python...');
+        console.log('URL:', `${API_BASE_URL}/api/generate-business-plan`);
         console.log('⚠️ NOTA: La generazione di un business plan completo può richiedere 3-5 minuti. Attendi...');
+        console.log('⏱️ Timestamp inizio:', new Date().toISOString());
         
-        // Crea un AbortController per timeout - aumentato a 20 minuti per business plan complessi
+        // Crea un AbortController per timeout - aumentato a 20 minuti
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 1200000); // 20 minuti timeout
+        const startTime = Date.now();
         
+        let response;
         try {
-            response = await fetch('https://api.openai.com/v1/chat/completions', {
+            response = await fetch(`${API_BASE_URL}/api/generate-business-plan`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiKey}`
                 },
-                body: JSON.stringify(requestBody),
+                body: JSON.stringify({
+                    formData: formData,
+                    horizonMonths: horizonMonths
+                }),
                 signal: controller.signal
             });
             clearTimeout(timeoutId);
+            const fetchTime = ((Date.now() - startTime) / 1000).toFixed(2);
             console.log('✅ Fetch completata. Status:', response.status, response.statusText);
+            console.log('⏱️ Tempo impiegato:', fetchTime, 'secondi');
         } catch (fetchError) {
             clearTimeout(timeoutId);
             console.error('❌ Errore nella chiamata fetch:', fetchError);
-            console.error('Tipo errore:', fetchError.name);
-            console.error('Messaggio:', fetchError.message);
-            console.error('Stack:', fetchError.stack);
             
-            // Gestisci diversi tipi di errori
             let errorMessage = 'Errore sconosciuto nella chiamata API';
             if (fetchError.name === 'AbortError') {
-                errorMessage = 'Timeout: la richiesta ha impiegato troppo tempo (oltre 20 minuti). ' +
-                    'Questo può accadere con modelli complessi o risposte molto lunghe. ' +
-                    'Riprova o considera di usare un modello più veloce.';
+                errorMessage = 'Timeout: la richiesta ha impiegato troppo tempo (oltre 20 minuti).';
             } else if (fetchError.name === 'TypeError') {
                 if (fetchError.message.includes('Failed to fetch') || fetchError.message.includes('Load failed')) {
-                    errorMessage = 'Errore di connessione: impossibile raggiungere l\'API OpenAI. Verifica:\n' +
+                    errorMessage = 'Errore di connessione: impossibile raggiungere il backend API. Verifica:\n' +
+                        '- Che il backend Python sia in esecuzione\n' +
+                        '- Che l\'URL API_BASE_URL sia corretto\n' +
                         '- La connessione internet\n' +
-                        '- Che l\'API key sia valida e configurata correttamente\n' +
-                        '- Eventuali problemi CORS o firewall\n' +
-                        '- Che l\'endpoint API sia raggiungibile';
+                        '- Eventuali problemi CORS';
                 } else {
                     errorMessage = `Errore di tipo: ${fetchError.message}`;
                 }
@@ -1183,78 +1087,24 @@ async function generateWithAI(formData) {
             
             throw new Error(errorMessage);
         }
-
-        // Leggi SEMPRE la risposta, anche se c'è un errore
-        try {
-            responseText = await response.text();
-            console.log('✅ Risposta letta. Lunghezza:', responseText.length);
-            console.log('=== RISPOSTA API RAW (TEXT) ===');
-            console.log(responseText);
-            console.log('=== FINE RISPOSTA RAW ===');
-        } catch (readError) {
-            console.error('❌ Errore nella lettura della risposta:', readError);
-            console.error('Status response:', response?.status);
-            console.error('Response headers:', response?.headers);
-            throw new Error(`Errore nella lettura della risposta: ${readError.message || 'Impossibile leggere la risposta dal server'}`);
-        }
         
-        let data;
-        try {
-            data = JSON.parse(responseText);
-        } catch (parseError) {
-            console.error('Errore nel parsing della risposta come JSON:', parseError);
-            console.error('Risposta raw:', responseText);
-            throw new Error(`Errore nel parsing della risposta: ${parseError.message}`);
-        }
-
-        // Log SEMPRE la risposta JSON completa
-        console.log('=== RISPOSTA API COMPLETA (JSON) ===');
-        console.log(JSON.stringify(data, null, 2));
-        console.log('=== FINE RISPOSTA JSON ===');
-
         if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ detail: 'Errore sconosciuto' }));
             console.error('Errore API - Status:', response.status);
-            console.error('Dati errore:', data);
-            throw new Error(`Errore API: ${response.status} - ${data.error?.message || 'Errore sconosciuto'}`);
+            console.error('Dati errore:', errorData);
+            throw new Error(`Errore API: ${response.status} - ${errorData.detail || 'Errore sconosciuto'}`);
         }
         
-        // Estrai il JSON dalla risposta
-        let businessPlanJSON;
-        console.log('=== ESTRACTIONE JSON DALLA RISPOSTA ===');
+        const result = await response.json();
+        console.log('✅ Risposta ricevuta dal backend');
         
-        if (data.choices && data.choices[0] && data.choices[0].message) {
-            const content = data.choices[0].message.content;
-            console.log('Contenuto messaggio tipo:', typeof content);
-            console.log('Contenuto messaggio completo:', content);
-            
-            if (typeof content === 'string') {
-                console.log('Contenuto è una stringa, provo a fare il parse...');
-                try {
-                    businessPlanJSON = JSON.parse(content);
-                    console.log('✅ JSON parsato con successo dalla stringa');
-                } catch (parseError) {
-                    console.error('❌ Errore nel parsing JSON:', parseError);
-                    console.error('Contenuto completo che ha causato errore:');
-                    console.log(content);
-                    // Logga comunque il contenuto raw
-                    console.log('=== CONTENUTO RAW (non parsato) ===');
-                    console.log(content);
-                    console.log('=== FINE CONTENUTO RAW ===');
-                    throw new Error('Errore nel parsing della risposta JSON: ' + parseError.message);
-                }
-            } else {
-                businessPlanJSON = content;
-                console.log('✅ Contenuto già è un oggetto, usato direttamente');
-            }
-        } else {
-            console.error('❌ Struttura risposta API non valida');
-            console.error('Data completo:', JSON.stringify(data, null, 2));
-            throw new Error('Risposta API non valida - struttura dati inattesa');
+        if (!result.success || !result.json) {
+            throw new Error('Risposta API non valida - formato dati inatteso');
         }
         
-        console.log('=== FINE ESTRAZIONE JSON ===');
-
-        // LOG DETTAGLIATO DEL JSON PER DEBUG - STAMPA COMPLETA E FORMATTATA
+        const businessPlanJSON = result.json;
+        
+        // LOG DETTAGLIATO DEL JSON PER DEBUG
         console.log('=== JSON BUSINESS PLAN RICEVUTO ===');
         console.log('Tipo dati ricevuti:', typeof businessPlanJSON);
         console.log('Chiavi disponibili:', Object.keys(businessPlanJSON || {}));
@@ -1269,13 +1119,10 @@ async function generateWithAI(formData) {
         }
         console.log('=== FINE LOG JSON ===');
         
-        // Salva IMMEDIATAMENTE il JSON raw in una variabile globale per poterlo esportare
+        // Salva il JSON in variabile globale e localStorage
         window.lastBusinessPlanJSON = businessPlanJSON;
         console.log('✅ JSON salvato in window.lastBusinessPlanJSON');
-        console.log('Verifica salvataggio:', !!window.lastBusinessPlanJSON, typeof window.lastBusinessPlanJSON);
-        console.log('JSON salvato (primi 500 caratteri):', JSON.stringify(businessPlanJSON, null, 2).substring(0, 500));
         
-        // Salva anche in localStorage per persistenza
         try {
             localStorage.setItem('lastBusinessPlanJSON', JSON.stringify(businessPlanJSON));
             console.log('✅ JSON salvato anche in localStorage');
@@ -1287,14 +1134,12 @@ async function generateWithAI(formData) {
         console.log('Inizio conversione JSON -> HTML...');
         const businessPlanHTML = convertBusinessPlanJSONToHTML(businessPlanJSON);
         console.log('Conversione completata. Lunghezza HTML:', businessPlanHTML.length);
-        console.log('Prime 500 caratteri HTML:', businessPlanHTML.substring(0, 500));
         
         if (!businessPlanHTML || businessPlanHTML.trim() === '') {
             console.error('ERRORE: HTML generato è vuoto!');
             throw new Error('La conversione JSON->HTML ha prodotto un risultato vuoto');
         }
         
-        // Restituisci sia l'HTML che il JSON per evitare problemi di timing
         console.log('=== generateWithAI completata con successo ===');
         return {
             html: businessPlanHTML,
@@ -1303,26 +1148,16 @@ async function generateWithAI(formData) {
         
     } catch (error) {
         console.log('=== generateWithAI terminata con errore ===');
-        console.error('Errore nella chiamata GPT:', error);
+        console.error('Errore nella chiamata API:', error);
         console.error('Stack trace:', error.stack);
         
-        // Mostra un messaggio più dettagliato all'utente
         const errorMessage = error.message || 'Errore sconosciuto';
         console.warn(`Errore API: ${errorMessage}. Uso template fallback.`);
         
         // Mostra popup di errore se si tratta di un errore di connessione
-        if (errorMessage.includes('Errore di connessione')) {
-            alert('❌ Errore di Connessione\n\n' + errorMessage + '\n\nIl sistema utilizzerà un template predefinito per continuare.');
+        if (errorMessage.includes('Errore di connessione') || errorMessage.includes('Failed to fetch')) {
+            alert('❌ Errore di Connessione\n\n' + errorMessage + '\n\nVerifica che il backend Python sia in esecuzione.\nIl sistema utilizzerà un template predefinito per continuare.');
         }
-        
-        // Log dell'errore per debug
-        if (errorMessage.includes('401') || errorMessage.includes('authentication') || errorMessage.includes('API key')) {
-            console.error('Errore di autenticazione API - verifica che OPENAI_API_KEY sia configurata correttamente in script.js');
-        }
-        
-        // IMPORTANTE: Anche in caso di errore, mostra comunque qualsiasi risposta ricevuta
-        console.log('=== NOTA: Se hai visto la risposta API sopra, quello è l\'output dell\'API ===');
-        console.log('=== Il fallback al template viene usato solo per continuare l\'esecuzione ===');
         
         // Fallback al template se la chiamata fallisce
         return generateBusinessPlan(formData);
@@ -2379,209 +2214,58 @@ async function generatePDF() {
     downloadPdfBtn.disabled = true;
     downloadPdfBtn.textContent = 'Generazione PDF...';
 
-    // Verifica che ci sia contenuto o JSON
+    // Verifica che ci sia JSON
     const hasJSON = window.currentPlanData.jsonData && typeof window.currentPlanData.jsonData === 'object';
-    const hasContent = window.currentPlanData.content && window.currentPlanData.content.trim() !== '';
+    const jsonData = window.lastBusinessPlanJSON || window.currentPlanData.jsonData;
     
-    if (!hasJSON && !hasContent) {
-        alert('Nessun contenuto disponibile per il PDF. Assicurati che il business plan sia stato generato correttamente.');
+    if (!hasJSON && !jsonData) {
+        alert('Nessun JSON disponibile per il PDF. Assicurati che il business plan sia stato generato correttamente.');
         downloadPdfBtn.disabled = false;
         downloadPdfBtn.textContent = 'Scarica PDF';
         return;
     }
 
     try {
-        console.log('📄 Generazione PDF usando window.print()...');
+        console.log('📄 Generazione PDF tramite API backend...');
         
-        let html;
+        const response = await fetch(`${API_BASE_URL}/api/generate-pdf`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                businessPlanJson: jsonData
+            })
+        });
         
-        // Se abbiamo JSON, usa buildHtmlFromJSON (stile generate.js)
-        if (hasJSON) {
-            console.log('Generazione PDF da JSON usando buildHtmlFromJSON...');
-            html = buildHtmlFromJSON(window.currentPlanData.jsonData);
-        } else {
-            // Fallback: genera HTML dal contenuto esistente
-            console.log('Generazione PDF da contenuto HTML esistente...');
-            const pdfLayout = window.currentPlanData.jsonData?.pdf_layout;
-            const title = pdfLayout?.titolo_documento || window.currentPlanData.companyName || 'Business Plan';
-            const subtitle = pdfLayout?.sottotitolo || '';
-            
-            html = `
-<!DOCTYPE html>
-<html lang="it">
-<head>
-    <meta charset="UTF-8">
-    <title>${title}</title>
-    <style>
-        * { box-sizing: border-box; }
-        body { margin: 0; padding: 20px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
-        h1 { color: #2563eb; font-size: 2.5rem; margin: 0 0 10px 0; font-weight: bold; }
-        h2 { color: #64748b; font-size: 1.5rem; margin: 0; font-weight: 400; }
-        h4 { color: #2563eb; font-size: 1.3rem; margin-top: 30px; margin-bottom: 15px; font-weight: 600; page-break-after: avoid; }
-        p { line-height: 1.8; margin-bottom: 15px; color: #1e293b; }
-        ul, ol { margin: 15px 0; padding-left: 30px; }
-        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-        th { background: #f1f5f9; padding: 8px; border: 1px solid #cbd5e1; }
-        td { padding: 6px; border: 1px solid #cbd5e1; }
-        @media print {
-            body { padding: 0; }
-        }
-    </style>
-</head>
-<body>
-    <h1>${title}</h1>
-    ${subtitle ? `<h2>${subtitle}</h2>` : ''}
-    ${window.currentPlanData.content}
-</body>
-</html>`;
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ detail: 'Errore sconosciuto' }));
+            throw new Error(`Errore API: ${response.status} - ${errorData.detail || 'Errore sconosciuto'}`);
         }
         
-        // Crea una nuova finestra per la stampa
-        // Prova prima senza parametri per evitare blocchi popup
-        let printWindow = window.open('', '_blank');
+        // Ottieni il blob del PDF
+        const blob = await response.blob();
         
-        // Se fallisce, prova con parametri
-        if (!printWindow) {
-            printWindow = window.open('', '_blank', 'width=800,height=600');
-        }
+        // Crea un URL temporaneo e scarica il file
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'business-plan.pdf';
+        document.body.appendChild(a);
+        a.click();
         
-        // Se ancora fallisce, usa un approccio alternativo
-        if (!printWindow) {
-            // Usa un iframe nascosto come fallback
-            console.log('⚠️ Popup bloccato, uso iframe come fallback...');
-            const iframe = document.createElement('iframe');
-            iframe.style.position = 'fixed';
-            iframe.style.top = '0';
-            iframe.style.left = '0';
-            iframe.style.width = '100%';
-            iframe.style.height = '100%';
-            iframe.style.border = 'none';
-            iframe.style.zIndex = '99999';
-            document.body.appendChild(iframe);
-            
-            const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-            iframeDoc.open();
-            iframeDoc.write(html);
-            iframeDoc.close();
-            
-            // Aspetta che il contenuto sia caricato (Chart.js è già incluso nell'HTML)
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            
-            // Se abbiamo JSON con grafici, aspetta che Chart.js sia caricato e i grafici renderizzati
-            if (hasJSON) {
-                console.log('📊 Attesa caricamento Chart.js e rendering grafici nell\'iframe...');
-                
-                // Verifica che Chart.js sia disponibile (è già incluso nell'HTML)
-                let chartJsReady = false;
-                let attempts = 0;
-                while (attempts < 30 && !chartJsReady) {
-                    if (iframe.contentWindow.Chart) {
-                        chartJsReady = true;
-                        console.log('✅ Chart.js disponibile nell\'iframe');
-                        break;
-                    }
-                    await new Promise(resolve => setTimeout(resolve, 200));
-                    attempts++;
-                }
-                
-                // Lo script dei grafici è già incluso nell'HTML e aspetterà automaticamente Chart.js
-                // Aspetta che i grafici siano renderizzati
-                console.log('⏳ Attesa rendering grafici nell\'iframe...');
-                attempts = 0;
-                while (attempts < 50) {
-                    if (iframe.contentWindow.__CHARTS_RENDERED__) {
-                        console.log('✅ Grafici renderizzati nell\'iframe!');
-                        break;
-                    }
-                    await new Promise(resolve => setTimeout(resolve, 200));
-                    attempts++;
-                }
-            }
-            
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            // Stampa dall'iframe
-            iframe.contentWindow.print();
-            
-            // Rimuovi l'iframe dopo la stampa
-            setTimeout(() => {
-                if (iframe.parentNode) {
-                    document.body.removeChild(iframe);
-                }
-            }, 1000);
-            
-            downloadPdfBtn.disabled = false;
-            downloadPdfBtn.textContent = 'Scarica PDF';
-            return;
-        }
+        // Pulisci
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
         
-        // Scrivi l'HTML nella nuova finestra
-        printWindow.document.write(html);
-        printWindow.document.close();
-        
-        // Aspetta che il contenuto sia caricato (Chart.js è già incluso nell'HTML)
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        // Se abbiamo JSON con grafici, aspetta che Chart.js sia caricato e i grafici renderizzati
-        if (hasJSON) {
-            console.log('📊 Attesa caricamento Chart.js e rendering grafici...');
-            
-            // Verifica che Chart.js sia disponibile (è già incluso nell'HTML)
-            let chartJsReady = false;
-            let attempts = 0;
-            while (attempts < 30 && !chartJsReady) {
-                if (printWindow.Chart) {
-                    chartJsReady = true;
-                    console.log('✅ Chart.js disponibile nella finestra di stampa');
-                    break;
-                }
-                await new Promise(resolve => setTimeout(resolve, 200));
-                attempts++;
-            }
-            
-            if (!chartJsReady) {
-                console.warn('⚠️ Chart.js non disponibile dopo ' + attempts + ' tentativi');
-            }
-            
-            // Lo script dei grafici è già incluso nell'HTML e aspetterà automaticamente Chart.js
-            // Aspetta che i grafici siano renderizzati
-            console.log('⏳ Attesa rendering grafici...');
-            attempts = 0;
-            while (attempts < 50) {
-                if (printWindow.__CHARTS_RENDERED__) {
-                    console.log('✅ Grafici renderizzati!');
-                    break;
-                }
-                await new Promise(resolve => setTimeout(resolve, 200));
-                attempts++;
-            }
-            
-            if (!printWindow.__CHARTS_RENDERED__) {
-                console.warn('⚠️ Grafici non renderizzati completamente dopo ' + attempts + ' tentativi');
-                // Verifica se ci sono canvas nella finestra
-                const canvases = printWindow.document.querySelectorAll('canvas');
-                console.log('📊 Canvas trovati nella finestra:', canvases.length);
-                if (canvases.length > 0) {
-                    console.log('⚠️ Canvas presenti ma grafici non renderizzati. Procedo comunque.');
-                }
-            }
-        }
-        
-        // Aspetta ancora un po' per assicurarsi che tutto sia renderizzato
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        
-        // Apri la finestra di stampa
-        console.log('🖨️ Apertura finestra di stampa...');
-        printWindow.print();
-        
-        console.log('✅ Finestra di stampa aperta! Seleziona "Salva come PDF" come destinazione.');
+        console.log('✅ PDF scaricato con successo!');
         
         downloadPdfBtn.disabled = false;
         downloadPdfBtn.textContent = 'Scarica PDF';
         
     } catch (error) {
         console.error('Errore nella generazione PDF:', error);
-        alert('Errore nella generazione del PDF: ' + error.message + '\n\nControlla la console per maggiori dettagli.');
+        alert('Errore nella generazione del PDF: ' + error.message + '\n\nVerifica che il backend Python sia in esecuzione.');
         downloadPdfBtn.disabled = false;
         downloadPdfBtn.textContent = 'Scarica PDF';
     }
