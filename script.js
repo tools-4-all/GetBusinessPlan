@@ -1,10 +1,13 @@
 // ============================================
 // CONFIGURAZIONE API BACKEND
 // ============================================
-// IMPORTANTE: Configura qui l'URL del backend Python
-// In sviluppo locale: http://localhost:8000
-// In produzione Render: https://getbusinessplan.onrender.com
-const API_BASE_URL = 'https://getbusinessplan.onrender.com'; // ⬅️ Backend Render
+// Rilevamento automatico: se il sito è aperto da localhost o file:// usa il backend locale,
+// altrimenti usa il backend su Render.
+// Per sviluppo locale: avvia il backend con: cd backend && uvicorn app:app --reload --port 8000
+const _host = typeof window !== 'undefined' ? window.location.hostname : '';
+const _isLocal = _host === 'localhost' || _host === '127.0.0.1' || _host === '';
+const API_BASE_URL = _isLocal ? 'http://localhost:8000' : 'https://getbusinessplan.onrender.com';
+if (typeof console !== 'undefined') console.log('[GetBusinessPlan] API Backend:', API_BASE_URL, _isLocal ? '(locale)' : '(Render)');
 
 // DOM Elements - will be initialized when DOM is ready
 let planModal;

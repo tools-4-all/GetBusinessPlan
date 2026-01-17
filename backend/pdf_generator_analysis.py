@@ -12,7 +12,7 @@ from pathlib import Path
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from pdf_generator import markdown_to_paragraphs, create_chart_image, create_numbered_canvas
+from pdf_generator import markdown_to_paragraphs, create_chart_image, create_numbered_canvas, escape_for_pdf
 
 async def create_pdf_from_market_analysis(market_analysis_json: dict) -> str:
     """Crea il PDF professionale dall'analisi di mercato"""
@@ -188,28 +188,26 @@ async def create_pdf_from_market_analysis(market_analysis_json: dict) -> str:
     
     story.append(Spacer(1, 2.5*cm))
     
-    # Box informativo con sfondo colorato
+    # Box informativo con sfondo colorato (Paragraph per rendere <b> correttamente)
     info_data = []
-    info_data.append([f"<b>Data:</b> {data_gen}"])
+    info_data.append([Paragraph(f"<b>Data:</b> {escape_for_pdf(data_gen)}", styles['Normal'])])
     if settore:
-        info_data.append([f"<b>Settore:</b> {settore}"])
+        info_data.append([Paragraph(f"<b>Settore:</b> {escape_for_pdf(settore)}", styles['Normal'])])
     if area_geografica:
-        info_data.append([f"<b>Area:</b> {area_geografica}"])
+        info_data.append([Paragraph(f"<b>Area:</b> {escape_for_pdf(area_geografica)}", styles['Normal'])])
     
     if info_data:
         info_table = Table(info_data, colWidths=[12*cm])
         info_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, -1), light_bg),
-            ('FONTNAME', (0, 0), (-1, -1), 'Times-Roman'),
-            ('FONTSIZE', (0, 0), (-1, -1), 11),
-            ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor('#1f2937')),
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('LEFTPADDING', (0, 0), (-1, -1), 20),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 20),
-            ('TOPPADDING', (0, 0), (-1, -1), 12),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e5e7eb')),
+            ('LEFTPADDING', (0, 0), (-1, -1), 24),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 24),
+            ('TOPPADDING', (0, 0), (-1, -1), 14),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 14),
+            ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#d1d5db')),
+            ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e5e7eb')),
         ]))
         story.append(info_table)
     
@@ -600,13 +598,11 @@ async def create_pdf_from_market_analysis(market_analysis_json: dict) -> str:
     
     story.append(Spacer(1, 1.5*cm))
     
-    # Messaggio professionale
+    # Messaggio professionale (senza <p>; ReportLab usa alignment sullo stile)
     closing_message = """
-    <p align="center">
     Questa Analisi di Mercato è stata redatta con cura e attenzione ai dettagli.<br/><br/>
     Per ulteriori informazioni o chiarimenti, non esitate a contattarci.<br/><br/>
     <i>Documento generato con GetBusinessPlan</i>
-    </p>
     """
     closing_style = ParagraphStyle(
         name='ClosingMessage',
@@ -621,29 +617,27 @@ async def create_pdf_from_market_analysis(market_analysis_json: dict) -> str:
     
     story.append(Spacer(1, 2*cm))
     
-    # Box informativo finale
+    # Box informativo finale (Paragraph per rendere <b> correttamente)
     final_info = [
-        [f"<b>Documento:</b> {titolo}"],
-        [f"<b>Data generazione:</b> {data_gen}"]
+        [Paragraph(f"<b>Documento:</b> {escape_for_pdf(titolo)}", styles['Normal'])],
+        [Paragraph(f"<b>Data generazione:</b> {escape_for_pdf(data_gen)}", styles['Normal'])]
     ]
     if settore:
-        final_info.append([f"<b>Settore:</b> {settore}"])
+        final_info.append([Paragraph(f"<b>Settore:</b> {escape_for_pdf(settore)}", styles['Normal'])])
     if area_geografica:
-        final_info.append([f"<b>Area Geografica:</b> {area_geografica}"])
+        final_info.append([Paragraph(f"<b>Area Geografica:</b> {escape_for_pdf(area_geografica)}", styles['Normal'])])
     
     final_info_table = Table(final_info, colWidths=[12*cm])
     final_info_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, -1), light_bg),
-        ('FONTNAME', (0, 0), (-1, -1), 'Times-Roman'),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor('#1f2937')),
         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('LEFTPADDING', (0, 0), (-1, -1), 20),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 20),
-        ('TOPPADDING', (0, 0), (-1, -1), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e5e7eb')),
+        ('LEFTPADDING', (0, 0), (-1, -1), 24),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 24),
+        ('TOPPADDING', (0, 0), (-1, -1), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+        ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#d1d5db')),
+        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e5e7eb')),
     ]))
     story.append(final_info_table)
     
