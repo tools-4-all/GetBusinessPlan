@@ -751,18 +751,10 @@ function initializeEventListeners() {
     }
 
     // Feature buttons
-    const validateIdeaBtn = document.getElementById('validateIdeaBtn');
     const marketAnalysisBtn = document.getElementById('marketAnalysisBtn');
     const featurePlanBtn = document.getElementById('featurePlanBtn');
-    const featureValidateBtn = document.getElementById('featureValidateBtn');
     const featureAnalysisBtn = document.getElementById('featureAnalysisBtn');
 
-    if (validateIdeaBtn) {
-        validateIdeaBtn.addEventListener('click', () => {
-            console.log('validateIdeaBtn clicked');
-            openValidateModal();
-        });
-    }
     if (marketAnalysisBtn) {
         marketAnalysisBtn.addEventListener('click', () => {
             console.log('marketAnalysisBtn clicked');
@@ -773,12 +765,6 @@ function initializeEventListeners() {
         featurePlanBtn.addEventListener('click', () => {
             console.log('featurePlanBtn clicked');
             openModal();
-        });
-    }
-    if (featureValidateBtn) {
-        featureValidateBtn.addEventListener('click', () => {
-            console.log('featureValidateBtn clicked');
-            openValidateModal();
         });
     }
     if (featureAnalysisBtn) {
@@ -831,7 +817,6 @@ function initializeEventListeners() {
 function initializeAll() {
     console.log('DOM loaded, initializing...');
     initializeEventListeners();
-    initializeValidationListeners();
     initializeAnalysisListeners();
     console.log('All listeners initialized');
     
@@ -2381,309 +2366,6 @@ document.querySelectorAll('.card, .step, .testimonial, .plan-example, .feature')
     observer.observe(el);
 });
 
-// ============================================
-// IDEA VALIDATION WIZARD
-// ============================================
-
-const validateQuestions = [
-    {
-        id: 'ideaName',
-        title: 'Qual è il nome della tua idea di business?',
-        description: 'Dai un nome alla tua idea imprenditoriale',
-        type: 'text',
-        required: true,
-        placeholder: 'Es. App per delivery sostenibile'
-    },
-    {
-        id: 'ideaDescription',
-        title: 'Descrivi la tua idea in dettaglio',
-        description: 'Spiega cosa vuoi creare, quale problema risolve e come funziona',
-        type: 'textarea',
-        required: true,
-        rows: 6,
-        placeholder: 'Descrivi la tua idea, il problema che risolve, la soluzione proposta e come funziona...'
-    },
-    {
-        id: 'targetCustomers',
-        title: 'Chi sono i tuoi clienti target?',
-        description: 'Descrivi le caratteristiche dei tuoi potenziali clienti',
-        type: 'textarea',
-        required: true,
-        rows: 4,
-        placeholder: 'Es. Piccole e medie imprese, giovani professionisti 25-40 anni, appassionati di tecnologia...'
-    },
-    {
-        id: 'problemSolved',
-        title: 'Quale problema specifico risolve la tua idea?',
-        description: 'Descrivi il problema che i tuoi clienti stanno affrontando',
-        type: 'textarea',
-        required: true,
-        rows: 4,
-        placeholder: 'Es. Difficoltà nel trovare servizi di delivery eco-sostenibili nella propria zona...'
-    },
-    {
-        id: 'uniqueValue',
-        title: 'Cosa rende unica la tua soluzione?',
-        description: 'Qual è il tuo vantaggio competitivo o elemento distintivo?',
-        type: 'textarea',
-        required: false,
-        rows: 4,
-        placeholder: 'Es. Tecnologia proprietaria, partnership esclusive, modello di business innovativo...'
-    },
-    {
-        id: 'marketSize',
-        title: 'Quanto è grande il mercato potenziale?',
-        description: 'Stima la dimensione del mercato (opzionale)',
-        type: 'textarea',
-        required: false,
-        rows: 3,
-        placeholder: 'Es. Mercato italiano del delivery: €X miliardi, in crescita del Y% annuo...'
-    }
-];
-
-let validateCurrentStep = 0;
-let validateWizardData = {};
-
-// Validation modal elements - will be initialized when DOM is ready
-let validateModal;
-let closeValidateModal;
-let validateWizardContainer;
-let validateWizardNavigation;
-let validatePrevBtn;
-let validateNextBtn;
-let validateProgressBar;
-let validateProgressSteps;
-let validateLoadingState;
-let validateResultState;
-let validateContent;
-let downloadValidatePdfBtn;
-
-function openValidateModal() {
-    if (!validateModal) {
-        validateModal = document.getElementById('validateModal');
-    }
-    if (!validateModal) {
-        console.error('validateModal not found');
-        return;
-    }
-    validateModal.style.display = 'block';
-    document.body.style.overflow = 'hidden';
-    initValidateWizard();
-}
-
-function closeValidateModalFunc() {
-    validateModal.style.display = 'none';
-    document.body.style.overflow = 'auto';
-    resetValidateWizard();
-}
-
-function resetValidateWizard() {
-    validateCurrentStep = 0;
-    validateWizardData = {};
-    validateWizardContainer.innerHTML = '';
-    validateProgressSteps.innerHTML = '';
-    validateWizardNavigation.style.display = 'none';
-    validateLoadingState.style.display = 'none';
-    validateResultState.style.display = 'none';
-}
-
-function initValidateWizard() {
-    resetValidateWizard();
-    renderValidateProgressSteps();
-    renderValidateCurrentStep();
-    updateValidateNavigation();
-}
-
-function renderValidateProgressSteps() {
-    validateProgressSteps.innerHTML = '';
-    validateQuestions.forEach((q, index) => {
-        const step = document.createElement('div');
-        step.className = `progress-step ${index === validateCurrentStep ? 'active' : ''} ${validateWizardData[q.id] ? 'completed' : ''}`;
-        step.textContent = index + 1;
-        validateProgressSteps.appendChild(step);
-    });
-    updateValidateProgressBar();
-}
-
-function updateValidateProgressBar() {
-    const progress = ((validateCurrentStep + 1) / validateQuestions.length) * 100;
-    validateProgressBar.style.width = `${progress}%`;
-}
-
-function renderValidateCurrentStep() {
-    const question = validateQuestions[validateCurrentStep];
-    if (!question) return;
-
-    validateWizardContainer.innerHTML = `
-        <div class="wizard-step">
-            <h2 class="wizard-question-title">${question.title}</h2>
-            ${question.description ? `<p class="wizard-question-desc">${question.description}</p>` : ''}
-            <div class="wizard-input-container">
-                ${renderInput(question)}
-            </div>
-        </div>
-    `;
-
-    const input = validateWizardContainer.querySelector('input, select, textarea');
-    if (input) {
-        setTimeout(() => input.focus(), 100);
-        if (validateWizardData[question.id]) {
-            input.value = validateWizardData[question.id];
-        }
-    }
-}
-
-function updateValidateNavigation() {
-    validateWizardNavigation.style.display = 'flex';
-    validatePrevBtn.style.display = validateCurrentStep > 0 ? 'block' : 'none';
-    
-    if (validateCurrentStep === validateQuestions.length - 1) {
-        validateNextBtn.textContent = 'Valida Idea';
-        validateNextBtn.classList.add('btn-large');
-    } else {
-        validateNextBtn.textContent = 'Avanti';
-        validateNextBtn.classList.remove('btn-large');
-    }
-}
-
-function validateValidateCurrentStep() {
-    const question = validateQuestions[validateCurrentStep];
-    if (!question) return true;
-
-    const input = document.getElementById(`wizard-${question.id}`);
-    if (!input) return true;
-
-    if (question.required && !input.value.trim()) {
-        input.classList.add('error');
-        input.focus();
-        return false;
-    }
-
-    input.classList.remove('error');
-    return true;
-}
-
-function saveValidateCurrentStep() {
-    const question = validateQuestions[validateCurrentStep];
-    if (!question) return;
-
-    const input = document.getElementById(`wizard-${question.id}`);
-    if (input) {
-        validateWizardData[question.id] = input.value.trim();
-    }
-}
-
-function validateNextStep() {
-    if (!validateValidateCurrentStep()) return;
-
-    saveValidateCurrentStep();
-
-    if (validateCurrentStep < validateQuestions.length - 1) {
-        validateCurrentStep++;
-        renderValidateCurrentStep();
-        renderValidateProgressSteps();
-        updateValidateNavigation();
-    } else {
-        generateIdeaValidation();
-    }
-}
-
-function validatePrevStep() {
-    if (validateCurrentStep > 0) {
-        saveValidateCurrentStep();
-        validateCurrentStep--;
-        renderValidateCurrentStep();
-        renderValidateProgressSteps();
-        updateValidateNavigation();
-    }
-}
-
-async function generateIdeaValidation() {
-    saveValidateCurrentStep();
-    
-    validateWizardContainer.style.display = 'none';
-    validateWizardNavigation.style.display = 'none';
-    validateLoadingState.style.display = 'block';
-
-    try {
-        const validationHTML = await generateValidationWithAI(validateWizardData);
-        
-        validateContent.innerHTML = validationHTML;
-        validateLoadingState.style.display = 'none';
-        validateResultState.style.display = 'block';
-        
-        window.currentValidationData = {
-            ...validateWizardData,
-            content: validationHTML
-        };
-    } catch (error) {
-        console.error('Errore nella validazione:', error);
-        alert('Si è verificato un errore durante la validazione. Riprova.');
-        validateWizardContainer.style.display = 'block';
-        validateWizardNavigation.style.display = 'flex';
-        validateLoadingState.style.display = 'none';
-    }
-}
-
-async function generateValidationWithAI(data) {
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    return `
-        <h4>Analisi della Validità dell'Idea</h4>
-        <p><strong>Idea:</strong> ${data.ideaName || 'N/A'}</p>
-        
-        <h4>Punti di Forza</h4>
-        <ul>
-            <li><strong>Problema chiaramente identificato:</strong> ${data.problemSolved || 'Il problema è ben definito'}</li>
-            <li><strong>Mercato target definito:</strong> ${data.targetCustomers || 'Target ben identificato'}</li>
-            <li><strong>Valore unico:</strong> ${data.uniqueValue || 'Soluzione con elementi distintivi'}</li>
-        </ul>
-        
-        <h4>Aree di Miglioramento</h4>
-        <ul>
-            <li>Considerare una validazione più approfondita del mercato target attraverso interviste o survey</li>
-            <li>Sviluppare un MVP (Minimum Viable Product) per testare l'idea con utenti reali</li>
-            <li>Analizzare i competitor diretti e indiretti in modo più dettagliato</li>
-        </ul>
-        
-        <h4>Raccomandazioni</h4>
-        <p>La tua idea mostra potenziale. Ti consigliamo di:</p>
-        <ol>
-            <li>Convalidare il problema con almeno 10-20 potenziali clienti</li>
-            <li>Creare un prototipo o MVP per testare l'ipotesi</li>
-            <li>Analizzare approfonditamente il mercato e i competitor</li>
-            <li>Definire un modello di business chiaro e sostenibile</li>
-        </ol>
-        
-        <h4>Prossimi Passi</h4>
-        <p>Considera di sviluppare un business plan completo utilizzando il nostro generatore per approfondire gli aspetti finanziari e strategici.</p>
-    `;
-}
-
-// Initialize validation modal elements and event listeners
-function initializeValidationListeners() {
-    validateModal = document.getElementById('validateModal');
-    closeValidateModal = document.getElementById('closeValidateModal');
-    validateWizardContainer = document.getElementById('validateWizardContainer');
-    validateWizardNavigation = document.getElementById('validateWizardNavigation');
-    validatePrevBtn = document.getElementById('validatePrevBtn');
-    validateNextBtn = document.getElementById('validateNextBtn');
-    validateProgressBar = document.getElementById('validateProgressBar');
-    validateProgressSteps = document.getElementById('validateProgressSteps');
-    validateLoadingState = document.getElementById('validateLoadingState');
-    validateResultState = document.getElementById('validateResultState');
-    validateContent = document.getElementById('validateContent');
-    downloadValidatePdfBtn = document.getElementById('downloadValidatePdfBtn');
-
-    if (closeValidateModal) closeValidateModal.addEventListener('click', closeValidateModalFunc);
-    if (validateNextBtn) validateNextBtn.addEventListener('click', validateNextStep);
-    if (validatePrevBtn) validatePrevBtn.addEventListener('click', validatePrevStep);
-    if (downloadValidatePdfBtn) downloadValidatePdfBtn.addEventListener('click', () => {
-        if (window.currentValidationData) {
-            generatePDFFromContent(window.currentValidationData, 'validazione-idea');
-        }
-    });
-}
 
 // ============================================
 // MARKET ANALYSIS WIZARD
@@ -3648,8 +3330,7 @@ function generatePDFFromContent(data, filename) {
 }
 
 // Close modals when clicking outside - this is handled in initializeEventListeners
-// Additional handlers for validation and analysis modals
+// Additional handlers for analysis modal
 document.addEventListener('click', (e) => {
-    if (validateModal && e.target === validateModal) closeValidateModalFunc();
     if (analysisModal && e.target === analysisModal) closeAnalysisModalFunc();
 });

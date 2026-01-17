@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Generatore di business plan AI per il mercato italiano - Crea un piano aziendale completo, valida la tua idea e analizza il mercato in meno di 15 minuti">
+    <meta name="description" content="Generatore di business plan AI per il mercato italiano - Crea un piano aziendale completo e analizza il mercato in meno di 15 minuti">
     <title>Business Plan AI per il Mercato Italiano - GetBusinessPlan</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -33,10 +33,9 @@
     <section class="hero">
         <div class="container">
             <h1 class="hero-title">Business Plan AI<br>per il Mercato Italiano</h1>
-            <p class="hero-subtitle">Crea un business plan professionale, valida la tua idea e analizza il mercato italiano utilizzando l'intelligenza artificiale. Il nostro servizio tiene conto delle peculiarità settoriali e normative italiane, garantendo un documento conforme alle esigenze di investitori, banche e istituzioni italiane.</p>
+            <p class="hero-subtitle">Crea un business plan professionale e analizza il mercato italiano utilizzando l'intelligenza artificiale. Il nostro servizio tiene conto delle peculiarità settoriali e normative italiane, garantendo un documento conforme alle esigenze di investitori, banche e istituzioni italiane.</p>
             <div class="hero-buttons">
                 <button class="btn-primary btn-large" id="startPlanBtn">Crea Business Plan</button>
-                <button class="btn-secondary btn-large" id="validateIdeaBtn">Valida Idea</button>
                 <button class="btn-secondary btn-large" id="marketAnalysisBtn">Analisi Mercato</button>
             </div>
         </div>
@@ -51,11 +50,6 @@
                     <h3>Generatore Business Plan</h3>
                     <p>Crea un business plan completo e professionale in meno di 15 minuti, conforme alle normative italiane e alle peculiarità settoriali. Include tutte le sezioni necessarie per presentare la tua azienda a investitori e banche italiane.</p>
                     <button class="btn-primary" id="featurePlanBtn">Inizia ora</button>
-                </div>
-                <div class="feature-main-card">
-                    <h3>Validazione Idea di Business</h3>
-                    <p>Valida la tua idea imprenditoriale prima di investire tempo e risorse. Ottieni feedback dettagliati su punti di forza, debolezze e opportunità nel contesto italiano, considerando normative e caratteristiche del mercato nazionale.</p>
-                    <button class="btn-primary" id="featureValidateBtn">Valida idea</button>
                 </div>
                 <div class="feature-main-card">
                     <h3>Analisi di Mercato Approfondita</h3>
@@ -170,29 +164,6 @@
         </div>
     </section>
 
-    <!-- Testimonials -->
-    <section class="testimonials">
-        <div class="container">
-            <h2 class="section-title">Cosa dicono di noi i clienti</h2>
-            <div class="testimonial-grid">
-                <div class="testimonial">
-                    <div class="testimonial-stars">★★★★★</div>
-                    <p class="testimonial-text">"Il miglior strumento per creare un business plan professionale. In 15 minuti ho avuto un documento completo e dettagliato!"</p>
-                    <p class="testimonial-author">- Zede H.</p>
-                </div>
-                <div class="testimonial">
-                    <div class="testimonial-stars">★★★★★</div>
-                    <p class="testimonial-text">"Facile da usare e i risultati sono impressionanti. Ho ottenuto il finanziamento grazie al business plan generato!"</p>
-                    <p class="testimonial-author">- Jason C.</p>
-                </div>
-                <div class="testimonial">
-                    <div class="testimonial-stars">★★★★★</div>
-                    <p class="testimonial-text">"Risparmiato settimane di lavoro. L'AI capisce perfettamente cosa serve per un business plan professionale."</p>
-                    <p class="testimonial-author">- Parker A.</p>
-                </div>
-            </div>
-        </div>
-    </section>
 
     <!-- Example Plan -->
     <section class="example-plan">
@@ -257,13 +228,6 @@
             <div class="blog-grid">
                 <article class="blog-card">
                     <div class="blog-card-content">
-                        <h3>Come validare un'idea di business in 7 giorni</h3>
-                        <p>Scopri un metodo pratico e veloce per testare la validità della tua idea imprenditoriale prima di investire tempo e risorse. Una guida step-by-step per validare il tuo business in una settimana.</p>
-                        <a href="validare-idea-business-7-giorni.html" class="blog-link">Leggi l'articolo →</a>
-                    </div>
-                </article>
-                <article class="blog-card">
-                    <div class="blog-card-content">
                         <h3>Business plan: cos'è davvero e quando serve (e quando no)</h3>
                         <p>Tutto quello che devi sapere sul business plan: quando è davvero necessario, quando puoi farne a meno, e come crearlo in modo efficace per il mercato italiano.</p>
                         <a href="business-plan-cose-davvero-quando-serve.html" class="blog-link">Leggi l'articolo →</a>
@@ -324,42 +288,6 @@
         </div>
     </div>
 
-    <!-- Modal for Idea Validation -->
-    <div class="modal" id="validateModal">
-        <div class="modal-content wizard-content">
-            <span class="close" id="closeValidateModal">&times;</span>
-            
-            <!-- Progress Bar -->
-            <div class="wizard-progress">
-                <div class="progress-bar" id="validateProgressBar"></div>
-                <div class="progress-steps" id="validateProgressSteps"></div>
-            </div>
-
-            <!-- Wizard Steps Container -->
-            <div class="wizard-container" id="validateWizardContainer">
-                <!-- Steps will be dynamically inserted here -->
-            </div>
-
-            <!-- Navigation Buttons -->
-            <div class="wizard-navigation" id="validateWizardNavigation" style="display: none;">
-                <button type="button" class="btn-secondary" id="validatePrevBtn" style="display: none;">Indietro</button>
-                <button type="button" class="btn-primary" id="validateNextBtn">Avanti</button>
-            </div>
-
-            <!-- Loading State -->
-            <div id="validateLoadingState" class="loading-state" style="display: none;">
-                <div class="spinner"></div>
-                <p>L'AI sta analizzando la tua idea di business... Questo potrebbe richiedere alcuni minuti.</p>
-            </div>
-
-            <!-- Result State -->
-            <div id="validateResultState" class="result-state" style="display: none;">
-                <h3>Analisi della tua idea completata!</h3>
-                <div id="validateContent"></div>
-                <button class="btn-primary" id="downloadValidatePdfBtn">Scarica PDF</button>
-            </div>
-        </div>
-    </div>
 
     <!-- Modal for Market Analysis -->
     <div class="modal" id="analysisModal">

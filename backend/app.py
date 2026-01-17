@@ -396,6 +396,16 @@ async def generate_market_analysis(request: MarketAnalysisRequest):
         else:
             market_analysis_json = content
         
+        # Valida i requisiti minimi di parole
+        is_valid, validation_report = utils.validate_market_analysis_word_count(market_analysis_json)
+        if not is_valid:
+            print("⚠️ ATTENZIONE: L'analisi non rispetta tutti i requisiti minimi di parole")
+            print(f"Avvisi: {len(validation_report['warnings'])}")
+            for warning in validation_report['warnings']:
+                print(f"  - {warning}")
+        else:
+            print("✅ Validazione parole: tutti i requisiti minimi rispettati")
+        
         end_time = datetime.datetime.now()
         elapsed = (end_time - start_time).total_seconds()
         print(f"=== FINE ANALISI DI MERCATO ===")
@@ -405,7 +415,8 @@ async def generate_market_analysis(request: MarketAnalysisRequest):
         return JSONResponse(content={
             "success": True,
             "json": market_analysis_json,
-            "generation_time_seconds": elapsed
+            "generation_time_seconds": elapsed,
+            "validation": validation_report if not is_valid else None  # Includi solo se ci sono problemi
         })
         
     except json.JSONDecodeError as e:
