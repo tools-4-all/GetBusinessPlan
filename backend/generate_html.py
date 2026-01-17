@@ -23,7 +23,7 @@ def format_eur(n):
 def chunk_by(arr, size):
     return [arr[i:i+size] for i in range(0, len(arr), size)]
 
-def build_html_from_json(model: dict) -> str:
+def build_html_from_json(model: dict, for_pdf: bool = True) -> str:
     """Genera HTML dal JSON (equivalente a buildHtml in generate.js)"""
     meta = model.get("meta", {})
     layout = model.get("pdf_layout", {})
@@ -73,9 +73,9 @@ def build_html_from_json(model: dict) -> str:
     else:
         rec_table = '<div class="muted">Nessuna raccomandazione fornita.</div>'
     
-    # Capitoli
+    # Capitoli (per PDF, i grafici saranno mostrati come tabelle)
     chapters_html = "".join([
-        _build_chapter_html(narrative_by_id[id], idx, chart_by_id, max_charts_per_page)
+        _build_chapter_html(narrative_by_id[id], idx, chart_by_id, max_charts_per_page, for_pdf=True)
         for idx, id in enumerate(ordered_chapter_ids) if id in narrative_by_id
     ])
     
@@ -114,7 +114,7 @@ def build_html_from_json(model: dict) -> str:
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>{escape_html(title)}</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  {f'<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>' if not for_pdf else ''}
   <style>
     :root{{
       --text:#111;
@@ -290,6 +290,7 @@ def build_html_from_json(model: dict) -> str:
   {exec_html}
   {chapters_html}
 
+  {f'''<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script>
     (function(){{
       const charts = {charts_json};
@@ -363,13 +364,13 @@ def build_html_from_json(model: dict) -> str:
       charts.forEach(makeChart);
       window.__CHARTS_RENDERED__ = true;
     }})();
-  </script>
+  </script>''' if not for_pdf else ''}
 </body>
 </html>'''
     
     return html
 
-def _build_chapter_html(ch, idx, chart_by_id, max_charts_per_page):
+def _build_chapter_html(ch, idx, chart_by_id, max_charts_per_page, for_pdf=False):
     """Costruisce HTML per un singolo capitolo"""
     body_html = markdown(ch.get("contenuto_markdown", ""))
     
@@ -380,7 +381,7 @@ def _build_chapter_html(ch, idx, chart_by_id, max_charts_per_page):
     if chart_ids:
         chart_groups = chunk_by(chart_ids, max_charts_per_page)
         chart_blocks = "".join([
-            f'<div class="charts-page page-break">{"".join([_build_chart_html(chart_by_id[cid]) for cid in group])}</div>'
+            f'<div class="charts-page page-break">{"".join([_build_chart_html(chart_by_id[cid], for_pdf=for_pdf) for cid in group])}</div>'
             for group in chart_groups
         ])
     
@@ -393,10 +394,46 @@ def _build_chapter_html(ch, idx, chart_by_id, max_charts_per_page):
         </section>
       '''
 
-def _build_chart_html(c):
+def _build_chart_html(c, for_pdf=False):
     """Costruisce HTML per un singolo grafico"""
     caption_html = f'<div class="chart-caption">{escape_html(c.get("caption", ""))}</div>' if c.get("caption") else ""
-    return f'''<div class="chart-card">
+    
+    if for_pdf:
+        # Per PDF: mostra i dati in formato tabella (WeasyPrint non supporta JavaScript)
+        chart_data = ""
+        if c.get("series"):
+            chart_data = "<table class='table' style='margin-top:10px;'><thead><tr><th>Punto</th>"
+            for series in c.get("series", []):
+                chart_data += f"<th>{escape_html(series.get('name', 'Serie'))}</th>"
+            chart_data += "</tr></thead><tbody>"
+            
+            # Raggruppa i punti
+            max_points = max([len(s.get("points", [])) for s in c.get("series", [])], default=0)
+            for i in range(max_points):
+                chart_data += "<tr>"
+                if i < len(c.get("series", [{}])[0].get("points", [])):
+                    chart_data += f"<td>{escape_html(str(c['series'][0]['points'][i].get('x', '')))}</td>"
+                else:
+                    chart_data += "<td></td>"
+                for series in c.get("series", []):
+                    if i < len(series.get("points", [])):
+                        chart_data += f"<td>{escape_html(str(series['points'][i].get('y', '')))}</td>"
+                    else:
+                        chart_data += "<td></td>"
+                chart_data += "</tr>"
+            chart_data += "</tbody></table>"
+        
+        return f'''<div class="chart-card">
+                      <div class="chart-title">{escape_html(c.get("titolo", c.get("id", "")))}</div>
+                      <div style="padding: 10px; background: #f7f7f8; border-radius: 8px; margin: 10px 0;">
+                        <p style="margin: 0; color: #666; font-size: 12px;"><em>Grafico: {escape_html(c.get("tipo", "line").upper())}</em></p>
+                        {chart_data}
+                      </div>
+                      {caption_html}
+                    </div>'''
+    else:
+        # Per visualizzazione browser: usa canvas con Chart.js
+        return f'''<div class="chart-card">
                       <div class="chart-title">{escape_html(c.get("titolo", c.get("id", "")))}</div>
                       <canvas class="chart" id="chart_{escape_html(c["id"])}" width="900" height="420"></canvas>
                       {caption_html}

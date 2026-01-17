@@ -17,10 +17,7 @@ source venv/bin/activate  # Su Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-4. Installa i browser per Playwright:
-```bash
-playwright install chromium
-```
+4. (Opzionale) Per test locali, WeasyPrint non richiede installazioni aggiuntive
 
 5. Crea un file `.env` con la tua chiave API:
 ```bash
