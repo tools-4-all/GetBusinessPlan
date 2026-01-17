@@ -5,10 +5,8 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_JUSTIFY
 from pathlib import Path
-from markdown import markdown
 from html.parser import HTMLParser
 import re
-from generate_html import build_html_from_json
 
 class HTMLStripper(HTMLParser):
     def __init__(self):
@@ -30,10 +28,19 @@ def strip_html(html):
     return s.get_text()
 
 def markdown_to_paragraphs(md_text, styles):
-    """Converte markdown in paragrafi ReportLab"""
-    html = markdown(md_text)
-    # Rimuovi tag HTML complessi e mantieni solo testo
-    text = strip_html(html)
+    """Converte markdown in paragrafi ReportLab (semplificato, senza libreria markdown)"""
+    # Semplice conversione markdown senza dipendenze esterne
+    text = md_text
+    
+    # Rimuovi markdown headers
+    text = re.sub(r'^###\s+(.+)$', r'\1', text, flags=re.MULTILINE)
+    text = re.sub(r'^##\s+(.+)$', r'\1', text, flags=re.MULTILINE)
+    text = re.sub(r'^#\s+(.+)$', r'\1', text, flags=re.MULTILINE)
+    
+    # Rimuovi markdown bold/italic
+    text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
+    text = re.sub(r'\*(.+?)\*', r'\1', text)
+    
     # Dividi in paragrafi
     paragraphs = text.split('\n\n')
     result = []
@@ -41,10 +48,15 @@ def markdown_to_paragraphs(md_text, styles):
         para = para.strip()
         if para:
             # Gestisci liste
-            if para.startswith('- ') or para.startswith('* '):
-                result.append(Paragraph(f"• {para[2:]}", styles['Normal']))
-            else:
-                result.append(Paragraph(para, styles['Normal']))
+            lines = para.split('\n')
+            for line in lines:
+                line = line.strip()
+                if line:
+                    if line.startswith('- ') or line.startswith('* '):
+                        result.append(Paragraph(f"• {line[2:]}", styles['Normal']))
+                    else:
+                        result.append(Paragraph(line, styles['Normal']))
+                    result.append(Spacer(1, 4))
             result.append(Spacer(1, 6))
     return result
 

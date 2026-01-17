@@ -1,6 +1,29 @@
 import json
-from markdown import markdown
+import re
 from typing import Dict, List, Any
+
+def simple_markdown_to_html(md_text):
+    """Converte markdown in HTML senza dipendenze esterne"""
+    html = md_text
+    # Headers
+    html = re.sub(r'^###\s+(.+)$', r'<h3>\1</h3>', html, flags=re.MULTILINE)
+    html = re.sub(r'^##\s+(.+)$', r'<h2>\1</h2>', html, flags=re.MULTILINE)
+    html = re.sub(r'^#\s+(.+)$', r'<h1>\1</h1>', html, flags=re.MULTILINE)
+    # Bold/Italic
+    html = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', html)
+    html = re.sub(r'\*(.+?)\*', r'<em>\1</em>', html)
+    # Liste
+    html = re.sub(r'^[-*]\s+(.+)$', r'<li>\1</li>', html, flags=re.MULTILINE)
+    # Paragrafi
+    paragraphs = html.split('\n\n')
+    result = []
+    for para in paragraphs:
+        para = para.strip()
+        if para and not para.startswith('<'):
+            result.append(f'<p>{para}</p>')
+        else:
+            result.append(para)
+    return '\n'.join(result)
 
 def safe_array(v):
     return v if isinstance(v, list) else []
@@ -372,7 +395,7 @@ def build_html_from_json(model: dict, for_pdf: bool = True) -> str:
 
 def _build_chapter_html(ch, idx, chart_by_id, max_charts_per_page, for_pdf=False):
     """Costruisce HTML per un singolo capitolo"""
-    body_html = markdown(ch.get("contenuto_markdown", ""))
+    body_html = simple_markdown_to_html(ch.get("contenuto_markdown", ""))
     
     chart_ids = safe_array(ch.get("chart_ids", []))
     chart_ids = [cid for cid in chart_ids if cid in chart_by_id]
