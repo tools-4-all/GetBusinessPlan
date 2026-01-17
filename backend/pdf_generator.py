@@ -165,6 +165,60 @@ def create_chart_image(chart_data, width=15*cm, height=10*cm):
     
     return buf
 
+def create_numbered_canvas(header_left, header_right, footer_left, footer_center, footer_right, confidenzialita):
+    """Crea funzioni callback per header/footer e numerazione pagine"""
+    
+    def on_first_page(canvas_obj, doc):
+        # Prima pagina (copertina) senza header/footer
+        pass
+    
+    def on_later_pages(canvas_obj, doc):
+        page_num = canvas_obj.getPageNumber()
+        canvas_obj.saveState()
+        canvas_obj.setFont("Times-Roman", 8)
+        canvas_obj.setFillColor(colors.HexColor('#666666'))
+        
+        # Header (solo dalla seconda pagina in poi)
+        if page_num > 1:
+            if header_left:
+                canvas_obj.drawString(2*cm, A4[1] - 1.5*cm, header_left)
+            if header_right:
+                canvas_obj.drawRightString(A4[0] - 2*cm, A4[1] - 1.5*cm, header_right)
+            
+            # Linea sotto header
+            canvas_obj.setStrokeColor(colors.HexColor('#cccccc'))
+            canvas_obj.setLineWidth(0.5)
+            canvas_obj.line(2*cm, A4[1] - 1.8*cm, A4[0] - 2*cm, A4[1] - 1.8*cm)
+        
+        # Footer
+        if footer_left:
+            canvas_obj.drawString(2*cm, 1.2*cm, footer_left)
+        if footer_center:
+            width = canvas_obj.stringWidth(footer_center, "Times-Roman", 8)
+            canvas_obj.drawString((A4[0] - width) / 2, 1.2*cm, footer_center)
+        
+        # Numerazione pagine
+        canvas_obj.setFont("Times-Roman", 9)
+        page_text = f"Pagina {page_num}"
+        canvas_obj.drawRightString(A4[0] - 2*cm, 1.5*cm, page_text)
+        
+        # Linea sopra footer
+        canvas_obj.setStrokeColor(colors.HexColor('#cccccc'))
+        canvas_obj.setLineWidth(0.5)
+        canvas_obj.line(2*cm, 1.5*cm, A4[0] - 2*cm, 1.5*cm)
+        
+        # Watermark confidenzialità se presente
+        if confidenzialita and confidenzialita != 'pubblico' and page_num > 1:
+            canvas_obj.setFont("Times-Bold", 10)
+            canvas_obj.setFillColor(colors.HexColor('#cccccc'))
+            conf_text = "CONFIDENZIALE" if confidenzialita == 'confidenziale' else "USO INTERNO"
+            width = canvas_obj.stringWidth(conf_text, "Times-Bold", 10)
+            canvas_obj.drawString((A4[0] - width) / 2, A4[1] - 1.5*cm, conf_text)
+        
+        canvas_obj.restoreState()
+    
+    return on_first_page, on_later_pages
+
 async def create_pdf_from_json(business_plan_json: dict) -> str:
     """Crea il PDF professionale dal JSON"""
     
@@ -174,25 +228,68 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
     
     output_path = output_dir / "business-plan.pdf"
     
+    # Estrai informazioni per header/footer
+    pdf_layout = business_plan_json.get('pdf_layout', {})
+    header_info = pdf_layout.get('header', {})
+    footer_info = pdf_layout.get('footer', {})
+    confidenzialita = pdf_layout.get('confidenzialita', 'pubblico')
+    
     # Crea il documento PDF
     doc = SimpleDocTemplate(
         str(output_path),
         pagesize=A4,
         rightMargin=2*cm,
         leftMargin=2*cm,
-        topMargin=2.5*cm,
-        bottomMargin=2*cm
+        topMargin=3*cm,
+        bottomMargin=2.5*cm
     )
     
-    # Stili
+    # Crea le funzioni callback per header/footer
+    on_first_page, on_later_pages = create_numbered_canvas(
+        header_info.get('left', ''),
+        header_info.get('right', ''),
+        footer_info.get('left', ''),
+        footer_info.get('center', ''),
+        footer_info.get('right', ''),
+        confidenzialita
+    )
+    
+    # Assegna i callback
+    doc.onFirstPage = on_first_page
+    doc.onLaterPages = on_later_pages
+    
+    # Stili con font professionali (Times New Roman)
     styles = getSampleStyleSheet()
     
-    # Stili personalizzati
+    # Stili personalizzati con Times-Roman per aspetto formale
+    styles.add(ParagraphStyle(
+        name='CoverTitle',
+        parent=styles['Heading1'],
+        fontName='Times-Bold',
+        fontSize=28,
+        textColor=colors.HexColor('#000000'),
+        spaceAfter=20,
+        alignment=TA_CENTER,
+        leading=34
+    ))
+    
+    styles.add(ParagraphStyle(
+        name='CoverSubtitle',
+        parent=styles['Heading2'],
+        fontName='Times-Roman',
+        fontSize=16,
+        textColor=colors.HexColor('#333333'),
+        spaceAfter=30,
+        alignment=TA_CENTER,
+        leading=20
+    ))
+    
     styles.add(ParagraphStyle(
         name='CustomTitle',
         parent=styles['Heading1'],
+        fontName='Times-Bold',
         fontSize=24,
-        textColor=colors.HexColor('#1a1a1a'),
+        textColor=colors.HexColor('#000000'),
         spaceAfter=30,
         alignment=TA_CENTER
     ))
@@ -200,41 +297,160 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
     styles.add(ParagraphStyle(
         name='CustomHeading1',
         parent=styles['Heading1'],
+        fontName='Times-Bold',
         fontSize=18,
-        textColor=colors.HexColor('#2c3e50'),
+        textColor=colors.HexColor('#000000'),
         spaceAfter=12,
-        spaceBefore=12
+        spaceBefore=16,
+        leading=22
     ))
     
     styles.add(ParagraphStyle(
         name='CustomHeading2',
         parent=styles['Heading2'],
+        fontName='Times-Bold',
         fontSize=14,
-        textColor=colors.HexColor('#34495e'),
+        textColor=colors.HexColor('#1a1a1a'),
         spaceAfter=8,
-        spaceBefore=8
+        spaceBefore=12,
+        leading=18
+    ))
+    
+    styles.add(ParagraphStyle(
+        name='Normal',
+        parent=styles['Normal'],
+        fontName='Times-Roman',
+        fontSize=11,
+        textColor=colors.HexColor('#000000'),
+        leading=14,
+        alignment=TA_JUSTIFY
+    ))
+    
+    styles.add(ParagraphStyle(
+        name='TOCEntry',
+        parent=styles['Normal'],
+        fontName='Times-Roman',
+        fontSize=11,
+        leftIndent=0,
+        spaceAfter=6
+    ))
+    
+    styles.add(ParagraphStyle(
+        name='TOCHeading',
+        parent=styles['Heading1'],
+        fontName='Times-Bold',
+        fontSize=16,
+        textColor=colors.HexColor('#000000'),
+        spaceAfter=20,
+        alignment=TA_CENTER
     ))
     
     # Story (contenuto del PDF)
     story = []
     
-    # Header e titolo
-    pdf_layout = business_plan_json.get('pdf_layout', {})
+    # === COPERTINA PROFESSIONALE ===
     titolo = pdf_layout.get('titolo_documento', 'Business Plan')
     sottotitolo = pdf_layout.get('sottotitolo', '')
     
-    story.append(Spacer(1, 1*cm))
-    story.append(Paragraph(titolo, styles['CustomTitle']))
+    story.append(Spacer(1, 4*cm))
+    story.append(Paragraph(titolo, styles['CoverTitle']))
     if sottotitolo:
+        story.append(Spacer(1, 0.5*cm))
+        story.append(Paragraph(sottotitolo, styles['CoverSubtitle']))
+    
+    story.append(Spacer(1, 3*cm))
+    
+    # Informazioni aziendali se disponibili
+    data = business_plan_json.get('data', {})
+    company_name = data.get('company_name', '')
+    if company_name:
+        story.append(Paragraph(f"<b>{company_name}</b>", styles['CoverSubtitle']))
         story.append(Spacer(1, 0.3*cm))
-        story.append(Paragraph(sottotitolo, styles['Heading2']))
-    story.append(Spacer(1, 0.5*cm))
     
     # Data generazione
     meta = business_plan_json.get('meta', {})
     data_gen = meta.get('data_generazione', datetime.now().strftime('%d/%m/%Y'))
-    story.append(Paragraph(f"<i>Generato il: {data_gen}</i>", styles['Normal']))
-    story.append(Spacer(1, 1*cm))
+    story.append(Spacer(1, 2*cm))
+    story.append(Paragraph(f"<i>Documento generato il {data_gen}</i>", styles['Normal']))
+    
+    # Versione
+    versione = meta.get('versione', '1.0')
+    story.append(Paragraph(f"<i>Versione {versione}</i>", styles['Normal']))
+    
+    # Confidenzialità
+    if confidenzialita and confidenzialita != 'pubblico':
+        story.append(Spacer(1, 1*cm))
+        conf_text = "CONFIDENZIALE" if confidenzialita == 'confidenziale' else "USO INTERNO"
+        story.append(Paragraph(f"<b>{conf_text}</b>", styles['CustomHeading2']))
+    
+    story.append(PageBreak())
+    
+    # === INDICE ===
+    story.append(Paragraph("INDICE", styles['TOCHeading']))
+    story.append(Spacer(1, 0.5*cm))
+    
+    # Costruisci l'indice dai capitoli
+    narrative = business_plan_json.get('narrative', {})
+    chapters = narrative.get('chapters', [])
+    chapter_order = pdf_layout.get('chapter_order', [])
+    
+    if chapter_order:
+        chapters_dict = {ch['id']: ch for ch in chapters}
+        ordered_chapters = [chapters_dict.get(ch_id) for ch_id in chapter_order if ch_id in chapters_dict]
+        for ch in chapters:
+            if ch['id'] not in chapter_order:
+                ordered_chapters.append(ch)
+        chapters = ordered_chapters
+    
+    toc_entries = []
+    page_num = 3  # Inizia dopo copertina e indice
+    
+    # Executive Summary
+    exec_summary = business_plan_json.get('executive_summary', {})
+    if exec_summary:
+        toc_entries.append(("Executive Summary", page_num))
+        page_num += 1
+    
+    # Capitoli
+    for chapter in chapters:
+        titolo_ch = chapter.get('titolo', '')
+        if titolo_ch:
+            toc_entries.append((titolo_ch, page_num))
+            page_num += 1
+    
+    # Assunzioni
+    assumptions = business_plan_json.get('assumptions', [])
+    if assumptions:
+        toc_entries.append(("Assunzioni", page_num))
+        page_num += 1
+    
+    # Dati Mancanti
+    dati_mancanti = business_plan_json.get('dati_mancanti', [])
+    if dati_mancanti:
+        toc_entries.append(("Dati Mancanti", page_num))
+        page_num += 1
+    
+    # Disclaimer
+    disclaimer = business_plan_json.get('disclaimer', '')
+    if disclaimer:
+        toc_entries.append(("Disclaimer", page_num))
+    
+    # Aggiungi voci indice
+    for entry_title, entry_page in toc_entries:
+        # Crea una tabella per allineare titolo e numero pagina
+        toc_table = Table([[entry_title, str(entry_page)]], colWidths=[14*cm, 2*cm])
+        toc_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (0, 0), 'Times-Roman'),
+            ('FONTSIZE', (0, 0), (-1, -1), 11),
+            ('ALIGN', (0, 0), (0, 0), 'LEFT'),
+            ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ]))
+        story.append(toc_table)
+    
+    story.append(PageBreak())
     
     # Executive Summary
     exec_summary = business_plan_json.get('executive_summary', {})
@@ -285,40 +501,31 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
                 kpi_data.append([nome, valore_str, scenario])
             
             if len(kpi_data) > 1:  # Se ci sono KPI oltre l'header
-                kpi_table = Table(kpi_data)
+                kpi_table = Table(kpi_data, colWidths=[6*cm, 4*cm, 4*cm])
                 kpi_table.setStyle(TableStyle([
-                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f7f7f8')),
-                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor('#111111')),
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c3e50')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
                     ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                    ('FONTSIZE', (0, 0), (-1, 0), 12),
+                    ('ALIGN', (1, 0), (2, -1), 'RIGHT'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Times-Bold'),
+                    ('FONTNAME', (0, 1), (-1, -1), 'Times-Roman'),
+                    ('FONTSIZE', (0, 0), (-1, 0), 11),
                     ('FONTSIZE', (0, 1), (-1, -1), 10),
-                    ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-                    ('TOPPADDING', (0, 0), (-1, 0), 8),
-                    ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#e6e6e6')),
-                    ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                    ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+                    ('TOPPADDING', (0, 0), (-1, 0), 10),
+                    ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
+                    ('TOPPADDING', (0, 1), (-1, -1), 6),
+                    ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                    ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f9f9f9')]),
                 ]))
                 story.append(kpi_table)
         
         story.append(Spacer(1, 0.5*cm))
         story.append(PageBreak())
     
-    # Capitoli narrativi
-    narrative = business_plan_json.get('narrative', {})
-    chapters = narrative.get('chapters', [])
-    
-    # Ordine dei capitoli dal pdf_layout
-    chapter_order = pdf_layout.get('chapter_order', [])
-    
-    # Se c'è un ordine specificato, usalo, altrimenti usa l'ordine naturale
-    if chapter_order:
-        chapters_dict = {ch['id']: ch for ch in chapters}
-        ordered_chapters = [chapters_dict.get(ch_id) for ch_id in chapter_order if ch_id in chapters_dict]
-        # Aggiungi capitoli non nell'ordine
-        for ch in chapters:
-            if ch['id'] not in chapter_order:
-                ordered_chapters.append(ch)
-        chapters = ordered_chapters
+    # === CAPITOLI NARRATIVI ===
+    # (chapters già ordinati sopra)
     
     # Crea un dizionario dei grafici per accesso rapido
     charts_dict = {chart['id']: chart for chart in business_plan_json.get('charts', [])}
@@ -385,10 +592,64 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
     disclaimer = business_plan_json.get('disclaimer', '')
     if disclaimer:
         story.append(PageBreak())
-        story.append(Paragraph("DISCLAIMER", styles['CustomHeading1']))
+        story.append(Paragraph("DISCLAIMER E NOTE LEGALI", styles['CustomHeading1']))
         story.append(Spacer(1, 0.3*cm))
         disclaimer_clean = disclaimer.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
         story.append(Paragraph(disclaimer_clean, styles['Normal']))
+        story.append(Spacer(1, 0.5*cm))
+        
+        # Note legali aggiuntive
+        note_legali = """
+        <b>Note Legali:</b><br/><br/>
+        Questo documento è stato generato automaticamente mediante intelligenza artificiale. 
+        Le informazioni contenute sono basate sui dati forniti dall'utente e su assunzioni 
+        esplicitate nel documento. Si raccomanda di:<br/><br/>
+        • Verificare tutti i dati finanziari e le proiezioni con un consulente fiscale o commercialista abilitato<br/>
+        • Verificare la conformità normativa con un consulente legale specializzato<br/>
+        • Validare le assunzioni di mercato con ricerche di mercato approfondite<br/>
+        • Aggiornare regolarmente il documento con dati reali man mano che diventano disponibili<br/><br/>
+        Il presente documento non costituisce consulenza finanziaria, legale o fiscale. 
+        L'utilizzo delle informazioni contenute è a proprio rischio e pericolo.
+        """
+        story.append(Paragraph(note_legali, styles['Normal']))
+    
+    # Pagina di firma/approvazione
+    story.append(PageBreak())
+    story.append(Spacer(1, 2*cm))
+    story.append(Paragraph("APPROVAZIONE E FIRMA", styles['CustomHeading1']))
+    story.append(Spacer(1, 1*cm))
+    
+    firma_text = f"""
+    Il presente Business Plan è stato redatto in data {data_gen} e approvato da:
+    """
+    story.append(Paragraph(firma_text, styles['Normal']))
+    story.append(Spacer(1, 2*cm))
+    
+    # Tabella firme
+    if company_name:
+        firma_table = Table([
+            ['Preparato da:', ''],
+            ['', ''],
+            ['', ''],
+            ['Firma:', ''],
+            ['', ''],
+            ['', ''],
+            ['Approvato da:', ''],
+            ['', ''],
+            ['', ''],
+            ['Firma:', ''],
+        ], colWidths=[8*cm, 8*cm])
+        firma_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Times-Roman'),
+            ('FONTSIZE', (0, 0), (-1, -1), 11),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('VALIGN', (0, 0), (-1, -1), 'BOTTOM'),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
+            ('LINEBELOW', (0, 2), (1, 2), 1, colors.black),
+            ('LINEBELOW', (0, 5), (1, 5), 1, colors.black),
+            ('LINEBELOW', (0, 9), (1, 9), 1, colors.black),
+        ]))
+        story.append(firma_table)
     
     # Genera il PDF
     doc.build(story)

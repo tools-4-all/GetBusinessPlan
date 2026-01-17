@@ -12,7 +12,7 @@ from pathlib import Path
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from pdf_generator import markdown_to_paragraphs, create_chart_image
+from pdf_generator import markdown_to_paragraphs, create_chart_image, create_numbered_canvas
 
 async def create_pdf_from_market_analysis(market_analysis_json: dict) -> str:
     """Crea il PDF professionale dall'analisi di mercato"""
@@ -23,25 +23,67 @@ async def create_pdf_from_market_analysis(market_analysis_json: dict) -> str:
     
     output_path = output_dir / "analisi-mercato.pdf"
     
+    # Estrai informazioni per header/footer
+    header_info = {'left': '', 'right': ''}
+    footer_info = {'left': '', 'center': 'Analisi di Mercato', 'right': ''}
+    confidenzialita = 'pubblico'
+    
     # Crea il documento PDF
     doc = SimpleDocTemplate(
         str(output_path),
         pagesize=A4,
         rightMargin=2*cm,
         leftMargin=2*cm,
-        topMargin=2.5*cm,
-        bottomMargin=2*cm
+        topMargin=3*cm,
+        bottomMargin=2.5*cm
     )
     
-    # Stili
+    # Crea le funzioni callback per header/footer
+    on_first_page, on_later_pages = create_numbered_canvas(
+        header_info.get('left', ''),
+        header_info.get('right', ''),
+        footer_info.get('left', ''),
+        footer_info.get('center', ''),
+        footer_info.get('right', ''),
+        confidenzialita
+    )
+    
+    # Assegna i callback
+    doc.onFirstPage = on_first_page
+    doc.onLaterPages = on_later_pages
+    
+    # Stili con font professionali (Times New Roman)
     styles = getSampleStyleSheet()
     
     # Stili personalizzati
     styles.add(ParagraphStyle(
+        name='CoverTitle',
+        parent=styles['Heading1'],
+        fontName='Times-Bold',
+        fontSize=28,
+        textColor=colors.HexColor('#000000'),
+        spaceAfter=20,
+        alignment=TA_CENTER,
+        leading=34
+    ))
+    
+    styles.add(ParagraphStyle(
+        name='CoverSubtitle',
+        parent=styles['Heading2'],
+        fontName='Times-Roman',
+        fontSize=16,
+        textColor=colors.HexColor('#333333'),
+        spaceAfter=30,
+        alignment=TA_CENTER,
+        leading=20
+    ))
+    
+    styles.add(ParagraphStyle(
         name='CustomTitle',
         parent=styles['Heading1'],
+        fontName='Times-Bold',
         fontSize=24,
-        textColor=colors.HexColor('#1a1a1a'),
+        textColor=colors.HexColor('#000000'),
         spaceAfter=30,
         alignment=TA_CENTER
     ))
@@ -49,43 +91,119 @@ async def create_pdf_from_market_analysis(market_analysis_json: dict) -> str:
     styles.add(ParagraphStyle(
         name='CustomHeading1',
         parent=styles['Heading1'],
+        fontName='Times-Bold',
         fontSize=18,
-        textColor=colors.HexColor('#2c3e50'),
+        textColor=colors.HexColor('#000000'),
         spaceAfter=12,
-        spaceBefore=12
+        spaceBefore=16,
+        leading=22
     ))
     
     styles.add(ParagraphStyle(
         name='CustomHeading2',
         parent=styles['Heading2'],
+        fontName='Times-Bold',
         fontSize=14,
-        textColor=colors.HexColor('#34495e'),
+        textColor=colors.HexColor('#1a1a1a'),
         spaceAfter=8,
-        spaceBefore=8
+        spaceBefore=12,
+        leading=18
+    ))
+    
+    styles.add(ParagraphStyle(
+        name='Normal',
+        parent=styles['Normal'],
+        fontName='Times-Roman',
+        fontSize=11,
+        textColor=colors.HexColor('#000000'),
+        leading=14,
+        alignment=TA_JUSTIFY
     ))
     
     # Story (contenuto del PDF)
     story = []
     
-    # Header e titolo
+    # === COPERTINA PROFESSIONALE ===
     meta = market_analysis_json.get('meta', {})
     titolo = f"Analisi di Mercato {meta.get('tipo_analisi', '').upper() if meta.get('tipo_analisi') == 'deep' else ''}"
     settore = meta.get('settore', '')
     area_geografica = meta.get('area_geografica', '')
     
-    story.append(Spacer(1, 1*cm))
-    story.append(Paragraph(titolo, styles['CustomTitle']))
+    story.append(Spacer(1, 4*cm))
+    story.append(Paragraph(titolo, styles['CoverTitle']))
     if settore:
-        story.append(Spacer(1, 0.3*cm))
-        story.append(Paragraph(settore, styles['Heading2']))
+        story.append(Spacer(1, 0.5*cm))
+        story.append(Paragraph(settore, styles['CoverSubtitle']))
     if area_geografica:
-        story.append(Paragraph(f"Area: {area_geografica}", styles['Normal']))
-    story.append(Spacer(1, 0.5*cm))
+        story.append(Spacer(1, 0.3*cm))
+        story.append(Paragraph(f"Area Geografica: {area_geografica}", styles['CoverSubtitle']))
+    
+    story.append(Spacer(1, 3*cm))
     
     # Data generazione
     data_gen = meta.get('data_generazione', datetime.now().strftime('%d/%m/%Y'))
-    story.append(Paragraph(f"<i>Generato il: {data_gen}</i>", styles['Normal']))
-    story.append(Spacer(1, 1*cm))
+    story.append(Paragraph(f"<i>Documento generato il {data_gen}</i>", styles['Normal']))
+    
+    story.append(PageBreak())
+    
+    # === INDICE ===
+    story.append(Paragraph("INDICE", styles['CustomTitle']))
+    story.append(Spacer(1, 0.5*cm))
+    
+    toc_entries = []
+    page_num = 3
+    
+    exec_summary = market_analysis_json.get('executive_summary', {})
+    if exec_summary:
+        toc_entries.append(("Executive Summary", page_num))
+        page_num += 1
+    
+    if market_analysis_json.get('market_size'):
+        toc_entries.append(("Dimensioni del Mercato", page_num))
+        page_num += 1
+    
+    if market_analysis_json.get('competitor_analysis'):
+        toc_entries.append(("Analisi Competitor", page_num))
+        page_num += 1
+    
+    if market_analysis_json.get('trends_opportunities'):
+        toc_entries.append(("Trend e Opportunità", page_num))
+        page_num += 1
+    
+    if market_analysis_json.get('swot_analysis'):
+        toc_entries.append(("Analisi SWOT", page_num))
+        page_num += 1
+    
+    if market_analysis_json.get('positioning_strategy'):
+        toc_entries.append(("Strategia di Posizionamento", page_num))
+        page_num += 1
+    
+    if market_analysis_json.get('charts'):
+        toc_entries.append(("Grafici", page_num))
+        page_num += 1
+    
+    if market_analysis_json.get('sources'):
+        toc_entries.append(("Fonti", page_num))
+        page_num += 1
+    
+    if market_analysis_json.get('assumptions'):
+        toc_entries.append(("Assunzioni", page_num))
+    
+    # Aggiungi voci indice
+    for entry_title, entry_page in toc_entries:
+        toc_table = Table([[entry_title, str(entry_page)]], colWidths=[14*cm, 2*cm])
+        toc_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Times-Roman'),
+            ('FONTSIZE', (0, 0), (-1, -1), 11),
+            ('ALIGN', (0, 0), (0, 0), 'LEFT'),
+            ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ]))
+        story.append(toc_table)
+    
+    story.append(PageBreak())
     
     # Executive Summary
     exec_summary = market_analysis_json.get('executive_summary', {})
@@ -346,6 +464,44 @@ async def create_pdf_from_market_analysis(market_analysis_json: dict) -> str:
             ass_clean = ass.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
             story.append(Paragraph(f"• {ass_clean}", styles['Normal']))
             story.append(Spacer(1, 0.2*cm))
+    
+    # Pagina di firma/approvazione
+    story.append(PageBreak())
+    story.append(Spacer(1, 2*cm))
+    story.append(Paragraph("APPROVAZIONE E FIRMA", styles['CustomHeading1']))
+    story.append(Spacer(1, 1*cm))
+    
+    data_gen = meta.get('data_generazione', datetime.now().strftime('%d/%m/%Y'))
+    firma_text = f"""
+    Il presente documento di Analisi di Mercato è stato redatto in data {data_gen} e approvato da:
+    """
+    story.append(Paragraph(firma_text, styles['Normal']))
+    story.append(Spacer(1, 2*cm))
+    
+    # Tabella firme
+    firma_table = Table([
+        ['Preparato da:', ''],
+        ['', ''],
+        ['', ''],
+        ['Firma:', ''],
+        ['', ''],
+        ['', ''],
+        ['Approvato da:', ''],
+        ['', ''],
+        ['', ''],
+        ['Firma:', ''],
+    ], colWidths=[8*cm, 8*cm])
+    firma_table.setStyle(TableStyle([
+        ('FONTNAME', (0, 0), (-1, -1), 'Times-Roman'),
+        ('FONTSIZE', (0, 0), (-1, -1), 11),
+        ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+        ('VALIGN', (0, 0), (-1, -1), 'BOTTOM'),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
+        ('LINEBELOW', (0, 2), (1, 2), 1, colors.black),
+        ('LINEBELOW', (0, 5), (1, 5), 1, colors.black),
+        ('LINEBELOW', (0, 9), (1, 9), 1, colors.black),
+    ]))
+    story.append(firma_table)
     
     # Genera il PDF
     doc.build(story)
