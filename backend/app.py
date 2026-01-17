@@ -445,6 +445,27 @@ async def generate_pdf(request: PDFRequest):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/api/generate-pdf-analysis")
+async def generate_pdf_analysis(request: PDFAnalysisRequest):
+    """Genera PDF dall'analisi di mercato"""
+    try:
+        print("=== INIZIO GENERAZIONE PDF ANALISI DI MERCATO ===")
+        output_path = await pdf_generator_analysis.create_pdf_from_market_analysis(request.marketAnalysisJson)
+        
+        if not Path(output_path).exists():
+            raise HTTPException(status_code=500, detail="File PDF non generato correttamente")
+        
+        return FileResponse(
+            path=output_path,
+            media_type="application/pdf",
+            filename="analisi-mercato.pdf"
+        )
+    except Exception as e:
+        print(f"Errore nella generazione PDF analisi: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Errore generazione PDF: {str(e)}")
+
 @app.post("/api/generate-full")
 async def generate_full(request: BusinessPlanRequest):
     """Genera sia il JSON che il PDF in un'unica chiamata"""
