@@ -1324,6 +1324,17 @@ section {
     border: 1px solid var(--border-light);
 }
 
+#analysisContent {
+    background: var(--bg-primary);
+    padding: 40px;
+    border-radius: var(--radius-lg);
+    margin-bottom: 32px;
+    max-height: 80vh;
+    overflow-y: auto;
+    border: 1px solid var(--border-light);
+    box-shadow: var(--shadow-sm);
+}
+
 #planContent h4 {
     margin-top: 32px;
     margin-bottom: 12px;
@@ -1504,4 +1515,364 @@ html {
 ::selection {
     background: var(--primary);
     color: white;
+}
+
+/* Market Analysis Output Styles */
+.analysis-output {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 0;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    line-height: 1.7;
+    color: var(--text-primary);
+}
+
+.analysis-header {
+    text-align: center;
+    margin-bottom: 48px;
+    padding-bottom: 32px;
+    border-bottom: 3px solid var(--primary);
+}
+
+.analysis-header h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--primary);
+    margin: 0 0 12px 0;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+}
+
+.analysis-header h2 {
+    font-size: 1.5rem;
+    font-weight: 400;
+    color: var(--text-secondary);
+    margin: 0 0 8px 0;
+}
+
+.analysis-header .meta-info {
+    color: var(--text-tertiary);
+    font-size: 0.9rem;
+    margin-top: 12px;
+}
+
+.analysis-section {
+    margin: 48px 0;
+    padding: 32px 0;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.analysis-section:last-child {
+    border-bottom: none;
+}
+
+.analysis-section h3 {
+    font-size: 1.75rem;
+    font-weight: 600;
+    color: var(--primary);
+    margin: 0 0 24px 0;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--primary);
+    letter-spacing: -0.01em;
+}
+
+.analysis-section h4 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 32px 0 16px 0;
+    letter-spacing: -0.01em;
+}
+
+.analysis-section h5 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 20px 0 12px 0;
+}
+
+.analysis-section p {
+    color: var(--text-secondary);
+    line-height: 1.8;
+    margin-bottom: 16px;
+    font-size: 15px;
+}
+
+.analysis-section ul,
+.analysis-section ol {
+    margin: 16px 0;
+    padding-left: 32px;
+    color: var(--text-secondary);
+}
+
+.analysis-section li {
+    margin-bottom: 12px;
+    line-height: 1.7;
+}
+
+.analysis-section strong {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.analysis-card {
+    background: var(--bg-secondary);
+    padding: 24px;
+    border-radius: var(--radius-md);
+    margin: 20px 0;
+    border: 1px solid var(--border-light);
+    transition: all 0.2s;
+}
+
+.analysis-card:hover {
+    border-color: var(--border);
+    box-shadow: var(--shadow-sm);
+}
+
+.analysis-card h4 {
+    margin-top: 0;
+    color: var(--primary);
+}
+
+.analysis-info-box {
+    background: var(--bg-secondary);
+    padding: 20px;
+    border-radius: var(--radius-md);
+    margin: 16px 0;
+    border-left: 4px solid var(--primary);
+}
+
+.analysis-info-box h4 {
+    margin-top: 0;
+    margin-bottom: 12px;
+}
+
+.analysis-info-box p {
+    margin-bottom: 8px;
+}
+
+.analysis-info-box p:last-child {
+    margin-bottom: 0;
+}
+
+.competitor-card {
+    background: var(--bg-secondary);
+    padding: 20px;
+    border-radius: var(--radius-md);
+    margin: 16px 0;
+    border-left: 4px solid var(--accent);
+    transition: all 0.2s;
+}
+
+.competitor-card.diretto {
+    border-left-color: #ef4444;
+}
+
+.competitor-card.indiretto {
+    border-left-color: #f59e0b;
+}
+
+.competitor-card:hover {
+    box-shadow: var(--shadow-sm);
+    transform: translateX(4px);
+}
+
+.competitor-card h4 {
+    margin-top: 0;
+    margin-bottom: 12px;
+}
+
+.competitor-card .competitor-type {
+    color: var(--text-tertiary);
+    font-size: 0.9rem;
+    font-weight: 400;
+}
+
+.trend-card {
+    background: var(--bg-secondary);
+    padding: 20px;
+    border-radius: var(--radius-md);
+    margin: 12px 0;
+    border: 1px solid var(--border-light);
+    transition: all 0.2s;
+}
+
+.trend-card:hover {
+    border-color: var(--border);
+    box-shadow: var(--shadow-sm);
+}
+
+.trend-card h5 {
+    margin-top: 0;
+    margin-bottom: 12px;
+}
+
+.trend-impact {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    margin-left: 8px;
+}
+
+.trend-impact.alto {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.trend-impact.medio {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.trend-impact.basso {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.trend-source {
+    font-size: 0.9rem;
+    color: var(--text-tertiary);
+    font-style: italic;
+    margin-top: 8px;
+}
+
+.swot-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+    margin: 24px 0;
+}
+
+.swot-box {
+    padding: 24px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-light);
+}
+
+.swot-box h4 {
+    margin-top: 0;
+    margin-bottom: 16px;
+    font-size: 1.1rem;
+}
+
+.swot-box.strengths {
+    background: #dcfce7;
+    border-color: #16a34a;
+}
+
+.swot-box.strengths h4 {
+    color: #16a34a;
+}
+
+.swot-box.weaknesses {
+    background: #fee2e2;
+    border-color: #dc2626;
+}
+
+.swot-box.weaknesses h4 {
+    color: #dc2626;
+}
+
+.swot-box.opportunities {
+    background: #dbeafe;
+    border-color: #2563eb;
+}
+
+.swot-box.opportunities h4 {
+    color: #2563eb;
+}
+
+.swot-box.threats {
+    background: #fef3c7;
+    border-color: #d97706;
+}
+
+.swot-box.threats h4 {
+    color: #d97706;
+}
+
+.swot-box ul {
+    margin: 0;
+    padding-left: 24px;
+}
+
+.swot-box li {
+    margin-bottom: 12px;
+}
+
+.swot-box li strong {
+    display: block;
+    margin-bottom: 4px;
+}
+
+.sources-list {
+    list-style: none;
+    padding-left: 0;
+}
+
+.sources-list li {
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.sources-list li:last-child {
+    border-bottom: none;
+}
+
+.sources-list a {
+    color: var(--accent);
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.sources-list a:hover {
+    color: var(--accent-hover);
+    text-decoration: underline;
+}
+
+.charts-container {
+    margin: 32px 0;
+    padding: 24px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-light);
+}
+
+.charts-container h3 {
+    margin-top: 0;
+}
+
+.chart-wrapper {
+    margin: 32px 0;
+    padding: 20px;
+    background: white;
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-xs);
+}
+
+@media (max-width: 768px) {
+    .analysis-header h1 {
+        font-size: 2rem;
+    }
+
+    .analysis-header h2 {
+        font-size: 1.25rem;
+    }
+
+    .analysis-section h3 {
+        font-size: 1.5rem;
+    }
+
+    .swot-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .analysis-card,
+    .analysis-info-box,
+    .competitor-card,
+    .trend-card {
+        padding: 16px;
+    }
 }

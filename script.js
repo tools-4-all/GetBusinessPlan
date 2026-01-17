@@ -3251,7 +3251,7 @@ async function generateAnalysisWithAI(data) {
 
 // Converte il JSON dell'analisi di mercato in HTML per la visualizzazione
 function convertMarketAnalysisJSONToHTML(analysisData) {
-    let html = '';
+    let html = '<div class="analysis-output">';
     
     // Helper per escape HTML
     const escape = (str) => String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -3265,30 +3265,36 @@ function convertMarketAnalysisJSONToHTML(analysisData) {
     
     // Meta info
     const meta = analysisData.meta || {};
-    html += `<div style="text-align: center; margin-bottom: 40px; border-bottom: 3px solid #2563eb; padding-bottom: 20px;">`;
-    html += `<h1 style="color: #2563eb; font-size: 2.5rem; margin: 0 0 10px 0;">Analisi di Mercato ${meta.tipo_analisi === 'deep' ? 'Approfondita' : ''}</h1>`;
+    html += `<div class="analysis-header">`;
+    html += `<h1>Analisi di Mercato ${meta.tipo_analisi === 'deep' ? 'Approfondita' : ''}</h1>`;
     if (meta.settore) {
-        html += `<h2 style="color: #64748b; font-size: 1.5rem; margin: 0; font-weight: 400;">${escape(meta.settore)}</h2>`;
+        html += `<h2>${escape(meta.settore)}</h2>`;
     }
-    if (meta.area_geografica) {
-        html += `<p style="color: #64748b; margin-top: 10px;">Area Geografica: ${escape(meta.area_geografica)}</p>`;
-    }
-    if (meta.data_generazione) {
-        html += `<p style="color: #64748b; font-size: 0.9rem; margin-top: 5px;">Generato il: ${escape(meta.data_generazione)}</p>`;
+    if (meta.area_geografica || meta.data_generazione) {
+        html += `<div class="meta-info">`;
+        if (meta.area_geografica) {
+            html += `<span>Area Geografica: ${escape(meta.area_geografica)}</span>`;
+        }
+        if (meta.data_generazione) {
+            html += `<span>Generato il: ${escape(meta.data_generazione)}</span>`;
+        }
+        html += `</div>`;
     }
     html += `</div>`;
     
     // Executive Summary
     if (analysisData.executive_summary) {
         const exec = analysisData.executive_summary;
-        html += `<h3 style="color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px; margin-top: 30px;">Executive Summary</h3>`;
+        html += `<div class="analysis-section">`;
+        html += `<h3>Executive Summary</h3>`;
         
         if (exec.sintesi) {
-            html += `<div style="margin: 20px 0;">${markdownToHTML(exec.sintesi)}</div>`;
+            html += `<div class="analysis-card">${markdownToHTML(exec.sintesi)}</div>`;
         }
         
         if (exec.punti_chiave && exec.punti_chiave.length > 0) {
-            html += `<h4>Punti Chiave</h4><ul>`;
+            html += `<h4>Punti Chiave</h4>`;
+            html += `<ul>`;
             exec.punti_chiave.forEach(punto => {
                 html += `<li>${escape(punto)}</li>`;
             });
@@ -3296,66 +3302,71 @@ function convertMarketAnalysisJSONToHTML(analysisData) {
         }
         
         if (exec.raccomandazioni && exec.raccomandazioni.length > 0) {
-            html += `<h4>Raccomandazioni Principali</h4><ol>`;
+            html += `<h4>Raccomandazioni Principali</h4>`;
+            html += `<ol>`;
             exec.raccomandazioni.forEach(rec => {
                 html += `<li>${escape(rec)}</li>`;
             });
             html += `</ol>`;
         }
+        html += `</div>`;
     }
     
     // Market Size
     if (analysisData.market_size) {
         const ms = analysisData.market_size;
-        html += `<h3 style="color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px; margin-top: 30px;">Dimensioni del Mercato</h3>`;
+        html += `<div class="analysis-section">`;
+        html += `<h3>Dimensioni del Mercato</h3>`;
         
         if (ms.tam) {
-            html += `<div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin: 15px 0;">`;
+            html += `<div class="analysis-info-box">`;
             html += `<h4>TAM (Total Addressable Market)</h4>`;
             html += `<p><strong>Valore:</strong> ${formatCurrency(ms.tam.valore, ms.tam.unita)}</p>`;
             if (ms.tam.fonte) html += `<p><strong>Fonte:</strong> ${escape(ms.tam.fonte)} (${escape(ms.tam.anno || 'N/A')})</p>`;
-            if (ms.tam.descrizione) html += `<p>${markdownToHTML(ms.tam.descrizione)}</p>`;
+            if (ms.tam.descrizione) html += `<div>${markdownToHTML(ms.tam.descrizione)}</div>`;
             html += `</div>`;
         }
         
         if (ms.sam) {
-            html += `<div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin: 15px 0;">`;
+            html += `<div class="analysis-info-box">`;
             html += `<h4>SAM (Serviceable Addressable Market)</h4>`;
             html += `<p><strong>Valore:</strong> ${formatCurrency(ms.sam.valore, ms.sam.unita)}</p>`;
             if (ms.sam.fonte) html += `<p><strong>Fonte:</strong> ${escape(ms.sam.fonte)} (${escape(ms.sam.anno || 'N/A')})</p>`;
-            if (ms.sam.descrizione) html += `<p>${markdownToHTML(ms.sam.descrizione)}</p>`;
+            if (ms.sam.descrizione) html += `<div>${markdownToHTML(ms.sam.descrizione)}</div>`;
             html += `</div>`;
         }
         
         if (ms.som) {
-            html += `<div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin: 15px 0;">`;
+            html += `<div class="analysis-info-box">`;
             html += `<h4>SOM (Serviceable Obtainable Market)</h4>`;
             html += `<p><strong>Valore:</strong> ${formatCurrency(ms.som.valore, ms.som.unita)}</p>`;
             if (ms.som.fonte) html += `<p><strong>Fonte:</strong> ${escape(ms.som.fonte)} (${escape(ms.som.anno || 'N/A')})</p>`;
-            if (ms.som.descrizione) html += `<p>${markdownToHTML(ms.som.descrizione)}</p>`;
+            if (ms.som.descrizione) html += `<div>${markdownToHTML(ms.som.descrizione)}</div>`;
             html += `</div>`;
         }
         
         if (ms.trend_crescita) {
-            html += `<div style="margin: 15px 0;">`;
+            html += `<div class="analysis-card">`;
             html += `<h4>Trend di Crescita</h4>`;
             html += `<p><strong>Tasso di crescita annuale:</strong> ${ms.trend_crescita.tasso_crescita_annuale}%</p>`;
             html += `<p><strong>Periodo:</strong> ${escape(ms.trend_crescita.periodo || 'N/A')}</p>`;
             if (ms.trend_crescita.fonte) html += `<p><strong>Fonte:</strong> ${escape(ms.trend_crescita.fonte)}</p>`;
-            if (ms.trend_crescita.descrizione) html += `<p>${markdownToHTML(ms.trend_crescita.descrizione)}</p>`;
+            if (ms.trend_crescita.descrizione) html += `<div>${markdownToHTML(ms.trend_crescita.descrizione)}</div>`;
             html += `</div>`;
         }
+        html += `</div>`;
     }
     
     // Competitor Analysis
     if (analysisData.competitor_analysis) {
         const comp = analysisData.competitor_analysis;
-        html += `<h3 style="color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px; margin-top: 30px;">Analisi Competitor</h3>`;
+        html += `<div class="analysis-section">`;
+        html += `<h3>Analisi Competitor</h3>`;
         
         if (comp.competitor_principali && comp.competitor_principali.length > 0) {
             comp.competitor_principali.forEach((competitor) => {
-                html += `<div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid ${competitor.tipo === 'diretto' ? '#ef4444' : '#f59e0b'};">`;
-                html += `<h4>${escape(competitor.nome)} <span style="color: #64748b; font-size: 0.9rem;">(${competitor.tipo === 'diretto' ? 'Competitor Diretto' : 'Competitor Indiretto'})</span></h4>`;
+                html += `<div class="competitor-card ${competitor.tipo}">`;
+                html += `<h4>${escape(competitor.nome)} <span class="competitor-type">(${competitor.tipo === 'diretto' ? 'Competitor Diretto' : 'Competitor Indiretto'})</span></h4>`;
                 if (competitor.fatturato_stimato) html += `<p><strong>Fatturato stimato:</strong> ${escape(competitor.fatturato_stimato)}</p>`;
                 if (competitor.quote_mercato) html += `<p><strong>Quota di mercato:</strong> ${escape(competitor.quote_mercato)}</p>`;
                 if (competitor.posizionamento) html += `<p><strong>Posizionamento:</strong> ${escape(competitor.posizionamento)}</p>`;
@@ -3374,42 +3385,47 @@ function convertMarketAnalysisJSONToHTML(analysisData) {
                 html += `</div>`;
             });
         }
+        html += `</div>`;
     }
     
     // Trends & Opportunities
     if (analysisData.trends_opportunities) {
         const to = analysisData.trends_opportunities;
-        html += `<h3 style="color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px; margin-top: 30px;">Trend e Opportunità</h3>`;
+        html += `<div class="analysis-section">`;
+        html += `<h3>Trend e Opportunità</h3>`;
         
         if (to.trend_emergenti && to.trend_emergenti.length > 0) {
             html += `<h4>Trend Emergenti</h4>`;
             to.trend_emergenti.forEach(trend => {
-                html += `<div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin: 10px 0;">`;
-                html += `<h5>${escape(trend.titolo)} <span style="color: ${trend.impatto === 'alto' ? '#ef4444' : trend.impatto === 'medio' ? '#f59e0b' : '#10b981'}; font-size: 0.9rem;">(Impatto: ${trend.impatto})</span></h5>`;
-                html += `<p>${markdownToHTML(trend.descrizione)}</p>`;
-                if (trend.fonte) html += `<p style="font-size: 0.9rem; color: #64748b;"><em>Fonte: ${escape(trend.fonte)}</em></p>`;
+                html += `<div class="trend-card">`;
+                html += `<h5>${escape(trend.titolo)} <span class="trend-impact ${trend.impatto}">Impatto: ${trend.impatto}</span></h5>`;
+                html += `<div>${markdownToHTML(trend.descrizione)}</div>`;
+                if (trend.fonte) html += `<p class="trend-source">Fonte: ${escape(trend.fonte)}</p>`;
                 html += `</div>`;
             });
         }
         
         if (to.opportunita && to.opportunita.length > 0) {
-            html += `<h4>Opportunità di Mercato</h4><ul>`;
+            html += `<h4>Opportunità di Mercato</h4>`;
+            html += `<ul>`;
             to.opportunita.forEach(opp => {
                 html += `<li><strong>${escape(opp.titolo)}</strong> (Potenziale: ${opp.potenziale})<br/>${markdownToHTML(opp.descrizione)}</li>`;
             });
             html += `</ul>`;
         }
+        html += `</div>`;
     }
     
     // SWOT Analysis
     if (analysisData.swot_analysis) {
         const swot = analysisData.swot_analysis;
-        html += `<h3 style="color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px; margin-top: 30px;">Analisi SWOT</h3>`;
-        html += `<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0;">`;
+        html += `<div class="analysis-section">`;
+        html += `<h3>Analisi SWOT</h3>`;
+        html += `<div class="swot-grid">`;
         
         // Strengths
-        html += `<div style="background: #dcfce7; padding: 15px; border-radius: 8px;">`;
-        html += `<h4 style="color: #16a34a;">Punti di Forza</h4><ul>`;
+        html += `<div class="swot-box strengths">`;
+        html += `<h4>Punti di Forza</h4><ul>`;
         if (swot.strengths) {
             swot.strengths.forEach(s => {
                 html += `<li><strong>${escape(s.titolo)}</strong><br/>${markdownToHTML(s.descrizione)}</li>`;
@@ -3418,8 +3434,8 @@ function convertMarketAnalysisJSONToHTML(analysisData) {
         html += `</ul></div>`;
         
         // Weaknesses
-        html += `<div style="background: #fee2e2; padding: 15px; border-radius: 8px;">`;
-        html += `<h4 style="color: #dc2626;">Debolezze</h4><ul>`;
+        html += `<div class="swot-box weaknesses">`;
+        html += `<h4>Debolezze</h4><ul>`;
         if (swot.weaknesses) {
             swot.weaknesses.forEach(w => {
                 html += `<li><strong>${escape(w.titolo)}</strong> (Impatto: ${w.impatto})<br/>${markdownToHTML(w.descrizione)}</li>`;
@@ -3428,8 +3444,8 @@ function convertMarketAnalysisJSONToHTML(analysisData) {
         html += `</ul></div>`;
         
         // Opportunities
-        html += `<div style="background: #dbeafe; padding: 15px; border-radius: 8px;">`;
-        html += `<h4 style="color: #2563eb;">Opportunità</h4><ul>`;
+        html += `<div class="swot-box opportunities">`;
+        html += `<h4>Opportunità</h4><ul>`;
         if (swot.opportunities) {
             swot.opportunities.forEach(o => {
                 html += `<li><strong>${escape(o.titolo)}</strong> (Potenziale: ${o.potenziale})<br/>${markdownToHTML(o.descrizione)}</li>`;
@@ -3438,8 +3454,8 @@ function convertMarketAnalysisJSONToHTML(analysisData) {
         html += `</ul></div>`;
         
         // Threats
-        html += `<div style="background: #fef3c7; padding: 15px; border-radius: 8px;">`;
-        html += `<h4 style="color: #d97706;">Minacce</h4><ul>`;
+        html += `<div class="swot-box threats">`;
+        html += `<h4>Minacce</h4><ul>`;
         if (swot.threats) {
             swot.threats.forEach(t => {
                 html += `<li><strong>${escape(t.titolo)}</strong> (Probabilità: ${t.probabilita}, Impatto: ${t.impatto})<br/>${markdownToHTML(t.descrizione)}</li>`;
@@ -3448,50 +3464,60 @@ function convertMarketAnalysisJSONToHTML(analysisData) {
         html += `</ul></div>`;
         
         html += `</div>`;
+        html += `</div>`;
     }
     
     // Positioning Strategy
     if (analysisData.positioning_strategy) {
         const pos = analysisData.positioning_strategy;
-        html += `<h3 style="color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px; margin-top: 30px;">Strategia di Posizionamento</h3>`;
+        html += `<div class="analysis-section">`;
+        html += `<h3>Strategia di Posizionamento</h3>`;
         
         if (pos.posizionamento_raccomandato) {
-            html += `<div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin: 15px 0;">`;
+            html += `<div class="analysis-card">`;
             html += `<h4>Posizionamento Raccomandato</h4>`;
-            html += `<p>${markdownToHTML(pos.posizionamento_raccomandato)}</p>`;
+            html += `<div>${markdownToHTML(pos.posizionamento_raccomandato)}</div>`;
             html += `</div>`;
         }
         
         if (pos.nicchie_mercato && pos.nicchie_mercato.length > 0) {
-            html += `<h4>Nicchie di Mercato</h4><ul>`;
+            html += `<h4>Nicchie di Mercato</h4>`;
+            html += `<ul>`;
             pos.nicchie_mercato.forEach(nicchia => {
                 html += `<li><strong>${escape(nicchia.nicchia)}</strong> (Potenziale: ${nicchia.potenziale})<br/>${markdownToHTML(nicchia.descrizione)}</li>`;
             });
             html += `</ul>`;
         }
+        html += `</div>`;
     }
     
     // Sources
     if (analysisData.sources && analysisData.sources.length > 0) {
-        html += `<h3 style="color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px; margin-top: 30px;">Fonti</h3>`;
-        html += `<ul style="font-size: 0.9rem;">`;
+        html += `<div class="analysis-section">`;
+        html += `<h3>Fonti</h3>`;
+        html += `<ul class="sources-list">`;
         analysisData.sources.forEach(source => {
             html += `<li><strong>${escape(source.titolo)}</strong> (${source.tipo})`;
-            if (source.url) html += ` - <a href="${escape(source.url)}" target="_blank">${escape(source.url)}</a>`;
+            if (source.url) html += ` - <a href="${escape(source.url)}" target="_blank" rel="noopener noreferrer">${escape(source.url)}</a>`;
             if (source.data_accesso) html += ` - Accesso: ${escape(source.data_accesso)}`;
+            if (source.descrizione) html += `<br/><span style="color: var(--text-tertiary); font-size: 0.9rem;">${escape(source.descrizione)}</span>`;
             html += `</li>`;
         });
         html += `</ul>`;
+        html += `</div>`;
     }
     
     // Charts (se presenti)
     if (analysisData.charts && analysisData.charts.length > 0) {
-        html += `<h3 style="color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px; margin-top: 30px;">Grafici</h3>`;
-        html += `<div id="analysis-charts-container"></div>`;
+        html += `<div class="analysis-section">`;
+        html += `<h3>Grafici</h3>`;
+        html += `<div class="charts-container" id="analysis-charts-container"></div>`;
         // I grafici verranno renderizzati con Chart.js dopo il caricamento
         window.analysisChartsData = analysisData.charts;
+        html += `</div>`;
     }
     
+    html += '</div>'; // Close analysis-output
     return html;
 }
 
