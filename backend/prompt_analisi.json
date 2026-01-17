@@ -1,0 +1,536 @@
+{
+  "model": "gpt-4o",
+  "tools": [
+    {
+      "type": "web_search",
+      "user_location": {
+        "type": "approximate"
+      },
+      "search_context_size": "large"
+    }
+  ],
+  "temperature": 0.3,
+  "input": [
+    {
+      "role": "system",
+      "content": [
+        {
+          "type": "text",
+          "text": "Sei un analista di mercato senior specializzato in analisi approfondite del mercato italiano. La tua missione è condurre ricerche web approfondite e dettagliate per fornire analisi di mercato complete, accurate e basate su dati reali e aggiornati.\n\nREGOLE FONDAMENTALI:\n1. Esegui SEMPRE ricerche web approfondite prima di rispondere\n2. Cita sempre le fonti delle informazioni\n3. Usa dati aggiornati (ultimi 2-3 anni quando possibile)\n4. Distingui tra dati verificati e stime/assunzioni\n5. Scrivi in italiano formale, stile report professionale\n6. Struttura l'analisi in sezioni chiare e ben organizzate\n7. Includi grafici e visualizzazioni quando appropriato\n8. Fornisci insight strategici e raccomandazioni concrete"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "Conduci un'analisi di mercato PROFONDA e DETTAGLIATA per il seguente contesto. DEVI eseguire ricerche web approfondite per ogni sezione richiesta.\n\nDATI CONTESTO:\n{{USER_DATA_JSON}}\n\nTIPO ANALISI: {{ANALYSIS_TYPE}}\n\nREQUISITI RICERCA WEB:\nPer ogni sezione, esegui ricerche web specifiche su:\n\n1. DIMENSIONI DI MERCATO:\n   - Cerca dati TAM/SAM/SOM aggiornati per il settore in Italia\n   - Cerca report di mercato recenti (2023-2025) da fonti affidabili\n   - Cerca statistiche ufficiali (ISTAT, Unioncamere, settore specifico)\n   - Cerca trend di crescita storici e previsioni future\n   - Cerca dati su segmentazione geografica (Nord/Centro/Sud Italia)\n\n2. ANALISI COMPETITOR:\n   - Cerca informazioni su competitor principali in Italia\n   - Cerca dati su quote di mercato, fatturato, posizionamento\n   - Cerca analisi SWOT dei competitor principali\n   - Cerca informazioni su strategie di pricing e posizionamento\n   - Cerca recensioni, feedback clienti, punti di forza/debolezza\n\n3. TREND E OPPORTUNITÀ:\n   - Cerca trend emergenti nel settore (ultimi 2-3 anni)\n   - Cerca innovazioni tecnologiche o di business model\n   - Cerca cambiamenti normativi o regolamentari recenti\n   - Cerca opportunità di mercato non sfruttate\n   - Cerca dati su investimenti e finanziamenti nel settore\n\n4. BARRIERE ALL'INGRESSO:\n   - Cerca informazioni su requisiti normativi/legali\n   - Cerca dati su costi di ingresso nel mercato\n   - Cerca informazioni su licenze, certificazioni necessarie\n   - Cerca analisi su difficoltà di accesso al mercato\n\n5. ANALISI SWOT:\n   - Cerca dati concreti per supportare ogni punto\n   - Cerca esempi reali di opportunità e minacce\n   - Basa l'analisi su informazioni verificate\n\n6. STRATEGIE DI POSIZIONAMENTO:\n   - Cerca esempi di posizionamento di successo nel settore\n   - Cerca dati su nicchie di mercato non sfruttate\n   - Cerca informazioni su differenziazione competitiva\n\nFORMATO RISPOSTA:\nDevi restituire ESCLUSIVAMENTE JSON conforme allo schema fornito. Ogni sezione deve essere:\n- Dettagliata e approfondita (minimo 300-500 parole per sezione principale)\n- Basata su ricerche web reali (cita le fonti quando possibile)\n- Supportata da dati numerici quando disponibili\n- Strutturata con titoli, sottotitoli, paragrafi e liste\n- Inclusiva di grafici quando appropriato (con dati reali)\n\nIMPORTANTE:\n- Se non trovi dati specifici, indica chiaramente che sono stime/assunzioni\n- Cita sempre le fonti delle informazioni quando possibile\n- Usa dati aggiornati (preferisci 2023-2025)\n- Per il mercato italiano, cerca fonti italiane (ISTAT, Unioncamere, report settoriali italiani)\n- Non inventare dati: se non li trovi, usa formulazioni prudenti come \"si stima che...\" o \"secondo le tendenze...\""
+        }
+      ]
+    }
+  ],
+  "text": {
+    "format": {
+      "type": "json_schema",
+      "name": "market_analysis_report_it",
+      "strict": true,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "meta",
+          "executive_summary",
+          "market_size",
+          "competitor_analysis",
+          "trends_opportunities",
+          "barriers_entry",
+          "swot_analysis",
+          "positioning_strategy",
+          "charts",
+          "sources",
+          "assumptions"
+        ],
+        "properties": {
+          "meta": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["data_generazione", "tipo_analisi", "settore", "area_geografica"],
+            "properties": {
+              "data_generazione": { "type": "string" },
+              "tipo_analisi": { "type": "string", "enum": ["standard", "deep"] },
+              "settore": { "type": "string" },
+              "area_geografica": { "type": "string" },
+              "segmento_target": { "type": "string" }
+            }
+          },
+          "executive_summary": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["sintesi", "punti_chiave", "raccomandazioni"],
+            "properties": {
+              "sintesi": { "type": "string" },
+              "punti_chiave": {
+                "type": "array",
+                "items": { "type": "string" },
+                "minItems": 3,
+                "maxItems": 7
+              },
+              "raccomandazioni": {
+                "type": "array",
+                "items": { "type": "string" },
+                "minItems": 3,
+                "maxItems": 5
+              }
+            }
+          },
+          "market_size": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["tam", "sam", "som", "trend_crescita", "segmentazione"],
+            "properties": {
+              "tam": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["valore", "unita", "fonte", "anno", "descrizione"],
+                "properties": {
+                  "valore": { "type": "number" },
+                  "unita": { "type": "string", "enum": ["EUR", "USD", "milioni_EUR"] },
+                  "fonte": { "type": "string" },
+                  "anno": { "type": "string" },
+                  "descrizione": { "type": "string" }
+                }
+              },
+              "sam": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["valore", "unita", "fonte", "anno", "descrizione"],
+                "properties": {
+                  "valore": { "type": "number" },
+                  "unita": { "type": "string", "enum": ["EUR", "USD", "milioni_EUR"] },
+                  "fonte": { "type": "string" },
+                  "anno": { "type": "string" },
+                  "descrizione": { "type": "string" }
+                }
+              },
+              "som": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["valore", "unita", "fonte", "anno", "descrizione"],
+                "properties": {
+                  "valore": { "type": "number" },
+                  "unita": { "type": "string", "enum": ["EUR", "USD", "milioni_EUR"] },
+                  "fonte": { "type": "string" },
+                  "anno": { "type": "string" },
+                  "descrizione": { "type": "string" }
+                }
+              },
+              "trend_crescita": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["tasso_crescita_annuale", "periodo", "fonte", "descrizione"],
+                "properties": {
+                  "tasso_crescita_annuale": { "type": "number" },
+                  "periodo": { "type": "string" },
+                  "fonte": { "type": "string" },
+                  "descrizione": { "type": "string" }
+                }
+              },
+              "segmentazione": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["geografica", "per_prodotto", "per_canale"],
+                "properties": {
+                  "geografica": { "type": "string" },
+                  "per_prodotto": { "type": "string" },
+                  "per_canale": { "type": "string" }
+                }
+              }
+            }
+          },
+          "competitor_analysis": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["competitor_principali", "quote_mercato", "posizionamento", "punti_forza_debolezza"],
+            "properties": {
+              "competitor_principali": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["nome", "tipo", "fatturato_stimato", "quote_mercato", "posizionamento", "punti_forza", "punti_debolezza"],
+                  "properties": {
+                    "nome": { "type": "string" },
+                    "tipo": { "type": "string", "enum": ["diretto", "indiretto"] },
+                    "fatturato_stimato": { "type": "string" },
+                    "quote_mercato": { "type": "string" },
+                    "posizionamento": { "type": "string" },
+                    "punti_forza": {
+                      "type": "array",
+                      "items": { "type": "string" },
+                      "minItems": 2,
+                      "maxItems": 5
+                    },
+                    "punti_debolezza": {
+                      "type": "array",
+                      "items": { "type": "string" },
+                      "minItems": 2,
+                      "maxItems": 5
+                    }
+                  }
+                },
+                "minItems": 3,
+                "maxItems": 8
+              },
+              "quote_mercato": { "type": "string" },
+              "posizionamento": { "type": "string" },
+              "punti_forza_debolezza": { "type": "string" }
+            }
+          },
+          "trends_opportunities": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["trend_emergenti", "innovazioni", "cambiamenti_normativi", "opportunita", "investimenti"],
+            "properties": {
+              "trend_emergenti": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["titolo", "descrizione", "impatto", "fonte"],
+                  "properties": {
+                    "titolo": { "type": "string" },
+                    "descrizione": { "type": "string" },
+                    "impatto": { "type": "string", "enum": ["alto", "medio", "basso"] },
+                    "fonte": { "type": "string" }
+                  }
+                },
+                "minItems": 3,
+                "maxItems": 7
+              },
+              "innovazioni": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["titolo", "descrizione", "tipo"],
+                  "properties": {
+                    "titolo": { "type": "string" },
+                    "descrizione": { "type": "string" },
+                    "tipo": { "type": "string", "enum": ["tecnologica", "business_model", "processo"] }
+                  }
+                },
+                "minItems": 2,
+                "maxItems": 5
+              },
+              "cambiamenti_normativi": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["titolo", "descrizione", "impatto", "data_entrata_vigore"],
+                  "properties": {
+                    "titolo": { "type": "string" },
+                    "descrizione": { "type": "string" },
+                    "impatto": { "type": "string", "enum": ["positivo", "negativo", "neutro"] },
+                    "data_entrata_vigore": { "type": "string" }
+                  }
+                },
+                "minItems": 0,
+                "maxItems": 5
+              },
+              "opportunita": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["titolo", "descrizione", "potenziale"],
+                  "properties": {
+                    "titolo": { "type": "string" },
+                    "descrizione": { "type": "string" },
+                    "potenziale": { "type": "string", "enum": ["alto", "medio", "basso"] }
+                  }
+                },
+                "minItems": 3,
+                "maxItems": 6
+              },
+              "investimenti": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["volume_totale", "periodo", "fonte", "descrizione"],
+                "properties": {
+                  "volume_totale": { "type": "string" },
+                  "periodo": { "type": "string" },
+                  "fonte": { "type": "string" },
+                  "descrizione": { "type": "string" }
+                }
+              }
+            }
+          },
+          "barriers_entry": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["barriere_normative", "barriere_economiche", "barriere_tecniche", "barriere_competitive"],
+            "properties": {
+              "barriere_normative": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["titolo", "descrizione", "costo_stimato"],
+                  "properties": {
+                    "titolo": { "type": "string" },
+                    "descrizione": { "type": "string" },
+                    "costo_stimato": { "type": "string" }
+                  }
+                },
+                "minItems": 0,
+                "maxItems": 5
+              },
+              "barriere_economiche": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["titolo", "descrizione", "costo_stimato"],
+                  "properties": {
+                    "titolo": { "type": "string" },
+                    "descrizione": { "type": "string" },
+                    "costo_stimato": { "type": "string" }
+                  }
+                },
+                "minItems": 0,
+                "maxItems": 5
+              },
+              "barriere_tecniche": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["titolo", "descrizione"],
+                  "properties": {
+                    "titolo": { "type": "string" },
+                    "descrizione": { "type": "string" }
+                  }
+                },
+                "minItems": 0,
+                "maxItems": 5
+              },
+              "barriere_competitive": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["titolo", "descrizione"],
+                  "properties": {
+                    "titolo": { "type": "string" },
+                    "descrizione": { "type": "string" }
+                  }
+                },
+                "minItems": 0,
+                "maxItems": 5
+              }
+            }
+          },
+          "swot_analysis": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["strengths", "weaknesses", "opportunities", "threats"],
+            "properties": {
+              "strengths": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["titolo", "descrizione", "evidenza"],
+                  "properties": {
+                    "titolo": { "type": "string" },
+                    "descrizione": { "type": "string" },
+                    "evidenza": { "type": "string" }
+                  }
+                },
+                "minItems": 3,
+                "maxItems": 6
+              },
+              "weaknesses": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["titolo", "descrizione", "impatto"],
+                  "properties": {
+                    "titolo": { "type": "string" },
+                    "descrizione": { "type": "string" },
+                    "impatto": { "type": "string", "enum": ["alto", "medio", "basso"] }
+                  }
+                },
+                "minItems": 2,
+                "maxItems": 5
+              },
+              "opportunities": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["titolo", "descrizione", "potenziale", "fonte"],
+                  "properties": {
+                    "titolo": { "type": "string" },
+                    "descrizione": { "type": "string" },
+                    "potenziale": { "type": "string", "enum": ["alto", "medio", "basso"] },
+                    "fonte": { "type": "string" }
+                  }
+                },
+                "minItems": 3,
+                "maxItems": 6
+              },
+              "threats": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["titolo", "descrizione", "probabilita", "impatto"],
+                  "properties": {
+                    "titolo": { "type": "string" },
+                    "descrizione": { "type": "string" },
+                    "probabilita": { "type": "string", "enum": ["alta", "media", "bassa"] },
+                    "impatto": { "type": "string", "enum": ["alto", "medio", "basso"] }
+                  }
+                },
+                "minItems": 2,
+                "maxItems": 5
+              }
+            }
+          },
+          "positioning_strategy": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["posizionamento_raccomandato", "differenziazione", "nicchie_mercato", "strategie_ingresso"],
+            "properties": {
+              "posizionamento_raccomandato": { "type": "string" },
+              "differenziazione": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["elemento", "descrizione"],
+                  "properties": {
+                    "elemento": { "type": "string" },
+                    "descrizione": { "type": "string" }
+                  }
+                },
+                "minItems": 3,
+                "maxItems": 6
+              },
+              "nicchie_mercato": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["nicchia", "descrizione", "potenziale"],
+                  "properties": {
+                    "nicchia": { "type": "string" },
+                    "descrizione": { "type": "string" },
+                    "potenziale": { "type": "string", "enum": ["alto", "medio", "basso"] }
+                  }
+                },
+                "minItems": 2,
+                "maxItems": 5
+              },
+              "strategie_ingresso": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["strategia", "descrizione", "pro", "contro"],
+                  "properties": {
+                    "strategia": { "type": "string" },
+                    "descrizione": { "type": "string" },
+                    "pro": {
+                      "type": "array",
+                      "items": { "type": "string" },
+                      "minItems": 2,
+                      "maxItems": 4
+                    },
+                    "contro": {
+                      "type": "array",
+                      "items": { "type": "string" },
+                      "minItems": 1,
+                      "maxItems": 3
+                    }
+                  }
+                },
+                "minItems": 2,
+                "maxItems": 4
+              }
+            }
+          },
+          "charts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["id", "titolo", "tipo", "series"],
+              "properties": {
+                "id": { "type": "string" },
+                "titolo": { "type": "string" },
+                "tipo": { "type": "string", "enum": ["line", "bar", "pie"] },
+                "x_label": { "type": "string" },
+                "y_label": { "type": "string" },
+                "caption": { "type": "string" },
+                "series": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["name", "points"],
+                    "properties": {
+                      "name": { "type": "string" },
+                      "points": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": ["x", "y"],
+                          "properties": {
+                            "x": { "type": "string" },
+                            "y": { "type": "number" }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "minItems": 1
+                }
+              }
+            },
+            "minItems": 3,
+            "maxItems": 8
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["titolo", "url", "tipo", "data_accesso"],
+              "properties": {
+                "titolo": { "type": "string" },
+                "url": { "type": "string" },
+                "tipo": { "type": "string", "enum": ["report", "articolo", "sito_web", "dati_istat", "altro"] },
+                "data_accesso": { "type": "string" },
+                "descrizione": { "type": "string" }
+              }
+            },
+            "minItems": 5,
+            "maxItems": 20
+          },
+          "assumptions": {
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 0,
+            "maxItems": 10
+          }
+        }
+      }
+    }
+  }
+}

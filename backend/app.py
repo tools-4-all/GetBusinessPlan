@@ -10,6 +10,7 @@ from typing import Optional
 from dotenv import load_dotenv
 import utils
 import pdf_generator
+import pdf_generator_analysis
 
 # Carica variabili d'ambiente
 load_dotenv()
@@ -43,6 +44,13 @@ class BusinessPlanRequest(BaseModel):
 
 class PDFRequest(BaseModel):
     businessPlanJson: dict
+
+class MarketAnalysisRequest(BaseModel):
+    formData: dict
+    analysisType: str = "deep"  # "standard" o "deep"
+
+class PDFAnalysisRequest(BaseModel):
+    marketAnalysisJson: dict
 
 @app.get("/")
 async def root():
@@ -251,6 +259,161 @@ async def generate_business_plan(request: BusinessPlanRequest):
         raise HTTPException(status_code=500, detail=f"Errore parsing JSON: {str(e)}")
     except HTTPException:
         # Rilancia le HTTPException così come sono
+        raise
+    except Exception as e:
+        end_time = datetime.datetime.now()
+        elapsed = (end_time - start_time).total_seconds()
+        print(f"ERRORE GENERALE dopo {elapsed:.2f} secondi: {str(e)}")
+        print(f"Tipo errore: {type(e).__name__}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Errore interno: {str(e)}")
+
+@app.post("/api/generate-market-analysis")
+async def generate_market_analysis(request: MarketAnalysisRequest):
+    """Genera analisi di mercato con deep research usando web search"""
+    import datetime
+    start_time = datetime.datetime.now()
+    print(f"=== INIZIO ANALISI DI MERCATO ===")
+    print(f"Timestamp: {start_time.isoformat()}")
+    print(f"Tipo analisi: {request.analysisType}")
+    print(f"Dati ricevuti: {len(str(request.formData))} caratteri")
+    
+    try:
+        # Carica il prompt template per analisi di mercato
+        prompt_path = Path(__file__).parent / "prompt_analisi.json"
+        if not prompt_path.exists():
+            raise HTTPException(status_code=500, detail="File prompt_analisi.json non trovato")
+        
+        print(f"Caricamento prompt da: {prompt_path}")
+        with open(prompt_path, "r", encoding="utf-8") as f:
+            prompt_config = json.load(f)
+        
+        model_name = prompt_config.get('model', 'gpt-4o')
+        print(f"Modello configurato: {model_name}")
+        
+        # Prepara i dati utente per l'analisi
+        user_data = {
+            "settore": request.formData.get('industry', ''),
+            "area_geografica": request.formData.get('geographicMarket', ''),
+            "segmento_target": request.formData.get('targetSegment', ''),
+            "competitor": request.formData.get('competitors', ''),
+            "dimensione_mercato": request.formData.get('marketSize', ''),
+            "focus_analisi": request.formData.get('analysisFocus', '')
+        }
+        user_data_json = json.dumps(user_data, ensure_ascii=False, indent=2)
+        
+        # Costruisci i messaggi per OpenAI
+        messages = []
+        for msg in prompt_config["input"]:
+            content_parts = []
+            for content_item in msg.get("content", []):
+                if content_item.get("type") == "text":
+                    text = content_item.get("text", "")
+                    # Sostituisci i placeholder
+                    text = text.replace("{{USER_DATA_JSON}}", user_data_json)
+                    text = text.replace("{{ANALYSIS_TYPE}}", request.analysisType)
+                    content_parts.append(text)
+            
+            if content_parts:
+                messages.append({
+                    "role": msg.get("role"),
+                    "content": "".join(content_parts)
+                })
+        
+        # Prepara il request body
+        request_body = {
+            "model": model_name,
+            "messages": messages,
+            "temperature": prompt_config.get("temperature", 0.3)
+        }
+        
+        # Aggiungi tools (web_search)
+        if prompt_config.get("tools"):
+            request_body["tools"] = prompt_config["tools"]
+        
+        # Aggiungi response_format se presente
+        if prompt_config.get("text", {}).get("format"):
+            fmt = prompt_config["text"]["format"]
+            request_body["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": fmt["name"],
+                    "strict": fmt["strict"],
+                    "schema": fmt["schema"]
+                }
+            }
+        
+        # Chiama OpenAI
+        openai_start = datetime.datetime.now()
+        print(f"Chiamata OpenAI con modello {model_name} per analisi di mercato...")
+        print(f"Timestamp inizio OpenAI: {openai_start.isoformat()}")
+        print(f"Request body keys: {list(request_body.keys())}")
+        
+        try:
+            # Chiamata OpenAI sincrona
+            import asyncio
+            import sys
+            if sys.version_info >= (3, 9):
+                response = await asyncio.to_thread(
+                    client.chat.completions.create,
+                    **request_body
+                )
+            else:
+                from concurrent.futures import ThreadPoolExecutor
+                loop = asyncio.get_event_loop()
+                with ThreadPoolExecutor() as executor:
+                    response = await loop.run_in_executor(
+                        executor,
+                        lambda: client.chat.completions.create(**request_body)
+                    )
+            openai_end = datetime.datetime.now()
+            openai_elapsed = (openai_end - openai_start).total_seconds()
+            print(f"Timestamp fine OpenAI: {openai_end.isoformat()}")
+            print(f"Tempo chiamata OpenAI: {openai_elapsed:.2f} secondi ({openai_elapsed/60:.2f} minuti)")
+            if response.choices and len(response.choices) > 0:
+                content = response.choices[0].message.content
+                print(f"Risposta ricevuta, lunghezza: {len(str(content)) if content else 0}")
+            else:
+                print("ATTENZIONE: Risposta OpenAI senza choices")
+        except Exception as openai_error:
+            openai_end = datetime.datetime.now()
+            openai_elapsed = (openai_end - openai_start).total_seconds()
+            print(f"ERRORE OpenAI dopo {openai_elapsed:.2f} secondi")
+            print(f"Tipo errore: {type(openai_error).__name__}")
+            print(f"Messaggio errore: {str(openai_error)}")
+            import traceback
+            traceback.print_exc()
+            error_detail = f"Errore OpenAI: {str(openai_error)}"
+            if "model" in str(openai_error).lower() or "invalid" in str(openai_error).lower():
+                error_detail += f" (Verifica che il modello '{model_name}' sia valido)"
+            raise HTTPException(status_code=500, detail=error_detail)
+        
+        # Estrai il JSON dalla risposta
+        content = response.choices[0].message.content
+        if isinstance(content, str):
+            market_analysis_json = json.loads(content)
+        else:
+            market_analysis_json = content
+        
+        end_time = datetime.datetime.now()
+        elapsed = (end_time - start_time).total_seconds()
+        print(f"=== FINE ANALISI DI MERCATO ===")
+        print(f"Tempo totale: {elapsed:.2f} secondi ({elapsed/60:.2f} minuti)")
+        print(f"Timestamp fine: {end_time.isoformat()}")
+        
+        return JSONResponse(content={
+            "success": True,
+            "json": market_analysis_json,
+            "generation_time_seconds": elapsed
+        })
+        
+    except json.JSONDecodeError as e:
+        print(f"ERRORE parsing JSON: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Errore parsing JSON: {str(e)}")
+    except HTTPException:
         raise
     except Exception as e:
         end_time = datetime.datetime.now()

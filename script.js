@@ -2204,6 +2204,57 @@ async function generatePDFStandaloneFromJSON(jsonData) {
     }
 }
 
+async function generatePDFAnalysis(marketAnalysisJSON) {
+    if (!downloadAnalysisPdfBtn) downloadAnalysisPdfBtn = document.getElementById('downloadAnalysisPdfBtn');
+    if (!downloadAnalysisPdfBtn) {
+        console.error('downloadAnalysisPdfBtn not found');
+        return;
+    }
+    
+    downloadAnalysisPdfBtn.disabled = true;
+    downloadAnalysisPdfBtn.textContent = 'Generazione PDF...';
+    
+    try {
+        console.log('=== INIZIO GENERAZIONE PDF ANALISI DI MERCATO ===');
+        console.log('Chiamata API backend Python...');
+        
+        const response = await fetch(`${API_BASE_URL}/api/generate-pdf-analysis`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                marketAnalysisJson: marketAnalysisJSON
+            })
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ detail: 'Errore sconosciuto' }));
+            throw new Error(`Errore API: ${response.status} - ${errorData.detail || 'Errore sconosciuto'}`);
+        }
+        
+        // Scarica il PDF
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'analisi-mercato.pdf';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        console.log('✅ PDF analisi di mercato generato e scaricato con successo');
+        downloadAnalysisPdfBtn.disabled = false;
+        downloadAnalysisPdfBtn.textContent = 'Scarica PDF';
+    } catch (error) {
+        console.error('Errore nella generazione PDF analisi:', error);
+        alert('Errore nella generazione del PDF: ' + error.message);
+        downloadAnalysisPdfBtn.disabled = false;
+        downloadAnalysisPdfBtn.textContent = 'Scarica PDF';
+    }
+}
+
 // PDF Generation using window.print() (qualità professionale - come lo script da console)
 async function generatePDF() {
     if (!window.currentPlanData) {
@@ -3056,100 +3107,391 @@ async function generateMarketAnalysis() {
 
 async function generateAnalysisWithAI(data) {
     const isDeep = analysisType === 'deep';
-    const delay = isDeep ? 3000 : 2000;
-    await new Promise(resolve => setTimeout(resolve, delay));
+    const analysisTypeStr = isDeep ? 'deep' : 'standard';
     
-    const getIndustryLabel = (value) => {
-        const industry = (isDeep ? analysisQuestionsDeep : analysisQuestionsStandard).find(q => q.id === 'industry');
-        if (industry && industry.options) {
-            const option = industry.options.find(opt => opt.value === value);
-            return option ? option.label : value;
+    console.log('=== INIZIO ANALISI DI MERCATO ===');
+    console.log('Timestamp:', new Date().toISOString());
+    console.log('FormData ricevuto:', data);
+    console.log('Tipo analisi:', analysisTypeStr);
+    console.log('API Base URL:', API_BASE_URL);
+    
+    try {
+        console.log('Chiamata API backend Python per analisi di mercato...');
+        console.log('URL:', `${API_BASE_URL}/api/generate-market-analysis`);
+        console.log('⚠️ NOTA: L\'analisi di mercato approfondita può richiedere 5-7 minuti. Attendi...');
+        console.log('⏱️ Timestamp inizio:', new Date().toISOString());
+        
+        // Crea un AbortController per timeout - 15 minuti per analisi approfondite
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 900000); // 15 minuti timeout
+        const startTime = Date.now();
+        
+        let response;
+        try {
+            response = await fetch(`${API_BASE_URL}/api/generate-market-analysis`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    formData: data,
+                    analysisType: analysisTypeStr
+                }),
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+            const fetchTime = ((Date.now() - startTime) / 1000).toFixed(2);
+            console.log('✅ Fetch completata. Status:', response.status, response.statusText);
+            console.log('⏱️ Tempo impiegato:', fetchTime, 'secondi');
+        } catch (fetchError) {
+            clearTimeout(timeoutId);
+            console.error('❌ Errore nella chiamata fetch:', fetchError);
+            
+            let errorMessage = 'Errore sconosciuto nella chiamata API';
+            if (fetchError.name === 'AbortError') {
+                errorMessage = 'Timeout: la richiesta ha impiegato troppo tempo (oltre 15 minuti).';
+            } else if (fetchError.name === 'TypeError') {
+                if (fetchError.message.includes('Failed to fetch') || fetchError.message.includes('Load failed')) {
+                    errorMessage = 'Errore di connessione: impossibile raggiungere il backend API. Verifica:\n' +
+                        '- Che il backend Python sia in esecuzione\n' +
+                        '- Che l\'URL API_BASE_URL sia corretto\n' +
+                        '- La connessione internet\n' +
+                        '- Eventuali problemi CORS';
+                } else {
+                    errorMessage = `Errore di tipo: ${fetchError.message}`;
+                }
+            } else {
+                errorMessage = `Errore nella chiamata API: ${fetchError.message || 'Errore sconosciuto'}`;
+            }
+            
+            throw new Error(errorMessage);
         }
-        return value;
+        
+        if (!response.ok) {
+            let errorData;
+            try {
+                const text = await response.text();
+                console.error('Risposta errore (raw):', text);
+                errorData = JSON.parse(text);
+            } catch (e) {
+                errorData = { detail: `Errore HTTP ${response.status}: ${response.statusText}` };
+            }
+            console.error('Errore API - Status:', response.status);
+            console.error('Dati errore:', errorData);
+            const errorMessage = errorData.detail || errorData.message || errorData.error || 'Errore sconosciuto';
+            throw new Error(`Errore API: ${response.status} - ${errorMessage}`);
+        }
+        
+        const result = await response.json();
+        console.log('✅ Risposta ricevuta dal backend');
+        
+        if (!result.success || !result.json) {
+            throw new Error('Risposta API non valida - formato dati inatteso');
+        }
+        
+        const marketAnalysisJSON = result.json;
+        
+        // LOG DETTAGLIATO DEL JSON PER DEBUG
+        console.log('=== JSON ANALISI DI MERCATO RICEVUTO ===');
+        console.log('Tipo dati ricevuti:', typeof marketAnalysisJSON);
+        console.log('Chiavi disponibili:', Object.keys(marketAnalysisJSON || {}));
+        console.log('--- JSON COMPLETO (formattato) ---');
+        try {
+            const jsonString = JSON.stringify(marketAnalysisJSON, null, 2);
+            console.log(jsonString);
+            console.log('--- FINE JSON ---');
+        } catch (stringifyError) {
+            console.error('Errore nella stringificazione JSON:', stringifyError);
+            console.log('JSON raw:', marketAnalysisJSON);
+        }
+        console.log('=== FINE LOG JSON ===');
+        
+        // Salva il JSON in variabile globale e localStorage
+        window.lastMarketAnalysisJSON = marketAnalysisJSON;
+        console.log('✅ JSON salvato in window.lastMarketAnalysisJSON');
+        
+        try {
+            localStorage.setItem('lastMarketAnalysisJSON', JSON.stringify(marketAnalysisJSON));
+            console.log('✅ JSON salvato anche in localStorage');
+        } catch (storageError) {
+            console.warn('⚠️ Impossibile salvare in localStorage:', storageError);
+        }
+        
+        // Converti il JSON in HTML per la visualizzazione
+        console.log('Inizio conversione JSON -> HTML...');
+        const analysisHTML = convertMarketAnalysisJSONToHTML(marketAnalysisJSON);
+        console.log('Conversione completata. Lunghezza HTML:', analysisHTML.length);
+        
+        if (!analysisHTML || analysisHTML.trim() === '') {
+            console.error('ERRORE: HTML generato è vuoto!');
+            throw new Error('La conversione JSON->HTML ha prodotto un risultato vuoto');
+        }
+        
+        console.log('=== generateAnalysisWithAI completata con successo ===');
+        return analysisHTML;
+        
+    } catch (error) {
+        console.log('=== generateAnalysisWithAI terminata con errore ===');
+        console.error('Errore nella chiamata API:', error);
+        console.error('Stack trace:', error.stack);
+        
+        const errorMessage = error.message || 'Errore sconosciuto';
+        console.warn(`Errore API: ${errorMessage}.`);
+        
+        // Mostra popup di errore
+        if (errorMessage.includes('Errore di connessione') || errorMessage.includes('Failed to fetch')) {
+            alert('❌ Errore di Connessione\n\n' + errorMessage + '\n\nVerifica che il backend Python sia in esecuzione.');
+        } else {
+            alert('❌ Errore nell\'analisi di mercato\n\n' + errorMessage);
+        }
+        
+        throw error; // Rilancia l'errore per gestirlo in generateMarketAnalysis
+    }
+}
+
+// Converte il JSON dell'analisi di mercato in HTML per la visualizzazione
+function convertMarketAnalysisJSONToHTML(analysisData) {
+    let html = '';
+    
+    // Helper per escape HTML
+    const escape = (str) => String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const formatCurrency = (num, unit) => {
+        if (!num) return 'N/A';
+        if (unit === 'EUR' || unit === 'USD') {
+            return new Intl.NumberFormat('it-IT', { style: 'currency', currency: unit === 'EUR' ? 'EUR' : 'USD' }).format(num);
+        }
+        return num.toLocaleString('it-IT') + ' ' + (unit || '');
     };
-
-    let html = `
-        <h4>Analisi di Mercato ${isDeep ? 'Approfondita' : ''} - ${getIndustryLabel(data.industry) || 'Settore'}</h4>
-        <p><strong>Area Geografica:</strong> ${data.geographicMarket || 'N/A'}</p>
-        ${data.targetSegment ? `<p><strong>Segmento Target:</strong> ${data.targetSegment}</p>` : ''}
+    
+    // Meta info
+    const meta = analysisData.meta || {};
+    html += `<div style="text-align: center; margin-bottom: 40px; border-bottom: 3px solid #2563eb; padding-bottom: 20px;">`;
+    html += `<h1 style="color: #2563eb; font-size: 2.5rem; margin: 0 0 10px 0;">Analisi di Mercato ${meta.tipo_analisi === 'deep' ? 'Approfondita' : ''}</h1>`;
+    if (meta.settore) {
+        html += `<h2 style="color: #64748b; font-size: 1.5rem; margin: 0; font-weight: 400;">${escape(meta.settore)}</h2>`;
+    }
+    if (meta.area_geografica) {
+        html += `<p style="color: #64748b; margin-top: 10px;">Area Geografica: ${escape(meta.area_geografica)}</p>`;
+    }
+    if (meta.data_generazione) {
+        html += `<p style="color: #64748b; font-size: 0.9rem; margin-top: 5px;">Generato il: ${escape(meta.data_generazione)}</p>`;
+    }
+    html += `</div>`;
+    
+    // Executive Summary
+    if (analysisData.executive_summary) {
+        const exec = analysisData.executive_summary;
+        html += `<h3 style="color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px; margin-top: 30px;">Executive Summary</h3>`;
         
-        <h4>Dimensioni del Mercato Italiano</h4>
-        <p>Il mercato italiano ${getIndustryLabel(data.industry) || 'del settore'} in ${data.geographicMarket || 'l\'area selezionata'} mostra segnali di crescita. 
-        ${data.targetSegment ? `Il segmento target identificato (${data.targetSegment}) rappresenta un'opportunità significativa nel contesto italiano.` : 'Il mercato italiano offre opportunità interessanti per nuovi entranti.'}</p>
-        ${isDeep && data.marketSize ? `<p><strong>Dettagli Dimensione Mercato:</strong> ${data.marketSize}</p>` : ''}
+        if (exec.sintesi) {
+            html += `<div style="margin: 20px 0;">${markdownToHTML(exec.sintesi)}</div>`;
+        }
         
-        <h4>Analisi Competitor Italiani</h4>
-        ${data.competitors ? `<p><strong>Competitor Identificati:</strong> ${data.competitors}</p>` : '<p>Il mercato italiano presenta diversi attori consolidati. È importante identificare i competitor diretti e indiretti per posizionarsi efficacemente nel contesto nazionale.</p>'}
-        <ul>
-            <li><strong>Competitor Diretti:</strong> Aziende italiane che offrono prodotti/servizi simili al tuo segmento target</li>
-            <li><strong>Competitor Indiretti:</strong> Soluzioni alternative che risolvono lo stesso problema in modo diverso</li>
-            ${isDeep ? '<li><strong>Analisi Posizionamento:</strong> Valuta come i competitor si posizionano nel mercato italiano e identifica gap o opportunità</li>' : ''}
-            ${isDeep ? '<li><strong>Quota di Mercato:</strong> Analizza la distribuzione della quota di mercato tra i principali attori</li>' : ''}
-        </ul>
+        if (exec.punti_chiave && exec.punti_chiave.length > 0) {
+            html += `<h4>Punti Chiave</h4><ul>`;
+            exec.punti_chiave.forEach(punto => {
+                html += `<li>${escape(punto)}</li>`;
+            });
+            html += `</ul>`;
+        }
         
-        <h4>Tendenze del Mercato Italiano</h4>
-        ${data.marketTrends ? `<p><strong>Tendenze Osservate:</strong> ${data.marketTrends}</p>` : ''}
-        <ul>
-            <li><strong>Digitalizzazione:</strong> Crescente adozione di tecnologie digitali nel settore italiano</li>
-            <li><strong>Sostenibilità:</strong> Maggiore attenzione a pratiche eco-sostenibili, in linea con le politiche europee</li>
-            <li><strong>Made in Italy:</strong> Valorizzazione del marchio e della qualità italiana</li>
-            ${isDeep ? '<li><strong>Tendenze Demografiche:</strong> Invecchiamento della popolazione, crescita delle città, cambiamenti nei consumi</li>' : ''}
-            ${isDeep ? '<li><strong>Innovazione Tecnologica:</strong> Adozione di AI, automazione e tecnologie emergenti</li>' : ''}
-        </ul>
+        if (exec.raccomandazioni && exec.raccomandazioni.length > 0) {
+            html += `<h4>Raccomandazioni Principali</h4><ol>`;
+            exec.raccomandazioni.forEach(rec => {
+                html += `<li>${escape(rec)}</li>`;
+            });
+            html += `</ol>`;
+        }
+    }
+    
+    // Market Size
+    if (analysisData.market_size) {
+        const ms = analysisData.market_size;
+        html += `<h3 style="color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px; margin-top: 30px;">Dimensioni del Mercato</h3>`;
         
-        ${isDeep ? `
-        <h4>Analisi SWOT del Mercato Italiano</h4>
-        <p><strong>Punti di Forza:</strong></p>
-        <ul>
-            <li>Qualità e tradizione italiana riconosciuta a livello internazionale</li>
-            <li>Infrastrutture solide in molte regioni</li>
-            <li>Ecosistema di startup e innovazione in crescita</li>
-        </ul>
-        <p><strong>Debolezze:</strong></p>
-        <ul>
-            <li>Burocrazia e tempi lunghi per avviare attività</li>
-            <li>Accesso al credito talvolta complesso per nuove imprese</li>
-            <li>Divario digitale tra regioni</li>
-        </ul>
-        ` : ''}
+        if (ms.tam) {
+            html += `<div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin: 15px 0;">`;
+            html += `<h4>TAM (Total Addressable Market)</h4>`;
+            html += `<p><strong>Valore:</strong> ${formatCurrency(ms.tam.valore, ms.tam.unita)}</p>`;
+            if (ms.tam.fonte) html += `<p><strong>Fonte:</strong> ${escape(ms.tam.fonte)} (${escape(ms.tam.anno || 'N/A')})</p>`;
+            if (ms.tam.descrizione) html += `<p>${markdownToHTML(ms.tam.descrizione)}</p>`;
+            html += `</div>`;
+        }
         
-        <h4>Opportunità nel Mercato Italiano</h4>
-        <ul>
-            <li>Mercato in crescita con spazio per nuovi entranti</li>
-            <li>Domanda non completamente soddisfatta nel segmento target</li>
-            <li>Possibilità di differenziazione attraverso innovazione e qualità</li>
-            ${isDeep ? '<li>Incentivi e agevolazioni per startup e PMI innovative</li>' : ''}
-            ${isDeep ? '<li>Export verso mercati europei e internazionali</li>' : ''}
-        </ul>
+        if (ms.sam) {
+            html += `<div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin: 15px 0;">`;
+            html += `<h4>SAM (Serviceable Addressable Market)</h4>`;
+            html += `<p><strong>Valore:</strong> ${formatCurrency(ms.sam.valore, ms.sam.unita)}</p>`;
+            if (ms.sam.fonte) html += `<p><strong>Fonte:</strong> ${escape(ms.sam.fonte)} (${escape(ms.sam.anno || 'N/A')})</p>`;
+            if (ms.sam.descrizione) html += `<p>${markdownToHTML(ms.sam.descrizione)}</p>`;
+            html += `</div>`;
+        }
         
-        <h4>Minacce</h4>
-        <ul>
-            <li>Competizione intensa da attori consolidati nel mercato italiano</li>
-            <li>Possibili cambiamenti normativi o regolamentari (GDPR, normative settoriali)</li>
-            <li>Variazioni economiche che possono influenzare la domanda</li>
-            ${isDeep && data.barriers ? `<li><strong>Barriere all'Ingresso Identificate:</strong> ${data.barriers}</li>` : ''}
-            ${isDeep ? '<li>Competizione da attori internazionali con maggiore capitale</li>' : ''}
-        </ul>
+        if (ms.som) {
+            html += `<div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin: 15px 0;">`;
+            html += `<h4>SOM (Serviceable Obtainable Market)</h4>`;
+            html += `<p><strong>Valore:</strong> ${formatCurrency(ms.som.valore, ms.som.unita)}</p>`;
+            if (ms.som.fonte) html += `<p><strong>Fonte:</strong> ${escape(ms.som.fonte)} (${escape(ms.som.anno || 'N/A')})</p>`;
+            if (ms.som.descrizione) html += `<p>${markdownToHTML(ms.som.descrizione)}</p>`;
+            html += `</div>`;
+        }
         
-        ${isDeep && data.regulations ? `
-        <h4>Normative e Regolamentazioni Italiane</h4>
-        <p>${data.regulations}</p>
-        <p>È importante essere conformi alle normative italiane ed europee, inclusi GDPR, normative settoriali specifiche e requisiti di licenza se applicabili.</p>
-        ` : ''}
+        if (ms.trend_crescita) {
+            html += `<div style="margin: 15px 0;">`;
+            html += `<h4>Trend di Crescita</h4>`;
+            html += `<p><strong>Tasso di crescita annuale:</strong> ${ms.trend_crescita.tasso_crescita_annuale}%</p>`;
+            html += `<p><strong>Periodo:</strong> ${escape(ms.trend_crescita.periodo || 'N/A')}</p>`;
+            if (ms.trend_crescita.fonte) html += `<p><strong>Fonte:</strong> ${escape(ms.trend_crescita.fonte)}</p>`;
+            if (ms.trend_crescita.descrizione) html += `<p>${markdownToHTML(ms.trend_crescita.descrizione)}</p>`;
+            html += `</div>`;
+        }
+    }
+    
+    // Competitor Analysis
+    if (analysisData.competitor_analysis) {
+        const comp = analysisData.competitor_analysis;
+        html += `<h3 style="color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px; margin-top: 30px;">Analisi Competitor</h3>`;
         
-        <h4>Raccomandazioni Strategiche</h4>
-        <p>Basandoti su questa analisi del mercato italiano, ti consigliamo di:</p>
-        <ol>
-            <li>Identificare un posizionamento chiaro che ti distingua dai competitor nel contesto italiano</li>
-            <li>Sviluppare una strategia di ingresso nel mercato italiano ben definita</li>
-            <li>Monitorare costantemente le tendenze e i cambiamenti del mercato nazionale</li>
-            <li>Considerare le specificità del mercato italiano (burocrazia, cultura aziendale, preferenze dei consumatori)</li>
-            <li>Creare un business plan dettagliato che incorpori queste informazioni e sia ottimizzato per il mercato italiano</li>
-            ${isDeep ? '<li>Valutare partnership strategiche con aziende italiane consolidate</li>' : ''}
-            ${isDeep ? '<li>Esplorare opportunità di finanziamento attraverso bandi, agevolazioni e investitori italiani</li>' : ''}
-        </ol>
-    `;
-
+        if (comp.competitor_principali && comp.competitor_principali.length > 0) {
+            comp.competitor_principali.forEach((competitor) => {
+                html += `<div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid ${competitor.tipo === 'diretto' ? '#ef4444' : '#f59e0b'};">`;
+                html += `<h4>${escape(competitor.nome)} <span style="color: #64748b; font-size: 0.9rem;">(${competitor.tipo === 'diretto' ? 'Competitor Diretto' : 'Competitor Indiretto'})</span></h4>`;
+                if (competitor.fatturato_stimato) html += `<p><strong>Fatturato stimato:</strong> ${escape(competitor.fatturato_stimato)}</p>`;
+                if (competitor.quote_mercato) html += `<p><strong>Quota di mercato:</strong> ${escape(competitor.quote_mercato)}</p>`;
+                if (competitor.posizionamento) html += `<p><strong>Posizionamento:</strong> ${escape(competitor.posizionamento)}</p>`;
+                
+                if (competitor.punti_forza && competitor.punti_forza.length > 0) {
+                    html += `<p><strong>Punti di Forza:</strong></p><ul>`;
+                    competitor.punti_forza.forEach(pf => html += `<li>${escape(pf)}</li>`);
+                    html += `</ul>`;
+                }
+                
+                if (competitor.punti_debolezza && competitor.punti_debolezza.length > 0) {
+                    html += `<p><strong>Punti di Debolezza:</strong></p><ul>`;
+                    competitor.punti_debolezza.forEach(pd => html += `<li>${escape(pd)}</li>`);
+                    html += `</ul>`;
+                }
+                html += `</div>`;
+            });
+        }
+    }
+    
+    // Trends & Opportunities
+    if (analysisData.trends_opportunities) {
+        const to = analysisData.trends_opportunities;
+        html += `<h3 style="color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px; margin-top: 30px;">Trend e Opportunità</h3>`;
+        
+        if (to.trend_emergenti && to.trend_emergenti.length > 0) {
+            html += `<h4>Trend Emergenti</h4>`;
+            to.trend_emergenti.forEach(trend => {
+                html += `<div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin: 10px 0;">`;
+                html += `<h5>${escape(trend.titolo)} <span style="color: ${trend.impatto === 'alto' ? '#ef4444' : trend.impatto === 'medio' ? '#f59e0b' : '#10b981'}; font-size: 0.9rem;">(Impatto: ${trend.impatto})</span></h5>`;
+                html += `<p>${markdownToHTML(trend.descrizione)}</p>`;
+                if (trend.fonte) html += `<p style="font-size: 0.9rem; color: #64748b;"><em>Fonte: ${escape(trend.fonte)}</em></p>`;
+                html += `</div>`;
+            });
+        }
+        
+        if (to.opportunita && to.opportunita.length > 0) {
+            html += `<h4>Opportunità di Mercato</h4><ul>`;
+            to.opportunita.forEach(opp => {
+                html += `<li><strong>${escape(opp.titolo)}</strong> (Potenziale: ${opp.potenziale})<br/>${markdownToHTML(opp.descrizione)}</li>`;
+            });
+            html += `</ul>`;
+        }
+    }
+    
+    // SWOT Analysis
+    if (analysisData.swot_analysis) {
+        const swot = analysisData.swot_analysis;
+        html += `<h3 style="color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px; margin-top: 30px;">Analisi SWOT</h3>`;
+        html += `<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0;">`;
+        
+        // Strengths
+        html += `<div style="background: #dcfce7; padding: 15px; border-radius: 8px;">`;
+        html += `<h4 style="color: #16a34a;">Punti di Forza</h4><ul>`;
+        if (swot.strengths) {
+            swot.strengths.forEach(s => {
+                html += `<li><strong>${escape(s.titolo)}</strong><br/>${markdownToHTML(s.descrizione)}</li>`;
+            });
+        }
+        html += `</ul></div>`;
+        
+        // Weaknesses
+        html += `<div style="background: #fee2e2; padding: 15px; border-radius: 8px;">`;
+        html += `<h4 style="color: #dc2626;">Debolezze</h4><ul>`;
+        if (swot.weaknesses) {
+            swot.weaknesses.forEach(w => {
+                html += `<li><strong>${escape(w.titolo)}</strong> (Impatto: ${w.impatto})<br/>${markdownToHTML(w.descrizione)}</li>`;
+            });
+        }
+        html += `</ul></div>`;
+        
+        // Opportunities
+        html += `<div style="background: #dbeafe; padding: 15px; border-radius: 8px;">`;
+        html += `<h4 style="color: #2563eb;">Opportunità</h4><ul>`;
+        if (swot.opportunities) {
+            swot.opportunities.forEach(o => {
+                html += `<li><strong>${escape(o.titolo)}</strong> (Potenziale: ${o.potenziale})<br/>${markdownToHTML(o.descrizione)}</li>`;
+            });
+        }
+        html += `</ul></div>`;
+        
+        // Threats
+        html += `<div style="background: #fef3c7; padding: 15px; border-radius: 8px;">`;
+        html += `<h4 style="color: #d97706;">Minacce</h4><ul>`;
+        if (swot.threats) {
+            swot.threats.forEach(t => {
+                html += `<li><strong>${escape(t.titolo)}</strong> (Probabilità: ${t.probabilita}, Impatto: ${t.impatto})<br/>${markdownToHTML(t.descrizione)}</li>`;
+            });
+        }
+        html += `</ul></div>`;
+        
+        html += `</div>`;
+    }
+    
+    // Positioning Strategy
+    if (analysisData.positioning_strategy) {
+        const pos = analysisData.positioning_strategy;
+        html += `<h3 style="color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px; margin-top: 30px;">Strategia di Posizionamento</h3>`;
+        
+        if (pos.posizionamento_raccomandato) {
+            html += `<div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin: 15px 0;">`;
+            html += `<h4>Posizionamento Raccomandato</h4>`;
+            html += `<p>${markdownToHTML(pos.posizionamento_raccomandato)}</p>`;
+            html += `</div>`;
+        }
+        
+        if (pos.nicchie_mercato && pos.nicchie_mercato.length > 0) {
+            html += `<h4>Nicchie di Mercato</h4><ul>`;
+            pos.nicchie_mercato.forEach(nicchia => {
+                html += `<li><strong>${escape(nicchia.nicchia)}</strong> (Potenziale: ${nicchia.potenziale})<br/>${markdownToHTML(nicchia.descrizione)}</li>`;
+            });
+            html += `</ul>`;
+        }
+    }
+    
+    // Sources
+    if (analysisData.sources && analysisData.sources.length > 0) {
+        html += `<h3 style="color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px; margin-top: 30px;">Fonti</h3>`;
+        html += `<ul style="font-size: 0.9rem;">`;
+        analysisData.sources.forEach(source => {
+            html += `<li><strong>${escape(source.titolo)}</strong> (${source.tipo})`;
+            if (source.url) html += ` - <a href="${escape(source.url)}" target="_blank">${escape(source.url)}</a>`;
+            if (source.data_accesso) html += ` - Accesso: ${escape(source.data_accesso)}`;
+            html += `</li>`;
+        });
+        html += `</ul>`;
+    }
+    
+    // Charts (se presenti)
+    if (analysisData.charts && analysisData.charts.length > 0) {
+        html += `<h3 style="color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px; margin-top: 30px;">Grafici</h3>`;
+        html += `<div id="analysis-charts-container"></div>`;
+        // I grafici verranno renderizzati con Chart.js dopo il caricamento
+        window.analysisChartsData = analysisData.charts;
+    }
+    
     return html;
 }
 
@@ -3171,9 +3513,14 @@ function initializeAnalysisListeners() {
     if (closeAnalysisModal) closeAnalysisModal.addEventListener('click', closeAnalysisModalFunc);
     if (analysisNextBtn) analysisNextBtn.addEventListener('click', analysisNextStep);
     if (analysisPrevBtn) analysisPrevBtn.addEventListener('click', analysisPrevStep);
-    if (downloadAnalysisPdfBtn) downloadAnalysisPdfBtn.addEventListener('click', () => {
-        if (window.currentAnalysisData) {
+    if (downloadAnalysisPdfBtn) downloadAnalysisPdfBtn.addEventListener('click', async () => {
+        if (window.lastMarketAnalysisJSON) {
+            await generatePDFAnalysis(window.lastMarketAnalysisJSON);
+        } else if (window.currentAnalysisData) {
+            // Fallback al metodo vecchio se non c'è JSON
             generatePDFFromContent(window.currentAnalysisData, 'analisi-mercato');
+        } else {
+            alert('Nessuna analisi di mercato disponibile. Genera prima un\'analisi.');
         }
     });
 }
