@@ -503,7 +503,7 @@
             "items": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["titolo", "url", "tipo", "data_accesso"],
+              "required": ["titolo", "url", "tipo", "data_accesso", "descrizione"],
               "properties": {
                 "titolo": { "type": "string" },
                 "url": { "type": "string" },
