@@ -47,7 +47,7 @@
           "meta": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["data_generazione", "tipo_analisi", "settore", "area_geografica"],
+            "required": ["data_generazione", "tipo_analisi", "settore", "area_geografica", "segmento_target"],
             "properties": {
               "data_generazione": { "type": "string" },
               "tipo_analisi": { "type": "string", "enum": ["standard", "deep"] },
