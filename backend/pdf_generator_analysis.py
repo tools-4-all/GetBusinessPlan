@@ -6,7 +6,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm
 from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, Table, TableStyle, Image
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, Table, TableStyle, Image, KeepTogether
 from reportlab.lib.enums import TA_JUSTIFY, TA_CENTER, TA_LEFT
 from pathlib import Path
 import matplotlib
@@ -120,26 +120,98 @@ async def create_pdf_from_market_analysis(market_analysis_json: dict) -> str:
     # Story (contenuto del PDF)
     story = []
     
-    # === COPERTINA PROFESSIONALE ===
+    # === COPERTINA PROFESSIONALE COLORATA ===
     meta = market_analysis_json.get('meta', {})
     titolo = f"Analisi di Mercato {meta.get('tipo_analisi', '').upper() if meta.get('tipo_analisi') == 'deep' else ''}"
     settore = meta.get('settore', '')
     area_geografica = meta.get('area_geografica', '')
+    data_gen = meta.get('data_generazione', datetime.now().strftime('%d/%m/%Y'))
     
-    story.append(Spacer(1, 4*cm))
-    story.append(Paragraph(titolo, styles['CoverTitle']))
+    # Colori professionali per la copertina (verde per analisi di mercato)
+    primary_color = colors.HexColor('#065f46')  # Verde scuro professionale
+    accent_color = colors.HexColor('#10b981')   # Verde medio
+    light_bg = colors.HexColor('#f0fdf4')       # Sfondo chiaro verde
+    
+    # Box colorato superiore
+    cover_header = Table([
+        ['']  # Spazio per il box colorato
+    ], colWidths=[A4[0] - 4*cm], rowHeights=[3*cm])
+    cover_header.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), primary_color),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+    story.append(cover_header)
+    
+    # Spazio e contenuto principale
+    story.append(Spacer(1, 2*cm))
+    
+    # Titolo principale con stile elegante
+    title_style = ParagraphStyle(
+        name='CoverTitleColored',
+        parent=styles['CoverTitle'],
+        fontName='Times-Bold',
+        fontSize=32,
+        textColor=primary_color,
+        spaceAfter=15,
+        alignment=TA_CENTER,
+        leading=38
+    )
+    story.append(Paragraph(titolo, title_style))
+    
+    # Linea decorativa sotto il titolo
+    decor_line = Table([['']], colWidths=[8*cm], rowHeights=[0.2*cm])
+    decor_line.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), accent_color),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+    ]))
+    story.append(decor_line)
+    
+    # Definisci lo stile del sottotitolo
+    subtitle_style = ParagraphStyle(
+        name='CoverSubtitleColored',
+        parent=styles['CoverSubtitle'],
+        fontName='Times-Roman',
+        fontSize=14,
+        textColor=colors.HexColor('#4b5563'),
+        spaceAfter=10,
+        alignment=TA_CENTER,
+        leading=18
+    )
+    
     if settore:
-        story.append(Spacer(1, 0.5*cm))
-        story.append(Paragraph(settore, styles['CoverSubtitle']))
+        story.append(Spacer(1, 0.8*cm))
+        story.append(Paragraph(settore, subtitle_style))
+    
     if area_geografica:
         story.append(Spacer(1, 0.3*cm))
-        story.append(Paragraph(f"Area Geografica: {area_geografica}", styles['CoverSubtitle']))
+        story.append(Paragraph(f"Area Geografica: {area_geografica}", subtitle_style))
     
-    story.append(Spacer(1, 3*cm))
+    story.append(Spacer(1, 2.5*cm))
     
-    # Data generazione
-    data_gen = meta.get('data_generazione', datetime.now().strftime('%d/%m/%Y'))
-    story.append(Paragraph(f"<i>Documento generato il {data_gen}</i>", styles['Normal']))
+    # Box informativo con sfondo colorato
+    info_data = []
+    info_data.append([f"<b>Data:</b> {data_gen}"])
+    if settore:
+        info_data.append([f"<b>Settore:</b> {settore}"])
+    if area_geografica:
+        info_data.append([f"<b>Area:</b> {area_geografica}"])
+    
+    if info_data:
+        info_table = Table(info_data, colWidths=[12*cm])
+        info_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), light_bg),
+            ('FONTNAME', (0, 0), (-1, -1), 'Times-Roman'),
+            ('FONTSIZE', (0, 0), (-1, -1), 11),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor('#1f2937')),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 20),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 20),
+            ('TOPPADDING', (0, 0), (-1, -1), 12),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e5e7eb')),
+        ]))
+        story.append(info_table)
     
     story.append(PageBreak())
     
@@ -499,6 +571,90 @@ async def create_pdf_from_market_analysis(market_analysis_json: dict) -> str:
         ('LINEBELOW', (0, 9), (1, 9), 1, colors.black),
     ]))
     story.append(firma_table)
+    
+    # === PAGINA FINALE DI CHIUSURA ===
+    story.append(PageBreak())
+    
+    # Box colorato superiore (come copertina)
+    closing_header = Table([['']], colWidths=[A4[0] - 4*cm], rowHeights=[2*cm])
+    closing_header.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), primary_color),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+    story.append(closing_header)
+    
+    story.append(Spacer(1, 3*cm))
+    
+    # Messaggio di chiusura
+    closing_title_style = ParagraphStyle(
+        name='ClosingTitle',
+        parent=styles['CoverTitle'],
+        fontName='Times-Bold',
+        fontSize=24,
+        textColor=primary_color,
+        spaceAfter=20,
+        alignment=TA_CENTER,
+        leading=30
+    )
+    story.append(Paragraph("Grazie per l'attenzione", closing_title_style))
+    
+    story.append(Spacer(1, 1.5*cm))
+    
+    # Messaggio professionale
+    closing_message = """
+    <p align="center">
+    Questa Analisi di Mercato è stata redatta con cura e attenzione ai dettagli.<br/><br/>
+    Per ulteriori informazioni o chiarimenti, non esitate a contattarci.<br/><br/>
+    <i>Documento generato con GetBusinessPlan</i>
+    </p>
+    """
+    closing_style = ParagraphStyle(
+        name='ClosingMessage',
+        parent=styles['Normal'],
+        fontName='Times-Roman',
+        fontSize=12,
+        textColor=colors.HexColor('#4b5563'),
+        alignment=TA_CENTER,
+        leading=18
+    )
+    story.append(Paragraph(closing_message, closing_style))
+    
+    story.append(Spacer(1, 2*cm))
+    
+    # Box informativo finale
+    final_info = [
+        [f"<b>Documento:</b> {titolo}"],
+        [f"<b>Data generazione:</b> {data_gen}"]
+    ]
+    if settore:
+        final_info.append([f"<b>Settore:</b> {settore}"])
+    if area_geografica:
+        final_info.append([f"<b>Area Geografica:</b> {area_geografica}"])
+    
+    final_info_table = Table(final_info, colWidths=[12*cm])
+    final_info_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), light_bg),
+        ('FONTNAME', (0, 0), (-1, -1), 'Times-Roman'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor('#1f2937')),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 20),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 20),
+        ('TOPPADDING', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e5e7eb')),
+    ]))
+    story.append(final_info_table)
+    
+    story.append(Spacer(1, 4*cm))
+    
+    # Footer decorativo
+    footer_decor = Table([['']], colWidths=[A4[0] - 4*cm], rowHeights=[0.3*cm])
+    footer_decor.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), accent_color),
+    ]))
+    story.append(footer_decor)
     
     # Genera il PDF
     doc.build(story)
