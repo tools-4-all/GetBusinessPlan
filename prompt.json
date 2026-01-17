@@ -1,0 +1,738 @@
+{
+    "model": "gpt-5-nano-2025-08-07",
+    "reasoning": { "effort": "medium" },
+    "tools": [
+    {
+      "type": "web_search",
+      "user_location": {
+        "type": "approximate"
+      },
+      "search_context_size": "medium"
+    }
+  ],
+    "input": [
+      {
+        "role": "system",
+        "content": [
+          {
+            "type": "text",
+            "text": "Sei un consulente senior di strategia e pianificazione aziendale specializzato sul mercato italiano. Scrivi in italiano formale, stile relazione professionale. Non inventare normative specifiche: quando citi aspetti fiscali o legali, usa formulazioni prudenti e indica che è necessaria verifica con un professionista abilitato. Mantieni coerenza numerica: margini, ricavi, costi e break-even devono tornare. Se mancano dati, fai ipotesi esplicite e conservative."
+          }
+        ]
+      },
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Genera un business plan professionale e DISCORSIVO per il progetto seguente. Devi restituire ESCLUSIVAMENTE JSON conforme allo schema. Includi grafici (dati + specifica) e una sezione Italia (forma giuridica, adempimenti, regime fiscale a livello generale e prudente).\n\nDATI UTENTE (JSON) — DA USARE COME FONTE PRIMARIA (non inventare dettagli specifici non presenti; se mancano dati usa ASSUNZIONI):\n{{USER_DATA_JSON}}\n\nVINCOLI:\n- Orizzonte: {{HORIZON_MONTHS}} mesi (es: 6)\n- Tre scenari: prudente, base, aggressivo\n- Tutti i numeri in EUR, separatore decimale con punto\n- Inserisci un elenco di 'assunzioni' esplicite e un elenco 'dati_mancanti'\n- Il documento finale sarà convertito in PDF, quindi usa titoli e paragrafi ben strutturati.\n\nOBBLIGO TESTO NARRATIVO (IMPORTANTISSIMO):\n- Per OGNI capitolo in narrative.chapters[], il campo contenuto_markdown deve essere un testo discorsivo, NON un riassunto telegrafico.\n- Ogni contenuto_markdown deve includere:\n  1) almeno 3 paragrafi completi (non frasi singole)\n  2) almeno 1 sottosezione in Markdown con '##' o '###'\n  3) almeno 1 elenco puntato con 4+ punti\n- Lunghezza minima consigliata per capitolo:\n  - CH1_VALUE: >= 350 parole\n  - CH2_MARKET: >= 550 parole\n  - CH3_BUSINESS_MODEL: >= 450 parole\n  - CH4_FINANCIALS: >= 550 parole\n  - CH5_ITALIA: >= 300 parole\n  - CH6_RISKS_ROADMAP: >= 500 parole\n  - CH7_CHARTS: >= 300 parole (spiega cosa mostrano i grafici e come leggerli)\n  - CH8_APPENDIX: >= 200 parole\n- Quando introduci numeri (prezzi, CAC, churn, conversioni, costi), devi:\n  a) indicare chiaramente se è dato utente o ASSUNZIONE\n  b) usare quei numeri in modo coerente in financials e nei capitoli\n\nISTRUZIONI DI COERENZA (OBBLIGATORIE):\n- 'pdf_layout.chapter_order' deve contenere gli stessi id presenti in 'narrative.chapters[].id' nello stesso ordine.\n- Ogni elemento di 'narrative.chapters[].chart_ids' deve esistere in 'charts[].id'.\n- Ogni elemento di 'charts[].chapter_id' deve corrispondere a un capitolo esistente in 'narrative.chapters[].id'.\n- In 'financials.scenarios[].monthly[]' popola esattamente {{HORIZON_MONTHS}} record (month=1..{{HORIZON_MONTHS}}).\n- Coerenza contabile: gross_profit = revenue - cogs; net_cash_flow = cash_in - cash_out.\n\nREGOLE SU ASSUNZIONI:\n- Se mancano dati su: TAM/SAM/SOM, conversioni funnel, churn, CAC per canale, costi fissi, costi variabili, ARPA/mix piani: inserisci ASSUNZIONI conservative e riportale sia in assumptions[] sia nel testo dei capitoli dove rilevanti.\n- Non spacciare mai un'ASSUNZIONE come fatto reale.\n\nREQUISITI GRAFICI (minimo 6):\n- Inserisci almeno:\n  1) evoluzione clienti cumulativi per scenario (line)\n  2) ricavi mensili per scenario (line)\n  3) ricavo cumulativo totale per scenario (bar)\n  4) cash balance mensile per scenario base (line)\n  5) EBITDA mensile scenario base (bar)\n  6) un grafico di supporto a scelta coerente (es. composizione assunzioni o funnel) (pie/bar)\n\nNOTA: se l'utente non fornisce dettagli operativi, mantieni il business plan professionale ma esplicita che è una prima versione basata su ipotesi e che serve validazione (pilota, metriche, test canali)."
+          }
+        ]
+      }
+    ],
+    "text": {
+      "format": {
+        "type": "json_schema",
+        "name": "business_model_report_it",
+        "strict": true,
+        "schema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "meta",
+            "pdf_layout",
+            "executive_summary",
+            "data",
+            "narrative",
+            "charts",
+            "assumptions",
+            "dati_mancanti",
+            "disclaimer"
+          ],
+          "properties": {
+            "meta": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["lingua", "stile", "orizzonte_mesi", "data_generazione", "versione"],
+              "properties": {
+                "lingua": { "type": "string", "enum": ["it-IT"] },
+                "stile": { "type": "string", "enum": ["formale"] },
+                "orizzonte_mesi": { "type": "integer", "minimum": 6, "maximum": 60 },
+                "data_generazione": { "type": "string" },
+                "versione": { "type": "string" }
+              }
+            },
+  
+            "pdf_layout": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "titolo_documento",
+                "sottotitolo",
+                "confidenzialita",
+                "header",
+                "footer",
+                "chapter_order",
+                "style_hints"
+              ],
+              "properties": {
+                "titolo_documento": { "type": "string" },
+                "sottotitolo": { "type": "string" },
+                "confidenzialita": {
+                  "type": "string",
+                  "enum": ["pubblico", "uso_interno", "confidenziale"]
+                },
+                "header": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["left", "right"],
+                  "properties": {
+                    "left": { "type": "string" },
+                    "right": { "type": "string" }
+                  }
+                },
+                "footer": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["left", "center", "right"],
+                  "properties": {
+                    "left": { "type": "string" },
+                    "center": { "type": "string" },
+                    "right": { "type": "string" }
+                  }
+                },
+                "chapter_order": {
+                  "type": "array",
+                  "minItems": 8,
+                  "items": { "type": "string" },
+                  "description": "Lista di id capitoli nell'ordine di stampa PDF, es: CH1_VALUE, CH2_MARKET..."
+                },
+                "style_hints": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "tone",
+                    "tables_density",
+                    "include_table_of_contents",
+                    "max_charts_per_page"
+                  ],
+                  "properties": {
+                    "tone": { "type": "string", "enum": ["formale", "molto_formale"] },
+                    "tables_density": { "type": "string", "enum": ["bassa", "media", "alta"] },
+                    "include_table_of_contents": { "type": "boolean" },
+                    "max_charts_per_page": { "type": "integer", "minimum": 1, "maximum": 4 }
+                  }
+                }
+              }
+            },
+  
+            "executive_summary": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["sintesi", "punti_chiave", "kpi_principali", "raccomandazioni_30_60_90"],
+              "properties": {
+                "sintesi": { "type": "string" },
+                "punti_chiave": {
+                  "type": "array",
+                  "items": { "type": "string" },
+                  "minItems": 4,
+                  "maxItems": 10
+                },
+                "kpi_principali": {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 10,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["nome", "valore", "unita", "scenario"],
+                    "properties": {
+                      "nome": { "type": "string" },
+                      "valore": { "type": "number" },
+                      "unita": { "type": "string" },
+                      "scenario": { "type": "string", "enum": ["prudente", "base", "aggressivo"] }
+                    }
+                  }
+                },
+                "raccomandazioni_30_60_90": {
+                  "type": "array",
+                  "minItems": 6,
+                  "maxItems": 15,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["orizzonte_giorni", "azione", "motivazione", "priorita"],
+                    "properties": {
+                      "orizzonte_giorni": { "type": "integer", "enum": [30, 60, 90] },
+                      "azione": { "type": "string" },
+                      "motivazione": { "type": "string" },
+                      "priorita": { "type": "string", "enum": ["alta", "media", "bassa"] }
+                    }
+                  }
+                }
+              }
+            },
+  
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "project",
+                "offering",
+                "customers",
+                "market",
+                "competition",
+                "business_model",
+                "go_to_market",
+                "operations",
+                "italia",
+                "risks",
+                "roadmap",
+                "financials"
+              ],
+              "properties": {
+                "project": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["nome", "settore", "geografia", "orizzonte_mesi", "obiettivo_documento"],
+                  "properties": {
+                    "nome": { "type": "string" },
+                    "settore": { "type": "string" },
+                    "geografia": {
+                      "type": "string",
+                      "description": "Es. Italia, Lazio, UE"
+                    },
+                    "orizzonte_mesi": { "type": "integer", "minimum": 6, "maximum": 60 },
+                    "obiettivo_documento": {
+                      "type": "string",
+                      "enum": ["uso_interno", "investitori", "banca", "bando"]
+                    }
+                  }
+                },
+  
+                "offering": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["tipo", "descrizione", "value_proposition", "differenziatori", "delivery"],
+                  "properties": {
+                    "tipo": { "type": "string", "enum": ["prodotto", "servizio", "piattaforma", "ibrido"] },
+                    "descrizione": { "type": "string" },
+                    "value_proposition": { "type": "string" },
+                    "differenziatori": {
+                      "type": "array",
+                      "minItems": 3,
+                      "maxItems": 10,
+                      "items": { "type": "string" }
+                    },
+                    "delivery": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["canale", "note"],
+                      "properties": {
+                        "canale": { "type": "string", "enum": ["online", "fisico", "ibrido"] },
+                        "note": { "type": "string" }
+                      }
+                    }
+                  }
+                },
+  
+                "customers": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["segmenti", "problemi", "job_to_be_done", "buyer_persona"],
+                  "properties": {
+                    "segmenti": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 5,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["nome", "tipo", "dimensione", "geografia", "priorita"],
+                        "properties": {
+                          "nome": { "type": "string" },
+                          "tipo": { "type": "string", "enum": ["B2C", "B2B", "B2G"] },
+                          "dimensione": {
+                            "type": "string",
+                            "description": "Es. microimprese, PMI, enterprise, privati"
+                          },
+                          "geografia": { "type": "string" },
+                          "priorita": { "type": "string", "enum": ["primario", "secondario"] }
+                        }
+                      }
+                    },
+                    "problemi": {
+                      "type": "array",
+                      "minItems": 3,
+                      "maxItems": 10,
+                      "items": { "type": "string" }
+                    },
+                    "job_to_be_done": {
+                      "type": "array",
+                      "minItems": 2,
+                      "maxItems": 6,
+                      "items": { "type": "string" }
+                    },
+                    "buyer_persona": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["ruolo", "obiettivi", "obiezioni", "trigger_acquisto"],
+                      "properties": {
+                        "ruolo": { "type": "string" },
+                        "obiettivi": {
+                          "type": "array",
+                          "minItems": 2,
+                          "maxItems": 6,
+                          "items": { "type": "string" }
+                        },
+                        "obiezioni": {
+                          "type": "array",
+                          "minItems": 2,
+                          "maxItems": 6,
+                          "items": { "type": "string" }
+                        },
+                        "trigger_acquisto": {
+                          "type": "array",
+                          "minItems": 2,
+                          "maxItems": 6,
+                          "items": { "type": "string" }
+                        }
+                      }
+                    }
+                  }
+                },
+  
+                "market": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["tam_sam_som", "trend", "driver", "barriere", "ipotesi_dimensionamento"],
+                  "properties": {
+                    "tam_sam_som": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["tam_eur_annuo", "sam_eur_annuo", "som_eur_annuo", "metodo"],
+                      "properties": {
+                        "tam_eur_annuo": { "type": "number", "minimum": 0 },
+                        "sam_eur_annuo": { "type": "number", "minimum": 0 },
+                        "som_eur_annuo": { "type": "number", "minimum": 0 },
+                        "metodo": {
+                          "type": "string",
+                          "description": "Top-down / bottom-up / proxy e ipotesi"
+                        }
+                      }
+                    },
+                    "trend": { "type": "array", "minItems": 2, "maxItems": 8, "items": { "type": "string" } },
+                    "driver": { "type": "array", "minItems": 2, "maxItems": 8, "items": { "type": "string" } },
+                    "barriere": { "type": "array", "minItems": 2, "maxItems": 8, "items": { "type": "string" } },
+                    "ipotesi_dimensionamento": { "type": "array", "minItems": 3, "maxItems": 12, "items": { "type": "string" } }
+                  }
+                },
+  
+                "competition": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["competitor_list", "posizionamento", "vantaggi_competitivi"],
+                  "properties": {
+                    "competitor_list": {
+                      "type": "array",
+                      "minItems": 2,
+                      "maxItems": 10,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["nome", "tipo", "prezzo_range", "punti_forza", "punti_debolezza"],
+                        "properties": {
+                          "nome": { "type": "string" },
+                          "tipo": { "type": "string", "enum": ["diretto", "indiretto", "alternativa"] },
+                          "prezzo_range": { "type": "string" },
+                          "punti_forza": { "type": "array", "minItems": 2, "maxItems": 6, "items": { "type": "string" } },
+                          "punti_debolezza": { "type": "array", "minItems": 2, "maxItems": 6, "items": { "type": "string" } }
+                        }
+                      }
+                    },
+                    "posizionamento": { "type": "string" },
+                    "vantaggi_competitivi": { "type": "array", "minItems": 3, "maxItems": 10, "items": { "type": "string" } }
+                  }
+                },
+  
+                "business_model": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["revenue_streams", "pricing", "cost_structure", "unit_economics"],
+                  "properties": {
+                    "revenue_streams": { "type": "array", "minItems": 1, "maxItems": 6, "items": { "type": "string" } },
+                    "pricing": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["modello", "piani", "note"],
+                      "properties": {
+                        "modello": { "type": "string", "enum": ["one_shot", "subscription", "commission", "ibrido"] },
+                        "piani": {
+                          "type": "array",
+                          "minItems": 1,
+                          "maxItems": 5,
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["nome", "prezzo_eur", "periodicita", "incluso"],
+                            "properties": {
+                              "nome": { "type": "string" },
+                              "prezzo_eur": { "type": "number", "minimum": 0 },
+                              "periodicita": { "type": "string", "enum": ["una_tantum", "mensile", "annuale"] },
+                              "incluso": { "type": "array", "minItems": 2, "maxItems": 12, "items": { "type": "string" } }
+                            }
+                          }
+                        },
+                        "note": { "type": "string" }
+                      }
+                    },
+                    "cost_structure": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["costi_fissi_mensili_eur", "costi_variabili_per_unita_eur", "note"],
+                      "properties": {
+                        "costi_fissi_mensili_eur": { "type": "number", "minimum": 0 },
+                        "costi_variabili_per_unita_eur": { "type": "number", "minimum": 0 },
+                        "note": { "type": "string" }
+                      }
+                    },
+                    "unit_economics": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["margine_lordo_percent", "cac_eur", "ltv_eur", "payback_mesi", "metodo"],
+                      "properties": {
+                        "margine_lordo_percent": { "type": "number", "minimum": 0, "maximum": 100 },
+                        "cac_eur": { "type": "number", "minimum": 0 },
+                        "ltv_eur": { "type": "number", "minimum": 0 },
+                        "payback_mesi": { "type": "number", "minimum": 0 },
+                        "metodo": { "type": "string" }
+                      }
+                    }
+                  }
+                },
+  
+                "go_to_market": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["canali", "messaggi", "funnel", "budget_marketing_mensile_eur", "kpi_acquisizione"],
+                  "properties": {
+                    "canali": { "type": "array", "minItems": 2, "maxItems": 8, "items": { "type": "string" } },
+                    "messaggi": { "type": "array", "minItems": 2, "maxItems": 8, "items": { "type": "string" } },
+                    "funnel": {
+                      "type": "array",
+                      "minItems": 3,
+                      "maxItems": 7,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["step", "conversion_rate_percent", "note"],
+                        "properties": {
+                          "step": { "type": "string" },
+                          "conversion_rate_percent": { "type": "number", "minimum": 0, "maximum": 100 },
+                          "note": { "type": "string" }
+                        }
+                      }
+                    },
+                    "budget_marketing_mensile_eur": { "type": "number", "minimum": 0 },
+                    "kpi_acquisizione": { "type": "array", "minItems": 3, "maxItems": 10, "items": { "type": "string" } }
+                  }
+                },
+  
+                "operations": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["team", "processi", "stack", "partner", "capacita"],
+                  "properties": {
+                    "team": { "type": "array", "minItems": 1, "maxItems": 10, "items": { "type": "string" } },
+                    "processi": { "type": "array", "minItems": 3, "maxItems": 10, "items": { "type": "string" } },
+                    "stack": { "type": "array", "minItems": 2, "maxItems": 12, "items": { "type": "string" } },
+                    "partner": { "type": "array", "minItems": 0, "maxItems": 10, "items": { "type": "string" } },
+                    "capacita": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["unita_mese_max", "vincoli"],
+                      "properties": {
+                        "unita_mese_max": { "type": "number", "minimum": 0 },
+                        "vincoli": { "type": "array", "minItems": 1, "maxItems": 8, "items": { "type": "string" } }
+                      }
+                    }
+                  }
+                },
+  
+                "italia": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "forma_giuridica_opzioni",
+                    "regime_fiscale_note",
+                    "adempimenti_checklist",
+                    "privacy_e_contratti",
+                    "raccomandazioni_prudenti"
+                  ],
+                  "properties": {
+                    "forma_giuridica_opzioni": {
+                      "type": "array",
+                      "minItems": 2,
+                      "maxItems": 6,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["opzione", "pro", "contro", "quando_sensata"],
+                        "properties": {
+                          "opzione": { "type": "string" },
+                          "pro": { "type": "array", "minItems": 2, "maxItems": 6, "items": { "type": "string" } },
+                          "contro": { "type": "array", "minItems": 2, "maxItems": 6, "items": { "type": "string" } },
+                          "quando_sensata": { "type": "string" }
+                        }
+                      }
+                    },
+                    "regime_fiscale_note": { "type": "array", "minItems": 3, "maxItems": 12, "items": { "type": "string" } },
+                    "adempimenti_checklist": {
+                      "type": "array",
+                      "minItems": 5,
+                      "maxItems": 20,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["tema", "impatto", "azione_suggerita", "priorita"],
+                        "properties": {
+                          "tema": { "type": "string" },
+                          "impatto": { "type": "string" },
+                          "azione_suggerita": { "type": "string" },
+                          "priorita": { "type": "string", "enum": ["alta", "media", "bassa"] }
+                        }
+                      }
+                    },
+                    "privacy_e_contratti": { "type": "array", "minItems": 2, "maxItems": 10, "items": { "type": "string" } },
+                    "raccomandazioni_prudenti": { "type": "array", "minItems": 3, "maxItems": 12, "items": { "type": "string" } }
+                  }
+                },
+  
+                "risks": {
+                  "type": "array",
+                  "minItems": 6,
+                  "maxItems": 20,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["categoria", "descrizione", "probabilita", "impatto", "mitigazione"],
+                    "properties": {
+                      "categoria": {
+                        "type": "string",
+                        "enum": ["mercato", "prodotto", "go_to_market", "operativo", "legale_fiscale", "finanziario"]
+                      },
+                      "descrizione": { "type": "string" },
+                      "probabilita": { "type": "string", "enum": ["bassa", "media", "alta"] },
+                      "impatto": { "type": "string", "enum": ["basso", "medio", "alto"] },
+                      "mitigazione": { "type": "string" }
+                    }
+                  }
+                },
+  
+                "roadmap": {
+                  "type": "array",
+                  "minItems": 6,
+                  "maxItems": 20,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["mese_inizio", "mese_fine", "fase", "deliverable", "kpi"],
+                    "properties": {
+                      "mese_inizio": { "type": "integer", "minimum": 1, "maximum": 60 },
+                      "mese_fine": { "type": "integer", "minimum": 1, "maximum": 60 },
+                      "fase": { "type": "string" },
+                      "deliverable": { "type": "array", "minItems": 1, "maxItems": 8, "items": { "type": "string" } },
+                      "kpi": { "type": "array", "minItems": 1, "maxItems": 6, "items": { "type": "string" } }
+                    }
+                  }
+                },
+  
+                "financials": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["currency", "scenarios", "metric_definitions"],
+                  "properties": {
+                    "currency": { "type": "string", "enum": ["EUR"] },
+                    "metric_definitions": {
+                      "type": "array",
+                      "minItems": 6,
+                      "maxItems": 30,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["key", "label", "unit", "formula_note"],
+                        "properties": {
+                          "key": { "type": "string" },
+                          "label": { "type": "string" },
+                          "unit": { "type": "string" },
+                          "formula_note": { "type": "string" }
+                        }
+                      }
+                    },
+                    "scenarios": {
+                      "type": "array",
+                      "minItems": 3,
+                      "maxItems": 3,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["name", "assumption_deltas", "monthly", "summary"],
+                        "properties": {
+                          "name": { "type": "string", "enum": ["prudente", "base", "aggressivo"] },
+                          "assumption_deltas": {
+                            "type": "array",
+                            "minItems": 3,
+                            "maxItems": 12,
+                            "items": { "type": "string" }
+                          },
+                          "monthly": {
+                            "type": "array",
+                            "minItems": 6,
+                            "maxItems": 60,
+                            "items": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "month",
+                                "customers",
+                                "new_customers",
+                                "revenue",
+                                "cogs",
+                                "gross_profit",
+                                "fixed_costs",
+                                "marketing_costs",
+                                "ebitda",
+                                "cash_in",
+                                "cash_out",
+                                "net_cash_flow",
+                                "cash_balance"
+                              ],
+                              "properties": {
+                                "month": { "type": "integer", "minimum": 1, "maximum": 60 },
+                                "customers": { "type": "number", "minimum": 0 },
+                                "new_customers": { "type": "number", "minimum": 0 },
+                                "revenue": { "type": "number" },
+                                "cogs": { "type": "number" },
+                                "gross_profit": { "type": "number" },
+                                "fixed_costs": { "type": "number" },
+                                "marketing_costs": { "type": "number" },
+                                "ebitda": { "type": "number" },
+                                "cash_in": { "type": "number" },
+                                "cash_out": { "type": "number" },
+                                "net_cash_flow": { "type": "number" },
+                                "cash_balance": { "type": "number" }
+                              }
+                            }
+                          },
+                          "summary": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "total_revenue",
+                              "avg_gross_margin_percent",
+                              "breakeven_month_estimate",
+                              "min_cash_balance",
+                              "end_cash_balance"
+                            ],
+                            "properties": {
+                              "total_revenue": { "type": "number" },
+                              "avg_gross_margin_percent": { "type": "number", "minimum": 0, "maximum": 100 },
+                              "breakeven_month_estimate": { "type": "integer", "minimum": 1, "maximum": 60 },
+                              "min_cash_balance": { "type": "number" },
+                              "end_cash_balance": { "type": "number" }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+  
+            "narrative": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["chapters"],
+              "properties": {
+                "chapters": {
+                  "type": "array",
+                  "minItems": 8,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["id", "titolo", "contenuto_markdown", "chart_ids"],
+                    "properties": {
+                      "id": { "type": "string" },
+                      "titolo": { "type": "string" },
+                      "contenuto_markdown": { "type": "string" },
+                      "chart_ids": { "type": "array", "items": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            },
+  
+            "charts": {
+              "type": "array",
+              "minItems": 6,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "titolo", "tipo", "x_label", "y_label", "series", "caption", "chapter_id"],
+                "properties": {
+                  "id": { "type": "string" },
+                  "chapter_id": { "type": "string" },
+                  "titolo": { "type": "string" },
+                  "tipo": { "type": "string", "enum": ["line", "bar", "pie"] },
+                  "x_label": { "type": "string" },
+                  "y_label": { "type": "string" },
+                  "series": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["name", "points"],
+                      "properties": {
+                        "name": { "type": "string" },
+                        "points": {
+                          "type": "array",
+                          "minItems": 3,
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["x", "y"],
+                            "properties": {
+                              "x": { "type": "string" },
+                              "y": { "type": "number" }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "caption": { "type": "string" }
+                }
+              }
+            },
+  
+            "assumptions": {
+              "type": "array",
+              "items": { "type": "string" },
+              "minItems": 8,
+              "maxItems": 30
+            },
+            "dati_mancanti": {
+              "type": "array",
+              "items": { "type": "string" },
+              "minItems": 5,
+              "maxItems": 30
+            },
+            "disclaimer": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+  

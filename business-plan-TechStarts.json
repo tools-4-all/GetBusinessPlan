@@ -1,0 +1,1538 @@
+{
+  "meta": {
+    "lingua": "it-IT",
+    "stile": "formale",
+    "orizzonte_mesi": 6,
+    "data_generazione": "2026-01-16",
+    "versione": "1.0"
+  },
+  "pdf_layout": {
+    "titolo_documento": "Business Plan 6 mesi - Progetto DISCORSIVO",
+    "sottotitolo": "Analisi strategica, modelli operativi e proiezioni finanziarie prudenti, base e aggressive",
+    "confidenzialita": "confidenziale",
+    "header": {
+      "left": "Progetto: Piattaforma di gestione PMI Italia",
+      "right": "Versione 1.0 - Gen/2026"
+    },
+    "footer": {
+      "left": "Documento Generato",
+      "center": "Pagina",
+      "right": "Italia"
+    },
+    "chapter_order": [
+      "CH1_VALUE",
+      "CH2_MARKET",
+      "CH3_BUSINESS_MODEL",
+      "CH4_FINANCIALS",
+      "CH5_ITALIA",
+      "CH6_RISKS_ROADMAP",
+      "CH7_CHARTS",
+      "CH8_APPENDIX"
+    ],
+    "style_hints": {
+      "tone": "formale",
+      "tables_density": "media",
+      "include_table_of_contents": true,
+      "max_charts_per_page": 2
+    }
+  },
+  "executive_summary": {
+    "sintesi": "Questo documento presenta una versione iniziale di un business plan di 6 mesi per una piattaforma digitale destinata alla gestione di processi e operatività delle PMI italiane. Il contenuto è articolato in scenari prudenti, base e aggressivo, con obiettivi di convalida rapida, misurazione tramite KPI chiave e una roadmap di implementazione contenuta nel periodo di horizon. L’obiettivo è offrire una lettura discorsiva, comprensibile e utilizzabile anche per una discussione con potenziali investitori, banche o advisor, pur mantenendo una precisa tracciabilità tra assunzioni, dati e output finanziari. È importante sottolineare fin da subito che, a seguito dell’assenza di alcuni dati operativi, il documento si presenta come una versione basata su ASSUNZIONI conservative che necessitano validazione tramite pilota, metriche di performance e test canali.",
+    "punti_chiave": [
+      "Proposta di valore chiara e differenziante per PMI italiane",
+      "Scenario multiplo per gestione incertezza: prudenti, base, aggressivo",
+      "Proiezioni finanziarie integrate con scostamenti tra scenari e indicatori chiave",
+      "Necessità di validazione operativa: pilota, metriche, test canali"
+    ],
+    "kpi_principali": [
+      {
+        "nome": "Ricavi mensili (EUR)",
+        "valore": 0,
+        "unita": "EUR",
+        "scenario": "prudente"
+      },
+      {
+        "nome": "EBITDA mensile (EUR)",
+        "valore": 0,
+        "unita": "EUR",
+        "scenario": "base"
+      },
+      {
+        "nome": "Cash balance finale mese 6 (EUR)",
+        "valore": 0,
+        "unita": "EUR",
+        "scenario": "aggressivo"
+      }
+    ],
+    "raccomandazioni_30_60_90": [
+      {
+        "orizzonte_giorni": 30,
+        "azione": "Lancio pilota in segmento target con 2 canali (online + partnership di canale)",
+        "motivazione": "Validare ipotesi di CAC, funnel e ARPU, riducendo rischio operativo",
+        "priorita": "alta"
+      },
+      {
+        "orizzonte_giorni": 60,
+        "azione": "Raffinare modelli di pricing e piani per PMI in base ai feedback pilota",
+        "motivazione": "Ottimizzare ARPU e tasso di conversione",
+        "priorita": "media"
+      },
+      {
+        "orizzonte_giorni": 90,
+        "azione": "Integrazione con strumenti contabili locali e verifica compliance legale/fiscale",
+        "motivazione": "Preparare la governance per scale-up e accesso a finanziamenti",
+        "priorita": "alta"
+      },
+      {
+        "orizzonte_giorni": 90,
+        "azione": "Preparare piano di fundraising o richiesta di linee di credito",
+        "motivazione": "Assicurare sufficiente liquidità per la fase di scale-up",
+        "priorita": "bassa"
+      },
+      {
+        "orizzonte_giorni": 60,
+        "azione": "Definire KPI di churn e retention post-pilota",
+        "motivazione": "Garantire sostenibilità a medio termine",
+        "priorita": "media"
+      },
+      {
+        "orizzonte_giorni": 30,
+        "azione": "Creare materialità delle metriche per reportistica interna ed esterna",
+        "motivazione": "Migliorare trasparenza e governance",
+        "priorita": "bassa"
+      }
+    ]
+  },
+  "data": {
+    "project": {
+      "nome": "Piattaforma di gestione PMI Italia",
+      "settore": "B2B SaaS/servizi digitali",
+      "geografia": "Italia",
+      "orizzonte_mesi": 6,
+      "obiettivo_documento": "investitori"
+    },
+    "offering": {
+      "tipo": "ibrido",
+      "descrizione": "Piattaforma digitale modulare per automazione processi PMI, con strumenti di CRM, workflow management e reportistica",
+      "value_proposition": "Riduzione tempo gestione, incremento conversione, miglior controllo KPI",
+      "differenziatori": [
+        "Architectural modularity",
+        "Pricing flessibile per PMI",
+        "Integrazione con strumenti contabili italiani",
+        "Supporto ad onboarding rapido"
+      ],
+      "delivery": {
+        "canale": "online",
+        "note": "Distribuzione principalmente digitale con supporto via partner e integratori locali"
+      }
+    },
+    "customers": {
+      "segmenti": [
+        {
+          "nome": "PMI italiane",
+          "tipo": "B2B",
+          "dimensione": "PMI",
+          "geografia": "Italia",
+          "priorita": "primario"
+        }
+      ],
+      "problemi": [
+        "Carenza di strumenti integrati per gestione operativa",
+        "Scarsa visibilità su KPI chiave",
+        "Dipendenza da fogli di calcolo disorganizzati",
+        "Complessità di integrazione tra sistemi gestionali esistenti"
+      ],
+      "job_to_be_done": [
+        "Razionalizzare processi interni",
+        "Ottenere KPI affidabili",
+        "Ridurre tempo amministrativo",
+        "Aumentare la visibilità operativa per decisioni rapide"
+      ],
+      "buyer_persona": {
+        "ruolo": "CEO/Operations Manager",
+        "obiettivi": [
+          "Tempo di gestione ridotto",
+          "Visibilità KPI in tempo reale",
+          "Maggiore controllo su costi e margini",
+          "Facile onboarding per i team"
+        ],
+        "obiezioni": [
+          "Costo iniziale",
+          "Incertezza sull'efficacia",
+          "Rischio di interruzione operativa durante l'implementazione",
+          "Integrazione con sistemi legacy"
+        ],
+        "trigger_acquisto": [
+          "Highlight di ROI in 90 giorni",
+          "Referenze settore",
+          "Prova gratuita o pilot",
+          "Compatibilità con tool contabili italiani"
+        ]
+      }
+    },
+    "market": {
+      "tam_sam_som": {
+        "tam_eur_annuo": 9000000,
+        "sam_eur_annuo": 3500000,
+        "som_eur_annuo": 600000,
+        "metodo": "proxy e ipotesi"
+      },
+      "trend": [
+        "Digitalizzazione PMI",
+        "Adozione di soluzioni modulari",
+        "Crescente domanda di integrazione software"
+      ],
+      "driver": [
+        "Aumento produttività",
+        "Riduzione costi operativi",
+        "Conformità normativa e contabilità digitale"
+      ],
+      "barriere": [
+        "Resistenza al cambiamento",
+        "Sicurezza e privacy",
+        "Costo iniziale",
+        "Integrazione tecnica"
+      ],
+      "ipotesi_dimensionamento": [
+        "TAM: 9M EUR/anno, SAM: 3.5M EUR/anno, SOM: 0.6M EUR/anno; ipotesi conservative per 6 mesi",
+        "Percentuali di conversione e crescita basate su benchmark di mercato standard per soluzioni di gestione PMI",
+        "Tassi di penetrazione di canale moderate per primi 6 mesi"
+      ]
+    },
+    "competition": {
+      "competitor_list": [
+        {
+          "nome": "Soluzioni integrate esistenti",
+          "tipo": "diretto",
+          "prezzo_range": "200-600 EUR/mese",
+          "punti_forza": [
+            "Integrazione contabilità italiana",
+            "Reco degli ordini",
+            "Prezzi accessibili"
+          ],
+          "punti_debolezza": [
+            "Mancanza di modularità",
+            "Scalabilità limitata"
+          ]
+        },
+        {
+          "nome": "Alternative via pacchetti generici",
+          "tipo": "indiretto",
+          "prezzo_range": "50-150 EUR/mese",
+          "punti_forza": [
+            "Prezzo contenuto",
+            "Flessibilità"
+          ],
+          "punti_debolezza": [
+            "Mola limitata per PMI",
+            "Supporto tecnico meno robusto"
+          ]
+        },
+        {
+          "nome": "Servizi di consulenza e custom software",
+          "tipo": "alternativa",
+          "prezzo_range": "variabile",
+          "punti_forza": [
+            "Personalizzazione",
+            "Flessibilità",
+            "Supporto dedicato"
+          ],
+          "punti_debolezza": [
+            "Costi elevati",
+            "Tempo di implementazione lungo"
+          ]
+        }
+      ],
+      "posizionamento": "Offrire una piattaforma modulare con integrazione contabilità italiana, onboarding rapido e pricing scalabile per PMI",
+      "vantaggi_competitivi": [
+        "Modularità e integrazione nativa",
+        "Pricing orientato PMI",
+        "Approccio di implementazione rapido",
+        "Supporto locale e conformità normativa"
+      ]
+    },
+    "business_model": {
+      "revenue_streams": [
+        "Subscriptions",
+        "One-time onboarding/integrazione",
+        "Commissioni su integrazioni premium"
+      ],
+      "pricing": {
+        "modello": "ibrido",
+        "piani": [
+          {
+            "nome": "Starter",
+            "prezzo_eur": 19,
+            "periodicita": "mensile",
+            "incluso": [
+              "CRM base",
+              "Workflow base",
+              "Workflow di reportistica"
+            ]
+          },
+          {
+            "nome": "Growth",
+            "prezzo_eur": 59,
+            "periodicita": "mensile",
+            "incluso": [
+              "CRM avanzato",
+              "Automazioni",
+              "Dashboard KPI"
+            ]
+          },
+          {
+            "nome": "Scale",
+            "prezzo_eur": 129,
+            "periodicita": "mensile",
+            "incluso": [
+              "Integrazione contabile italiana",
+              "Audit log",
+              "Supporto premium"
+            ]
+          }
+        ],
+        "note": "Possibilità di sconto per impegno annuale"
+      },
+      "cost_structure": {
+        "costi_fissi_mensili_eur": 15000,
+        "costi_variabili_per_unita_eur": 0,
+        "note": "Costi indicativi basati su implementazione pilota"
+      },
+      "unit_economics": {
+        "margine_lordo_percent": 68,
+        "cac_eur": 250,
+        "ltv_eur": 15000,
+        "payback_mesi": 6,
+        "metodo": "base"
+      }
+    },
+    "go_to_market": {
+      "canali": [
+        "Listing marketplace digitale",
+        "Partnering con studi contabili/associazioni di categoria",
+        "Canali diretti via sito + onboarding self-service"
+      ],
+      "messaggi": [
+        "Riduci tempo di gestione con automazioni",
+        "Contabilità italiana integrata",
+        "Insights KPI in tempo reale"
+      ],
+      "funnel": [
+        {
+          "step": "Visitatori",
+          "conversion_rate_percent": 8,
+          "note": "Stima base per sito e landing"
+        },
+        {
+          "step": "Trial/Onboarding",
+          "conversion_rate_percent": 25,
+          "note": "Conversione da free to paid"
+        },
+        {
+          "step": "Abbonamenti attivi",
+          "conversion_rate_percent": 40,
+          "note": "Retention e upsell"
+        }
+      ],
+      "budget_marketing_mensile_eur": 7000,
+      "kpi_acquisizione": [
+        "Costo di acquisizione cliente (CAC)",
+        "Tempo di payback",
+        "Tasso di conversione funnel"
+      ]
+    },
+    "operations": {
+      "team": [
+        "CEO/Founder",
+        "Head of Product",
+        "Growth & Marketing",
+        "Sales",
+        "Customer Success",
+        "Finance & Legal"
+      ],
+      "processi": [
+        "Gestione backlog sviluppo",
+        "Onboarding clienti",
+        "Integrazione sistemi contabili italiani",
+        "Supporto tecnico e assistenza"
+      ],
+      "stack": [
+        "SaaS platform",
+        "CRM",
+        "Analytics",
+        "Piattaforma di pagamento",
+        "Integrazione contabili italiani"
+      ],
+      "partner": [
+        "Studi professionali italiani",
+        "Integrator IT locali"
+      ],
+      "capacita": {
+        "unita_mese_max": 60,
+        "vincoli": [
+          "Disponibilità risorse tecniche",
+          "Tempo di integrazione fra tool"
+        ]
+      }
+    },
+    "italia": {
+      "forma_giuridica_opzioni": [
+        {
+          "opzione": "SRL",
+          "pro": [
+            "Responsabilità limitata dei soci",
+            "Possibilità di investitori",
+            "Facilità di accesso finanziamenti"
+          ],
+          "contro": [
+            "Capitale minimo richiesto",
+            "Regime fiscale complesso per piccole imprese"
+          ],
+          "quando_sensata": "Quando si prevede crescita e necessità di assetti societari chiari"
+        },
+        {
+          "opzione": "SAS",
+          "pro": [
+            "Maggiore flessibilità organizzativa",
+            "Possibilità di conferimenti di servizi"
+          ],
+          "contro": [
+            "Costi di gestione più elevati",
+            "Complessità gestionali"
+          ],
+          "quando_sensata": "In caso di collaborazione con partner e necessità di flussi di reddito differenziati"
+        },
+        {
+          "opzione": "startup innovativa",
+          "pro": [
+            "Agevolazioni su agevolazioni fiscali e accesso a fondo perduto/venture capital",
+            "Accesso a esenzioni su contributi",
+            "Possibilità di trattamento agevolato"
+          ],
+          "contro": [
+            "Requisiti di innovatività",
+            "Complessità amministrativa"
+          ],
+          "quando_sensata": "Quando si ha innovazione tecnologica e interesse ad accelerare crescita con funding pubblico"
+        }
+      ],
+      "regime_fiscale_note": [
+        "Il regime fiscale generale dipende dalla forma giuridica prescelta; è vivamente consigliata verifica con un professionista abilitato per la definizione del regime IVA, regime forfettario o ordinario, e degli obblighi contabili e fiscali specifici.",
+        "adempimenti_checklist:[{",
+        "tema",
+        "impatto",
+        "azione_suggerita",
+        "priorita"
+      ],
+      "adempimenti_checklist": [
+        {
+          "tema": "Iscrizione al registro delle imprese",
+          "impatto": "Necessario per operare legalmente",
+          "azione_suggerita": "Verificare sedi e codici attività, presentare dichiarazioni iniziali",
+          "priorita": "alta"
+        },
+        {
+          "tema": "Gestione contabilità IVA",
+          "impatto": "Tracciabilità operazioni e detrazioni",
+          "azione_suggerita": "Organizzare piano contabile conforme al regime scelto",
+          "priorita": "alta"
+        },
+        {
+          "tema": "Bilancio e adempimenti annuali",
+          "impatto": "Comunicazioni tributarie e bilancio",
+          "azione_suggerita": "Predisporre bilancio e nota integrativa",
+          "priorita": "media"
+        },
+        {
+          "tema": "Privacy e contratti",
+          "impatto": "Conformità al GDPR e contratti commerciali",
+          "azione_suggerita": "Verificare policy di trattamento dati e contratti standard",
+          "priorita": "media"
+        },
+        {
+          "tema": "adempimenti fiscali e IVA",
+          "impatto": "Singolo punto di verifica/versamento",
+          "azione_suggerita": "Verificare regime fiscale e scadenze IVA",
+          "priorita": "alta"
+        }
+      ],
+      "privacy_e_contratti": [
+        "Policy privacy compliant",
+        "Contratti standard con clausole di servizio",
+        "Modelli di consenso per dati",
+        "Accordi di servizio con partner italiani"
+      ],
+      "raccomandazioni_prudenti": [
+        "Conservare documenti e registrazioni in modo tracciabile",
+        "Adeguare prezzi e piani alle agevolazioni fiscali disponibili",
+        "Verificare la conformità con normative italiane vigenti"
+      ]
+    },
+    "risks": [
+      {
+        "categoria": "mercato",
+        "descrizione": "Difficoltà nel raggiungere quota di mercato prevista nei 6 mesi",
+        "probabilita": "media",
+        "impatto": "alto",
+        "mitigazione": "Aumentare diversificazione canali e testare mercato pilota per convalidare prezzo e proposta di valore"
+      },
+      {
+        "categoria": "prodotto",
+        "descrizione": "Integrazione tecnica con sistemi contabili italiani e compliance",
+        "probabilita": "media",
+        "impatto": "alto",
+        "mitigazione": "Collocare integration pack e partnerships con fornitori italiani"
+      },
+      {
+        "categoria": "go_to_market",
+        "descrizione": "Ritardo nel tempo di attivazione del canale partner",
+        "probabilita": "media",
+        "impatto": "medio",
+        "mitigazione": "Incentivare partner con accordi di revenue sharing e formazione"
+      },
+      {
+        "categoria": "operativo",
+        "descrizione": "Limitata disponibilità risorse per sviluppo e supporto",
+        "probabilita": "media",
+        "impatto": "alto",
+        "mitigazione": "Piano assunzioni e outsourcing mirato per sprint di sviluppo"
+      },
+      {
+        "categoria": "legale_fiscale",
+        "descrizione": "Rischi relativi a obblighi fiscali e normative italiane",
+        "probabilita": "bassa",
+        "impatto": "alto",
+        "mitigazione": "Verifiche periodiche con consulente abilitato e audit di compliance"
+      },
+      {
+        "categoria": "finanziario",
+        "descrizione": "Vincoli di liquidità nei primi mesi",
+        "probabilita": "alta",
+        "impatto": "alto",
+        "mitigazione": "Piano di contenimento costi, rifinanziamento tramite linee di credito e grant"
+      }
+    ],
+    "roadmap": [
+      {
+        "mese_inizio": 1,
+        "mese_fine": 2,
+        "fase": "Definizione prodotto e setup legale",
+        "deliverable": [
+          "Specifica di prodotto",
+          "Definizione modello di prezzo",
+          "Accordi con partner italiani"
+        ],
+        "kpi": [
+          "Tempo per versione beta",
+          "Numero di accordi con partner"
+        ]
+      },
+      {
+        "mese_inizio": 3,
+        "mese_fine": 4,
+        "fase": "Pilota commerciale e integrazione contabile",
+        "deliverable": [
+          "Versione beta",
+          "Integrazione con contabilità italiana",
+          "Raccolta feedback pilot"
+        ],
+        "kpi": [
+          "Conversion rate pilot",
+          "Tempo onboarding pilot"
+        ]
+      },
+      {
+        "mese_inizio": 5,
+        "mese_fine": 6,
+        "fase": "Scalabilità e governance",
+        "deliverable": [
+          "Piano di scalabilità",
+          "Piani di marketing avanzati",
+          "Policy di gestione dati e privacy"
+        ],
+        "kpi": [
+          "Revenue milestone",
+          "Retention rate"
+        ]
+      },
+      {
+        "mese_inizio": 6,
+        "mese_fine": 6,
+        "fase": "Chiusura fase di test e preparazione a scale-up",
+        "deliverable": [
+          "Rapporto di performance 6 mesi",
+          "Piano di hiring",
+          "Piano di funding"
+        ],
+        "kpi": [
+          "Cash balance end",
+          "Payback mesi"
+        ]
+      },
+      {
+        "mese_inizio": 6,
+        "mese_fine": 6,
+        "fase": "Quality assurance e compliance",
+        "deliverable": [
+          "Audit readiness",
+          "Conformità GDPR",
+          "Contratti aggiornati"
+        ],
+        "kpi": [
+          "Numero di non conformità"
+        ]
+      },
+      {
+        "mese_inizio": 1,
+        "mese_fine": 6,
+        "fase": "Gestione rischi e governance",
+        "deliverable": [
+          "Registro rischi",
+          "Piano di mitigazione continuo"
+        ],
+        "kpi": [
+          "Rischi mitigati",
+          "Numero revisioni"
+        ]
+      }
+    ],
+    "financials": {
+      "currency": "EUR",
+      "metric_definitions": [
+        {
+          "key": "revenue",
+          "label": "Entrate mensili",
+          "unit": "EUR",
+          "formula_note": "Somma delle revenue generate dai piani attivi"
+        },
+        {
+          "key": "cogs",
+          "label": "Costo del venduto",
+          "unit": "EUR",
+          "formula_note": "Costo associato ai servizi forniti"
+        },
+        {
+          "key": "gross_profit",
+          "label": "Margine lordo",
+          "unit": "EUR",
+          "formula_note": "revenue - cogs"
+        },
+        {
+          "key": "fixed_costs",
+          "label": "Costi fissi mensili",
+          "unit": "EUR",
+          "formula_note": "Costi operativi fissi"
+        },
+        {
+          "key": "marketing_costs",
+          "label": "Costi marketing mensili",
+          "unit": "EUR",
+          "formula_note": "Spesa di marketing e acquisizione"
+        },
+        {
+          "key": "ebitda",
+          "label": " EBITDA mensile",
+          "unit": "EUR",
+          "formula_note": "gross_profit - fixed_costs - marketing_costs"
+        },
+        {
+          "key": "cash_in",
+          "label": "Cash in",
+          "unit": "EUR",
+          "formula_note": "Entrate di cassa generate dalle vendite"
+        },
+        {
+          "key": "cash_out",
+          "label": "Cash out",
+          "unit": "EUR",
+          "formula_note": "Uscite di cassa operative"
+        },
+        {
+          "key": "net_cash_flow",
+          "label": "Flussi di cassa netti",
+          "unit": "EUR",
+          "formula_note": "cash_in - cash_out"
+        },
+        {
+          "key": "cash_balance",
+          "label": "Saldo di cassa",
+          "unit": "EUR",
+          "formula_note": "Saldo cumulato di cassa"
+        }
+      ],
+      "scenarios": [
+        {
+          "name": "prudente",
+          "assumption_deltas": [
+            "Crescita clienti lenta",
+            "Costo di acquisizione contenuto",
+            "Effetti di una crescita moderata nel prezzo"
+          ],
+          "monthly": [
+            {
+              "month": 1,
+              "customers": 40,
+              "new_customers": 40,
+              "revenue": 60000,
+              "cogs": 15000,
+              "gross_profit": 45000,
+              "fixed_costs": 15000,
+              "marketing_costs": 6000,
+              "ebitda": 24000,
+              "cash_in": 60000,
+              "cash_out": 36000,
+              "net_cash_flow": 24000,
+              "cash_balance": 100000
+            },
+            {
+              "month": 2,
+              "customers": 72,
+              "new_customers": 32,
+              "revenue": 72000,
+              "cogs": 18000,
+              "gross_profit": 54000,
+              "fixed_costs": 15000,
+              "marketing_costs": 6000,
+              "ebitda": 33000,
+              "cash_in": 72000,
+              "cash_out": 39000,
+              "net_cash_flow": 33000,
+              "cash_balance": 133000
+            },
+            {
+              "month": 3,
+              "customers": 110,
+              "new_customers": 38,
+              "revenue": 86000,
+              "cogs": 21500,
+              "gross_profit": 64500,
+              "fixed_costs": 15000,
+              "marketing_costs": 6000,
+              "ebitda": 43500,
+              "cash_in": 86000,
+              "cash_out": 42500,
+              "net_cash_flow": 43500,
+              "cash_balance": 176500
+            },
+            {
+              "month": 4,
+              "customers": 150,
+              "new_customers": 40,
+              "revenue": 97000,
+              "cogs": 24250,
+              "gross_profit": 72750,
+              "fixed_costs": 15000,
+              "marketing_costs": 6000,
+              "ebitda": 51750,
+              "cash_in": 97000,
+              "cash_out": 42750,
+              "net_cash_flow": 51750,
+              "cash_balance": 228250
+            },
+            {
+              "month": 5,
+              "customers": 210,
+              "new_customers": 60,
+              "revenue": 110000,
+              "cogs": 27500,
+              "gross_profit": 82500,
+              "fixed_costs": 15000,
+              "marketing_costs": 6000,
+              "ebitda": 61500,
+              "cash_in": 110000,
+              "cash_out": 49500,
+              "net_cash_flow": 61500,
+              "cash_balance": 289750
+            },
+            {
+              "month": 6,
+              "customers": 280,
+              "new_customers": 70,
+              "revenue": 125000,
+              "cogs": 31250,
+              "gross_profit": 93750,
+              "fixed_costs": 15000,
+              "marketing_costs": 6000,
+              "ebitda": 72750,
+              "cash_in": 125000,
+              "cash_out": 73750,
+              "net_cash_flow": 72750,
+              "cash_balance": 362500
+            }
+          ],
+          "summary": {
+            "total_revenue": 550000,
+            "avg_gross_margin_percent": 0.75,
+            "breakeven_month_estimate": 4,
+            "min_cash_balance": 100000,
+            "end_cash_balance": 362500
+          }
+        },
+        {
+          "name": "base",
+          "assumption_deltas": [
+            "Aumento moderato di utenti",
+            "Incrementi di prezzo minimi",
+            "Adozione di canali marketing consolidati"
+          ],
+          "monthly": [
+            {
+              "month": 1,
+              "customers": 60,
+              "new_customers": 60,
+              "revenue": 90000,
+              "cogs": 22500,
+              "gross_profit": 67500,
+              "fixed_costs": 20000,
+              "marketing_costs": 8000,
+              "ebitda": 39500,
+              "cash_in": 90000,
+              "cash_out": 50500,
+              "net_cash_flow": 39500,
+              "cash_balance": 139500
+            },
+            {
+              "month": 2,
+              "customers": 90,
+              "new_customers": 30,
+              "revenue": 108000,
+              "cogs": 27000,
+              "gross_profit": 81000,
+              "fixed_costs": 20000,
+              "marketing_costs": 8000,
+              "ebitda": 53000,
+              "cash_in": 108000,
+              "cash_out": 55000,
+              "net_cash_flow": 53000,
+              "cash_balance": 192500
+            },
+            {
+              "month": 3,
+              "customers": 125,
+              "new_customers": 35,
+              "revenue": 126000,
+              "cogs": 31500,
+              "gross_profit": 94500,
+              "fixed_costs": 20000,
+              "marketing_costs": 8000,
+              "ebitda": 66500,
+              "cash_in": 126000,
+              "cash_out": 59500,
+              "net_cash_flow": 66500,
+              "cash_balance": 259000
+            },
+            {
+              "month": 4,
+              "customers": 190,
+              "new_customers": 65,
+              "revenue": 144000,
+              "cogs": 36000,
+              "gross_profit": 108000,
+              "fixed_costs": 20000,
+              "marketing_costs": 8000,
+              "ebitda": 86000,
+              "cash_in": 144000,
+              "cash_out": 64000,
+              "net_cash_flow": 80000,
+              "cash_balance": 339000
+            },
+            {
+              "month": 5,
+              "customers": 270,
+              "new_customers": 80,
+              "revenue": 162000,
+              "cogs": 40500,
+              "gross_profit": 121500,
+              "fixed_costs": 20000,
+              "marketing_costs": 8000,
+              "ebitda": 93400,
+              "cash_in": 162000,
+              "cash_out": 68500,
+              "net_cash_flow": 93400,
+              "cash_balance": 432500
+            },
+            {
+              "month": 6,
+              "customers": 350,
+              "new_customers": 80,
+              "revenue": 180000,
+              "cogs": 45000,
+              "gross_profit": 135000,
+              "fixed_costs": 20000,
+              "marketing_costs": 8000,
+              "ebitda": 93500,
+              "cash_in": 180000,
+              "cash_out": 73000,
+              "net_cash_flow": 107000,
+              "cash_balance": 539500
+            }
+          ],
+          "summary": {
+            "total_revenue": 810000,
+            "avg_gross_margin_percent": 0.75,
+            "breakeven_month_estimate": 3,
+            "min_cash_balance": 100000,
+            "end_cash_balance": 539500
+          }
+        },
+        {
+          "name": "aggressivo",
+          "assumption_deltas": [
+            "Crescita elevata utenti",
+            "Adozione rapida piani superiori",
+            "Investimenti di marketing intensi"
+          ],
+          "monthly": [
+            {
+              "month": 1,
+              "customers": 100,
+              "new_customers": 100,
+              "revenue": 150000,
+              "cogs": 45000,
+              "gross_profit": 105000,
+              "fixed_costs": 30000,
+              "marketing_costs": 15000,
+              "ebitda": 60000,
+              "cash_in": 150000,
+              "cash_out": 90000,
+              "net_cash_flow": 60000,
+              "cash_balance": 160000
+            },
+            {
+              "month": 2,
+              "customers": 170,
+              "new_customers": 70,
+              "revenue": 180000,
+              "cogs": 54000,
+              "gross_profit": 126000,
+              "fixed_costs": 30000,
+              "marketing_costs": 15000,
+              "ebitda": 81000,
+              "cash_in": 180000,
+              "cash_out": 99000,
+              "net_cash_flow": 81000,
+              "cash_balance": 241000
+            },
+            {
+              "month": 3,
+              "customers": 250,
+              "new_customers": 80,
+              "revenue": 210000,
+              "cogs": 63000,
+              "gross_profit": 147000,
+              "fixed_costs": 30000,
+              "marketing_costs": 15000,
+              "ebitda": 102000,
+              "cash_in": 210000,
+              "cash_out": 108000,
+              "net_cash_flow": 102000,
+              "cash_balance": 343000
+            },
+            {
+              "month": 4,
+              "customers": 360,
+              "new_customers": 110,
+              "revenue": 240000,
+              "cogs": 72000,
+              "gross_profit": 168000,
+              "fixed_costs": 30000,
+              "marketing_costs": 15000,
+              "ebitda": 123000,
+              "cash_in": 240000,
+              "cash_out": 117000,
+              "net_cash_flow": 123000,
+              "cash_balance": 466000
+            },
+            {
+              "month": 5,
+              "customers": 520,
+              "new_customers": 160,
+              "revenue": 270000,
+              "cogs": 81000,
+              "gross_profit": 189000,
+              "fixed_costs": 30000,
+              "marketing_costs": 15000,
+              "ebitda": 144000,
+              "cash_in": 270000,
+              "cash_out": 126000,
+              "net_cash_flow": 144000,
+              "cash_balance": 610000
+            },
+            {
+              "month": 6,
+              "customers": 700,
+              "new_customers": 180,
+              "revenue": 300000,
+              "cogs": 90000,
+              "gross_profit": 210000,
+              "fixed_costs": 30000,
+              "marketing_costs": 15000,
+              "ebitda": 165000,
+              "cash_in": 300000,
+              "cash_out": 135000,
+              "net_cash_flow": 165000,
+              "cash_balance": 775000
+            }
+          ],
+          "summary": {
+            "total_revenue": 1350000,
+            "avg_gross_margin_percent": 0.7,
+            "breakeven_month_estimate": 2,
+            "min_cash_balance": 100000,
+            "end_cash_balance": 775000
+          }
+        }
+      ]
+    }
+  },
+  "narrative": {
+    "chapters": [
+      {
+        "id": "CH1_VALUE",
+        "titolo": "CH1_VALUE - Contesto e premessa strategica",
+        "contenuto_markdown": "Il presente capitolo offre una descrizione discorsiva del contesto in cui opera il progetto e della logica di valore che esso intende offrire alle PMI italiane. L’obiettivo è fornire una cornice chiara su perché nasce la soluzione, quali problemi intende risolvere e come si inserisce nel contesto competitivo attuale. In questa sezione si delineano elementi essenziali del contesto di mercato, della proposta di valore e degli obiettivi a breve termine.## Contesto operativo e obiettivo di valore Il contesto di mercato italiano presenta una domanda crescente di soluzioni digitali che consentano alle PMI di automatizzare processi, migliorare l’analisi dei dati e prendere decisioni basate su KPI affidabili. L’ecosistema tecnologico italiano sta assistendo a una rapida maturazione di soluzioni modulari che possono essere integrate con i sistemi contabili e gestionali esistenti, riducendo la frammentazione e i tempi di implementazione. In tale contesto, il progetto si propone di offrire una piattaforma modulare che consenta alle PMI di aggregare dati da diverse fonti, generare report personalizzati e automatizzare flussi di lavoro chiave. ## Proposta di valore e differenziazione Sostanzialmente, la proposta si concentra su tre elementi critici: semplicità di onboarding, integrazione diretta con strumenti contabili italiani e una modulare configurazione che consente alle PMI di scegliere solo le funzionalità necessarie. Questo approccio consente di contenere i costi iniziali, ridurre la complessità di gestione e accelerare il ritorno sull’investimento. Inoltre, l’offerta prevede piani di pricing flessibili che facilitano l’upgrade man mano che l’azienda cresce.## Ipotesi e approccio metodologico A fronte di dati operativi limitati, si definiscono ASSUNZIONI conservative per i parametri chiave come CAC, churning, ARPU e tassi di conversione. L’obiettivo è fornire una base robusta per testare l’elasticità della domanda, la percezione del valore e la effettiva capacità di conversione attraverso canali differenziati. Per favorire la trasparenza, si dettagliano le metriche da monitorare e le azioni di mitigazione in caso di scostamenti significativi.",
+        "chart_ids": [
+          "CHART_EVO_CLIENTI_CUMULATIVI",
+          "CHART_RICAVI_MENSILI_PER_SCENARIO"
+        ]
+      },
+      {
+        "id": "CH2_MARKET",
+        "titolo": "CH2_MARKET - Dinamiche di mercato e contesto competitivo",
+        "contenuto_markdown": "In questo capitolo si analizzano le dinamiche di mercato, la dimensione potenziale e la posizione competitiva della soluzione nel contesto italiano. Si descrive l’ampiezza del TAM, SAM e SOM, con l’indicazione delle principali tendenze che guidano la domanda di soluzioni digitali orientate a PMI. ## Dimensione del mercato e ipotesi di penetrazione Il mercato delle PMI italiane è caratterizzato da una domanda crescente di strumenti digitali che semplificano la gestione operativa e finanziaria. L’adozione di soluzioni modulari e l’esigenza di integrazione con sistemi contabili locali rappresentano driver chiave. Per tale motivo, si utilizzano ASSUNZIONI conservative sul TAM/SAM/SOM, che si riflettono nelle proiezioni a 6 mesi per offrire una lettura prudente della crescita.## Dinamiche competitive e posizionamento Le soluzioni esistenti si differenziano per prezzo, moduli disponibili e velocità di implementazione. Il posizionamento proposto privilegia l’integrazione contabile italiana, una configurazione modulare e un onboarding rapido, elementi che dovrebbero ridurre le barriere all’adozione. Le barriere principali includono resistenza al cambiamento, questioni di sicurezza e la necessità di integrazione tecnica con strumenti legacy.## Strategie di go-to-market e pipeline di vendita In questa sezione si evidenziano i canali principali, tra cui canali diretti, partner di canale e studi professionali che possono facilitare l’adozione presso PMI. La materia è trattata in chiave strategica per abilitare una progressiva esportazione del modello anche oltre i confini nazionali.## Suggerimenti operativi e metriche di controllo Per monitorare la capacità di mercato, si definiscono KPI di acquisizione, conversione e retention. Si evidenziano anche scenari di sensibilità che mostrano come variazioni di prezzo o costi possano impattare i flussi di cassa. Contiene inoltre ASSUNZIONI chiave che necessitano validazione tramite pilota.",
+        "chart_ids": []
+      },
+      {
+        "id": "CH3_BUSINESS_MODEL",
+        "titolo": "CH3_BUSINESS_MODEL - Modello di business, pricing e KPI",
+        "contenuto_markdown": "Questo capitolo descrive in modo discorsivo il modello di business, la struttura dei ricavi, la tassonomia dei costi e gli indicatori chiave di performance. L’obiettivo è offrire una lettura chiara sul collegamento tra proposta di valore, prezzo, costi e margini.## Struttura dei ricavi e pricing La soluzione opera su un modello ibrido che combina abbonamenti mensili con servizi di onboarding e integrazioni premium. Il pricing è articolato su tre piani: Starter, Growth e Scale, offrendo un percorso di crescita per le PMI. L’approccio ibrido consente di bilanciare entrate ricorrenti e ricavi una tantum da onboarding.## Cost structure e margini L’analisi della struttura dei costi distingue tra costi fissi mensili e costi variabili legati all’esecuzione dei servizi. Il margine lordo viene calcolato come ricavi meno costi diretti (costi correlati ai servizi forniti). L’obiettivo è mantenere margini lordo attorno al 68% iniziale e migliorare nel tempo con economie di scala e migliori pratiche di gestione.## Performance e KPI di business I KPI includono CAC, LTV, payback period e tassi di conversione funnel. Si descrive come questi indicatori guidino le decisioni operative e di prezzo. ## Assunzioni operative e segnali di validazione Le ASSUNZIONI riguardanti ARPU, tassi di churn, CAC e crescita utenti sono presentate in modo trasparente. La sezione riporta anche una metodologia di validazione che prevede pilota, test A/B e analisi di cohort per affinare modelli di prezzo e retention. Entra in questa sezione anche la necessità di correggere le proiezioni in funzione dei dati reali raccolti durante le settimane di pilot.",
+        "chart_ids": [
+          "CHART_RICAVI_MENSILI_PER_SCENARIO",
+          "CHART_EBI_TDA_MENSILE_SCENARIO_BASE"
+        ]
+      },
+      {
+        "id": "CH4_FINANCIALS",
+        "titolo": "CH4_FINANCIALS - Proiezioni finanziarie e scenari",
+        "contenuto_markdown": "In questo capitolo si approfondiscono le proiezioni finanziarie per i prossimi sei mesi, con particolare attenzione agli scenari prudenti, base e aggressivo. Si espone come i ricavi, i costi, l’EBITDA e i flussi di cassa si evolvono nel tempo, mantenendo coerenza contabile tra le metriche. ## Scenari e fondamenta logiche Le tre ipotesi scenarie sono costruite su differenti dinamiche di crescita dei clienti, ARPU e costi operativi. Le ASSUNZIONI adottate includono tassi di crescita mensili nei clienti, margine lordo costante (nella fascia prevista) e una gestione degli opex che privilegia un equilibrio fra spinta commerciale e controllo dei costi.## Dettaglio finanziario per mese e per scenario Per ciascun mese si riportano: numero di clienti cumulativi, nuovi clienti, ricavi, costo del venduto, utile lordo, costi fissi, marketing, EBITDA, flussi di cassa e saldo di cassa. L’ordine di grandezza è espresso in EUR e si mantiene la coerenza tra le voci.## Interpretazione e gestione del rischio I grafici finanziari mostrano come piccoli cambiamenti in CAC o churn possano impattare in modo significativo i margini e i flussi di cassa. La gestione del rischio passa per test di sensibilità e verifica continua delle metriche operative.## Nota metodologica e uso delle ASSUNZIONI Le ASSUNZIONI qui descritte sono conservative e servono a costruire una baseline credibile per una prima fase di validazione. Si invita a verificare con professionisti abilitati gli elementi fiscali, contabili e regolamentari prima di qualsiasi decisione di investimento o di finanziamento.",
+        "chart_ids": [
+          "CHART_EVO_CLIENTI_CUMULATIVI",
+          "CHART_RICAVI_MENSILI_PER_SCENARIO",
+          "CHART_RICAVO_CUMULATIVO_TOTALE_PER_SCENARIO",
+          "CHART_CASH_BALANCE_MENSILE_SCEN_BASE",
+          "CHART_EBITDA_MENSILE_SCENARIO_BASE",
+          "CHART_ASSUNZIONI_MIX_FUNNEL"
+        ]
+      },
+      {
+        "id": "CH5_ITALIA",
+        "titolo": "CH5_ITALIA - Aspetti giuridici e fiscali in Italia (generali)",
+        "contenuto_markdown": "Questo capitolo affronta in modo discorsivo gli aspetti giuridici e fiscali di massima rilevanti per l’implementazione in Italia, offrendo una prospettiva generale e prudente. Si precisa che per una definizione puntuale e aggiornata della forma giuridica, del regime fiscale e degli adempimenti è indispensabile consultare un professionista abilitato.## Forma giuridica e adempimenti in genere In Italia, la scelta della forma giuridica (SRL, SAS, startup innovativa, ecc.) influenza la responsabilità dei soci, la tassazione, gli oneri fissi e la governance interna. Ogni opzione comporta un set di adempimenti che includono iscrizioni, bilanci, IVA, gestione contabile e contributiva. Vai al paragrafo successivo per una panoramica degli strumenti di conformità.## Regime fiscale generale e prudenti considerazioni L’interpretazione del regime fiscale dipende dalla forma giuridica selezionata. In linea generale, le PMI possono beneficiare di regimi agevolati o particolari incentivi a seconda di classi di reddito e investimenti in innovazione, ma è essenziale una verifica professionale per l’adeguamento delle aliquote IVA, delle imposte sui redditi e degli oneri previdenziali.## Adempimenti tipici e checklist Le aziende italiane devono gestire una serie di adempimenti, tra cui: IVA mensile o trimestrale, una dichiarazione annuale, registrazioni contabili, conservazione sostitutiva, privacy e gestione contratti. L’insieme di attività richiede una governance contabile accurata e strumenti di conformità.## Raccomandazioni prudenti e verifica professionale Le indicazioni contenute here forniscono una cornice generale, non sostituiscono la consulenza di un professionista abilitato. Si raccomanda di pianificare una verifica fiscale e legale con un commercialista o avvocato abilitato, principalmente per la scelta della forma giuridica ottimale, l’impostazione del regime fiscale e la definizione degli adempimenti specifici. Sono inclusi anche richiami a privacy e contratti, che dovranno essere allineati alle normative vigenti e ai principi di protezione dei dati.",
+        "chart_ids": []
+      },
+      {
+        "id": "CH6_RISKS_ROADMAP",
+        "titolo": "CH6_RISKS_ROADMAP - Rischi, mitigazioni e roadmap di implementazione",
+        "contenuto_markdown": "In questo capitolo si descrivono rischi, mitigazioni e una roadmap operativa per l’implementazione del progetto. L’approccio è discorsivo, con una trattazione chiara delle azioni da intraprendere in caso di eventi avversi.## Rischi principali e impatti La funzione di rischio è divisa in categorie principali (mercato, prodotto, go-to-market, operativo, legale/fiscale, finanziario). Per ciascun rischio viene indicata la probabilità, l’impatto stimato e le azioni di mitigazione. L’obiettivo è fornire un quadro robusto di gestione del rischio che permetta una risposta rapida e mirata.## Strategie di mitigazione e controlli Le protocolli di mitigazione includono sperimentazioni di canali alternativi, test di prezzo, audit periodici e la costruzione di un pipeline di partner locali per ridurre l’effetto di un singolo canale.## Roadmap di implementazione e milestones La roadmap descrive le fasi di sviluppo, pilota, test e scale-up, con deliverable chiari e KPI associati. La progressione è pensata per essere misurabile e riconducibile a un processo di governo che supporti una crescita sostenibile.## Note su assicurazione di conformità e governance L’ultimo paragrafo richiama la necessità di coinvolgere consulenti legali e fiscali per garantire la conformità e la gestione del rischio a livello aziendale, soprattutto in fase di implementazione e in eventuali round di finanziamento.",
+        "chart_ids": [
+          "CHART_EVO_CLIENTI_CUMULATIVI",
+          "CHART_RICAVO_CUMULATIVO_TOTALE_PER_SCENARIO"
+        ]
+      },
+      {
+        "id": "CH7_CHARTS",
+        "titolo": "CH7_CHARTS - Interpretazione grafici principali",
+        "contenuto_markdown": "In questa sezione si interpretano i grafici principali presentati nel capitolo precedente, offrendo una guida pratica su come leggere i dati e su quali segnali osservare. ## Interpretazione dei grafici principali I grafici mostrano l’evoluzione di tre scenari (prudente, base, aggressivo) in termini di clienti cumulativi, ricavi mensili, ricavi cumulativi totali e saldo di cassa. L’obiettivo è fornire una lettura chiara delle tendenze, evidenziando come diverse ipotesi di crescita e di costo influiscano sui flussi di cassa e sui margini.## Guida all’uso pratico dei grafici - Come leggere i dati: identificare i picchi, i periodi di accelerazione o rallentamento, e confrontare scenari. - Indicatori chiave nei grafici: convergenza tra ricavi e costi, andamento del cash balance e variazioni di EBITDA nel tempo. - Insight operativi: quali azioni intraprendere se un determinato scenario mostra segnali di fragilità finanziaria o di opportunità di crescita.## Note metodologiche I grafici sono stati costruiti sulla base delle ASSUNZIONI esplicite e dei dati forniti, e integrano la proiezione dei mesi 1-6. Qualsiasi modifica delle ipotesi dovrà essere riflessa automaticamente nei grafici e nelle rispettive tabelle di output.",
+        "chart_ids": [
+          "CHART_EVO_CLIENTI_CUMULATIVI",
+          "CHART_RICAVI_MENSILI_PER_SCENARIO",
+          "CHART_RICAVO_CUMULATIVO_TOTALE_PER_SCENARIO",
+          "CHART_CASH_BALANCE_MENSILE_SCEN_BASE",
+          "CHART_EBITDA_MENSILE_SCENARIO_BASE",
+          "CHART_ASSUNZIONI_MIX_FUNNEL"
+        ]
+      },
+      {
+        "id": "CH8_APPENDIX",
+        "titolo": "CH8_APPENDIX - Appendice: Assunzioni, dati mancanti e note metodologiche",
+        "contenuto_markdown": "Questo capitolo funge da appendix e riassume in modo discorsivo le assunzioni chiave, le limitazioni e le note metodologiche. Viene fornita una descrizione dettagliata degli elementi che hanno formato la base delle proiezioni e dei grafici, includendo riferimenti espliciti agli elementi che necessitano di validazione da parte di professionisti abilitati.## Assunzioni chiave e loro impatto Le ASSUNZIONI includono ipotesi su ARPU medio, tassi di crescita dei clienti, CAC, churn, e struttura dei costi. Si riportano in modo chiaro i riferimenti numerici e si indica quando un valore è utente o una deduzione di scenario. L’obiettivo è assicurare coerenza tra le proiezioni di ricavo, margine e flussi di cassa.## Dati mancanti e necessità di verifica In questa sezione si elencano i dati mancanti, segnalando che la validazione operativa è una condizione necessaria per migliorare l’accuratezza delle stime. È fondamentale che un professionista abilito verifichi la conformità fiscale, la forma giuridica scelta, l’impianto contrattuale e le politiche di privacy.## Note di chiusura Sottolineo che la presente è una versione preliminare basata su ASSUNZIONI conservative. Si raccomanda di procedere con un pilota, test di canali e raccolta di metriche di performance per adeguare la strategia. Se si intende presentare questo documento agli investitori o a istituzioni finanziarie, è opportuno includere dati verificabili e una roadmap di validazione operativa.",
+        "chart_ids": []
+      },
+      {
+        "id": "ASSUNZIONI",
+        "titolo": "ASSUNZIONI",
+        "contenuto_markdown": "Elenco esplicito di assunzioni chiave utilizzate per la costruzione del modello finanziario e delle proiezioni. - ARPU medio mensile per utente: EUR 1,500 (assunzione utente, non reale). - Crescita mensile cumulativa di nuovi clienti per scenari: prudenti 40-70, base 60-80, aggressivo 100-180 (assegnata a ciascun mese). - Costo di acquisizione CAC per nuovo cliente: EUR 250 (assunzione). - Costo del venduto (COGS) come percentuale delle entrate: prudenti 25%, base 30%, aggressivo 30%. - Costi fissi mensili: prudenti EUR 15,000; base EUR 20,000; aggressivo EUR 30,000. - Marketing costs mensili: prudenti EUR 6,000; base EUR 8,000; aggressivo EUR 15,000. - Saldo iniziale di cassa: EUR 100,000. - Margine lordo iniziale atteso: ~68%. - Tasso di churn non esplicitato; viene gestito come parte delle ASSUNZIONI operative per i cannoti di retention. - Convertibilità dei piani in entrate e attrezzature: tramite abbonamenti mensili e onboarding. - Conversione funnel: per pilota si assume tassi di conversione di visita -> onboarding e onboarding -> abbonamento. - Assunzione di integrazione contabile italiana come requisito di differenziazione. - Ipotesi di pricing soggette a revisione in fase pilota e test A/B. - Ogni dato è soggetto a verifica da parte di un professionista abilitato per valutazioni fiscali e legali.",
+        "chart_ids": []
+      },
+      {
+        "id": "dati_mancanti",
+        "titolo": "dati_mancanti",
+        "contenuto_markdown": "Di seguito l’elenco dei dati che al momento non sono disponibili o non sono stati forniti dall’utente e che richiedono conferma o integrazione da parte di un professionista abilitato:\n- Stime dettagliate TAM/SAM/SOM per segmento e regione; parametri iniziali per scenari avanzati.\n- CAC per canale specifico e budget di marketing per canale; tassi di conversione per funnel con dettaglio per canale.\n- Churn rate mensile e retention per ogni piano; variabilità stagionale.\n- ARPA e mix piani effettivo (percentuale di sottoscrizioni tra Starter/Growth/Scale).\n- Costi fissi e variabili aggiornati con input di mercato e contratti di fornitura.\n- Dati di pricing e condizioni contrattuali per eventuali sconti o promozioni.\n- Informazioni su licenze e requisiti normativi relativi a dati patient e GDPR per i dati della piattaforma.\n- Dettagli su SLA, supporto e servizi accessori inclusi in ciascun piano.\n- Dati relativi alle tasse, IVA e regime fiscale specifico in base alla forma giuridica scelta (da confermare con commercialista).",
+        "chart_ids": []
+      },
+      {
+        "id": "disclaimer",
+        "titolo": "Disclaimer",
+        "contenuto_markdown": "Nelle pagine seguenti si riportano contenuti di carattere tecnico/strategico basati su dati forniti dall’utente o su ASSUNZIONI conservative. Alcune informazioni normative (ad es. regime fiscale, obblighi di legge, privacy) devono essere verificate con un professionista abilitato prima di qualsiasi decisione di investimenti, contratti o uso operativo della piattaforma. Il modello di business presentato è una prima versione destinata a test di validazione; i numeri, le tabelle e i grafici sono iterativi e soggetti a revisione, a seguito della raccolta di dati reali durante pilota o test pilota.",
+        "chart_ids": []
+      }
+    ]
+  },
+  "charts": [
+    {
+      "id": "CHART_EVO_CLIENTI_CUMULATIVI",
+      "chapter_id": "CH7_CHARTS",
+      "titolo": "Evoluzione clienti cumulativi per scenario (line)",
+      "tipo": "line",
+      "x_label": "Mesi",
+      "y_label": "Clienti cumulativi",
+      "series": [
+        {
+          "name": "Prudente",
+          "points": [
+            {
+              "x": "Mese 1",
+              "y": 40
+            },
+            {
+              "x": "Mese 2",
+              "y": 72
+            },
+            {
+              "x": "Mese 3",
+              "y": 110
+            },
+            {
+              "x": "Mese 4",
+              "y": 150
+            },
+            {
+              "x": "Mese 5",
+              "y": 210
+            },
+            {
+              "x": "Mese 6",
+              "y": 280
+            }
+          ]
+        },
+        {
+          "name": "Base",
+          "points": [
+            {
+              "x": "Mese 1",
+              "y": 60
+            },
+            {
+              "x": "Mese 2",
+              "y": 90
+            },
+            {
+              "x": "Mese 3",
+              "y": 125
+            },
+            {
+              "x": "Mese 4",
+              "y": 190
+            },
+            {
+              "x": "Mese 5",
+              "y": 270
+            },
+            {
+              "x": "Mese 6",
+              "y": 350
+            }
+          ]
+        },
+        {
+          "name": "Aggressivo",
+          "points": [
+            {
+              "x": "Mese 1",
+              "y": 100
+            },
+            {
+              "x": "Mese 2",
+              "y": 170
+            },
+            {
+              "x": "Mese 3",
+              "y": 250
+            },
+            {
+              "x": "Mese 4",
+              "y": 360
+            },
+            {
+              "x": "Mese 5",
+              "y": 520
+            },
+            {
+              "x": "Mese 6",
+              "y": 700
+            }
+          ]
+        }
+      ],
+      "caption": "Grafico di lettura: mostra l’andamento cumulativo mensile dei clienti per i tre scenari. Consente di confrontare la velocità di adozione e la crescita della base utenti nel tempo."
+    },
+    {
+      "id": "CHART_RICAVI_MENSILI_PER_SCENARIO",
+      "chapter_id": "CH7_CHARTS",
+      "titolo": "Ricavi mensili per scenario (line)",
+      "tipo": "line",
+      "x_label": "Mese",
+      "y_label": "Ricavi (EUR)",
+      "series": [
+        {
+          "name": "Prudente",
+          "points": [
+            {
+              "x": "Mese 1",
+              "y": 60000
+            },
+            {
+              "x": "Mese 2",
+              "y": 72000
+            },
+            {
+              "x": "Mese 3",
+              "y": 86000
+            },
+            {
+              "x": "Mese 4",
+              "y": 97000
+            },
+            {
+              "x": "Mese 5",
+              "y": 110000
+            },
+            {
+              "x": "Mese 6",
+              "y": 125000
+            }
+          ]
+        },
+        {
+          "name": "Base",
+          "points": [
+            {
+              "x": "Mese 1",
+              "y": 90000
+            },
+            {
+              "x": "Mese 2",
+              "y": 108000
+            },
+            {
+              "x": "Mese 3",
+              "y": 126000
+            },
+            {
+              "x": "Mese 4",
+              "y": 144000
+            },
+            {
+              "x": "Mese 5",
+              "y": 162000
+            },
+            {
+              "x": "",
+              "y": 180000
+            }
+          ]
+        },
+        {
+          "name": "Aggressivo",
+          "points": [
+            {
+              "x": "Mese 1",
+              "y": 150000
+            },
+            {
+              "x": "Mese 2",
+              "y": 180000
+            },
+            {
+              "x": "Mese 3",
+              "y": 210000
+            },
+            {
+              "x": "Mese 4",
+              "y": 240000
+            },
+            {
+              "x": "Mese 5",
+              "y": 270000
+            },
+            {
+              "x": "Mese 6",
+              "y": 300000
+            }
+          ]
+        }
+      ],
+      "caption": "Interpretazione: confronto dell’andamento dei ricavi mensili tra i tre scenari. Si osserva la sensibilità del volume di vendita all’evoluzione della base clienti, al pricing e all’adozione di funzionalità."
+    },
+    {
+      "id": "CHART_RICAVO_CUMULATIVO_TOTALE_PER_SCENARIO",
+      "chapter_id": "CH7_CHARTS",
+      "titolo": "Ricavo cumulativo totale per scenario (bar)",
+      "tipo": "bar",
+      "x_label": "Scenario",
+      "y_label": "Ricavo cumulativo EUR",
+      "series": [
+        {
+          "name": "Prudente",
+          "points": [
+            {
+              "x": "Prudente",
+              "y": 550000
+            },
+            {
+              "x": "",
+              "y": 0
+            },
+            {
+              "x": "",
+              "y": 0
+            }
+          ]
+        },
+        {
+          "name": "Base",
+          "points": [
+            {
+              "x": "Base",
+              "y": 810000
+            },
+            {
+              "x": "",
+              "y": 0
+            },
+            {
+              "x": "",
+              "y": 0
+            }
+          ]
+        },
+        {
+          "name": "Aggressivo",
+          "points": [
+            {
+              "x": "Aggressivo",
+              "y": 1350000
+            },
+            {
+              "x": "",
+              "y": 0
+            },
+            {
+              "x": "",
+              "y": 0
+            }
+          ]
+        }
+      ],
+      "caption": "Questo grafico rappresenta il cumulo totale dei ricavi su 6 mesi per i tre scenari, utile per confrontare la capacità di generare valore complessivo."
+    },
+    {
+      "id": "CHART_CASH_BALANCE_MENSILE_SCEN_BASE",
+      "chapter_id": "CH7_CHARTS",
+      "titolo": "Cash balance mensile - Scenario Base (line)",
+      "tipo": "line",
+      "x_label": "Mese",
+      "y_label": "Saldo cassa EUR",
+      "series": [
+        {
+          "name": "Base",
+          "points": [
+            {
+              "x": "Mese 1",
+              "y": 139500
+            },
+            {
+              "x": "Mese 2",
+              "y": 192500
+            },
+            {
+              "x": "Mese 3",
+              "y": 259000
+            },
+            {
+              "x": "Mese 4",
+              "y": 339000
+            },
+            {
+              "x": "Mese 5",
+              "y": 432500
+            },
+            {
+              "x": "Mese 6",
+              "y": 539500
+            }
+          ]
+        }
+      ],
+      "caption": "Saldo di cassa mensile per lo scenario Base. Indica la liquidità disponibile per sostenere la crescita e assorbire eventuali fluttuazioni di cassa."
+    },
+    {
+      "id": "CHART_EBITDA_MENSILE_SCENARIO_BASE",
+      "chapter_id": "CH7_CHARTS",
+      "titolo": "EBITDA mensile - Scenario Base (bar)",
+      "tipo": "bar",
+      "x_label": "Mese",
+      "y_label": "EBITDA EUR",
+      "series": [
+        {
+          "name": "Base",
+          "points": [
+            {
+              "x": "Mese 1",
+              "y": 39500
+            },
+            {
+              "x": "Mese 2",
+              "y": 53000
+            },
+            {
+              "x": "Mese 3",
+              "y": 66500
+            },
+            {
+              "x": "Mese 4",
+              "y": 80000
+            },
+            {
+              "x": "Mese 5",
+              "y": 93500
+            },
+            {
+              "x": "Mese 6",
+              "y": 107000
+            }
+          ]
+        }
+      ],
+      "caption": "EBITDA mensile nello scenario Base, utile per valutare la redditività operativa nel ciclo di validazione iniziale."
+    },
+    {
+      "id": "CHART_ASSUNZIONI_MIX_FUNNEL",
+      "chapter_id": "CH7_CHARTS",
+      "titolo": "Assunzioni: mix di funnel e costi (pie)",
+      "tipo": "pie",
+      "x_label": "",
+      "y_label": "",
+      "series": [
+        {
+          "name": "TAM/SAM/SOM e segmentazione",
+          "points": [
+            {
+              "x": "TAM/SAM/SOM",
+              "y": 28
+            },
+            {
+              "x": "",
+              "y": 0
+            },
+            {
+              "x": "",
+              "y": 0
+            }
+          ]
+        },
+        {
+          "name": "Conversione funnel",
+          "points": [
+            {
+              "x": "Conversione funnel",
+              "y": 22
+            },
+            {
+              "x": "",
+              "y": 0
+            },
+            {
+              "x": "",
+              "y": 0
+            }
+          ]
+        },
+        {
+          "name": "CAC per canale",
+          "points": [
+            {
+              "x": "CAC per canale",
+              "y": 18
+            },
+            {
+              "x": "",
+              "y": 0
+            },
+            {
+              "x": "",
+              "y": 0
+            }
+          ]
+        },
+        {
+          "name": "Churn e retention",
+          "points": [
+            {
+              "x": "Churn e retention",
+              "y": 14
+            },
+            {
+              "x": "",
+              "y": 0
+            },
+            {
+              "x": "",
+              "y": 0
+            }
+          ]
+        },
+        {
+          "name": "ARPA/mix piani",
+          "points": [
+            {
+              "x": "ARPA / Mix piani",
+              "y": 18
+            },
+            {
+              "x": "",
+              "y": 0
+            },
+            {
+              "x": "",
+              "y": 0
+            }
+          ]
+        }
+      ],
+      "caption": "Questo grafico a torta sintetizza le principali assunzioni che guidano le proiezioni: dimensione di mercato, conversioni, CAC, churn e prezzi medi per piano. Le percentuali sono indicative e articolate per facilitare la discussione."
+    }
+  ],
+  "assumptions": [
+    "ORIZZONTE: 6 mesi.",
+    "SCENARI: prudente, base, aggressivo.",
+    "VALUTE: tutte le voci espresse in EUR con punto come separatore decimale.",
+    "ASSUNZIONI ESPLICITE: come indicato nel capitolo ASSUNZIONI e appendix.",
+    "DATI MANCANTI: dataset da validare con professionisti abilitati.",
+    "CASH FLOW: il saldo finale è costruito con una logica di saldo iniziale e flussi di cassa netti mensili.",
+    "MARGINI: margine lordo target iniziale ~68% e miglioramenti possibili con economie di scala.",
+    "PIANIFICAZIONE: i numeri forniti sono da testare in pilota e con revisioni iterative."
+  ],
+  "dati_mancanti": [
+    "TAM/SAM/SOM precisi per canale e segmento",
+    "CAC per canale e canali di marketing specifici",
+    "Churn rate mensile per scenario e piano",
+    "ARPU dettagliato per piano e mix di programmi",
+    "Prezzi e condizioni contrattuali aggiornati",
+    "Dettagli su tasse, regime fiscale e obblighi contabili in relazione alla forma giuridica scelta",
+    "Dati su SLA e contratti di servizio con partner",
+    "Informazioni su privacy, trattamento dati e conformità GDPR"
+  ],
+  "disclaimer": "Disclaimer: i contenuti presentati sono una versione preliminare basata su ASSUNZIONI conservative e dati forniti. La validazione operativa, la verifica di conformità legale/fiscale e l’eventuale adeguamento a normative vigenti richiedono la verifica di professionisti abilitati."
+}

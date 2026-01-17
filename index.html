@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Generatore di business plan AI per il mercato italiano - Crea un piano aziendale completo, valida la tua idea e analizza il mercato in meno di 15 minuti">
+    <title>Business Plan AI per il Mercato Italiano - GetBusinessPlan</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- jsPDF for PDF generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- html2pdf for better HTML to PDF conversion (optional) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">GetBusinessPlan</div>
+                <nav class="nav">
+                    <button class="btn-secondary" id="createPlanBtn">Crea piano</button>
+                    <a href="blog.html" class="btn-link">Blog</a>
+                    <button class="btn-link" id="loginBtn">Accedi</button>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="container">
+            <h1 class="hero-title">Business Plan AI<br>per il Mercato Italiano</h1>
+            <p class="hero-subtitle">Crea un business plan professionale, valida la tua idea e analizza il mercato italiano utilizzando l'intelligenza artificiale. Il nostro servizio tiene conto delle peculiarità settoriali e normative italiane, garantendo un documento conforme alle esigenze di investitori, banche e istituzioni italiane.</p>
+            <div class="hero-buttons">
+                <button class="btn-primary btn-large" id="startPlanBtn">Crea Business Plan</button>
+                <button class="btn-secondary btn-large" id="validateIdeaBtn">Valida Idea</button>
+                <button class="btn-secondary btn-large" id="marketAnalysisBtn">Analisi Mercato</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features-main">
+        <div class="container">
+            <h2 class="section-title">Le nostre funzionalità</h2>
+            <div class="features-main-grid">
+                <div class="feature-main-card">
+                    <h3>Generatore Business Plan</h3>
+                    <p>Crea un business plan completo e professionale in meno di 15 minuti, conforme alle normative italiane e alle peculiarità settoriali. Include tutte le sezioni necessarie per presentare la tua azienda a investitori e banche italiane.</p>
+                    <button class="btn-primary" id="featurePlanBtn">Inizia ora</button>
+                </div>
+                <div class="feature-main-card">
+                    <h3>Validazione Idea di Business</h3>
+                    <p>Valida la tua idea imprenditoriale prima di investire tempo e risorse. Ottieni feedback dettagliati su punti di forza, debolezze e opportunità nel contesto italiano, considerando normative e caratteristiche del mercato nazionale.</p>
+                    <button class="btn-primary" id="featureValidateBtn">Valida idea</button>
+                </div>
+                <div class="feature-main-card">
+                    <h3>Analisi di Mercato Approfondita</h3>
+                    <p>Analizza il mercato italiano di riferimento con dati dettagliati su competitor nazionali, tendenze, opportunità e minacce. Report completo che considera le dinamiche regionali e settoriali del mercato italiano.</p>
+                    <button class="btn-primary" id="featureAnalysisBtn">Analizza mercato</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works -->
+    <section class="how-it-works">
+        <div class="container">
+            <h2 class="section-title">Come funziona?</h2>
+            <div class="steps">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <h3>Compila le informazioni</h3>
+                    <p>Rispondi a domande semplici sulle caratteristiche della tua azienda, ottimizzate per il contesto del mercato italiano.</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <h3>L'AI genera il piano</h3>
+                    <p>La nostra intelligenza artificiale analizza le informazioni nel contesto del mercato italiano e crea un business plan professionale e completo.</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <h3>Modifica e personalizza</h3>
+                    <p>Una volta creato il piano dell'AI, è possibile modificarlo facilmente per adattarlo alle tue esigenze specifiche.</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <h3>Scarica in PDF</h3>
+                    <p>Ottieni il tuo business plan professionale in formato PDF, pronto per essere presentato a investitori italiani, banche e istituzioni.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Italian Market Specifics -->
+    <section class="italian-specs">
+        <div class="container">
+            <h2 class="section-title">Ottimizzato per il Mercato Italiano</h2>
+            <p class="section-subtitle">Il nostro servizio tiene conto delle peculiarità settoriali e normative italiane per garantire un business plan conforme e professionale</p>
+            <div class="specs-grid">
+                <div class="spec-card">
+                    <h3>Conformità Normativa Italiana</h3>
+                    <p>Il business plan generato rispetta le normative italiane, inclusi GDPR, Codice del Consumo, normative settoriali specifiche e requisiti delle istituzioni finanziarie italiane. Ogni documento è strutturato secondo gli standard richiesti da banche e investitori italiani.</p>
+                </div>
+                <div class="spec-card">
+                    <h3>Peculiarità Settoriali</h3>
+                    <p>La nostra AI conosce le specificità dei settori italiani: dalla ristorazione al Made in Italy, dal turismo all'artigianato, dall'agroalimentare alla tecnologia. Ogni business plan riflette le caratteristiche uniche del tuo settore nel contesto del mercato italiano.</p>
+                </div>
+                <div class="spec-card">
+                    <h3>Modelli Finanziari Italiani</h3>
+                    <p>Le proiezioni finanziarie seguono i modelli contabili italiani (OIC, principi contabili nazionali) e tengono conto delle agevolazioni fiscali, incentivi regionali e programmi di finanziamento disponibili in Italia (es. Fondo Nazionale Innovazione, Invitalia, bandi regionali).</p>
+                </div>
+                <div class="spec-card">
+                    <h3>Istituzioni e Burocrazia</h3>
+                    <p>Il business plan include riferimenti alle procedure burocratiche italiane, alle licenze necessarie, alle autorizzazioni settoriali e alle tempistiche tipiche del sistema italiano, aiutandoti a navigare la complessità normativa nazionale.</p>
+                </div>
+                <div class="spec-card">
+                    <h3>Mercato e Competitor Italiani</h3>
+                    <p>L'analisi di mercato considera il contesto economico italiano, i competitor nazionali, le catene di distribuzione locali, le preferenze dei consumatori italiani e le dinamiche regionali che caratterizzano il nostro mercato.</p>
+                </div>
+                <div class="spec-card">
+                    <h3>Investitori e Banche Italiane</h3>
+                    <p>Il formato e il contenuto sono ottimizzati per le aspettative di investitori italiani, business angels, fondi di venture capital nazionali e banche italiane, che hanno criteri di valutazione specifici rispetto ai mercati internazionali.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Who Is This For -->
+    <section class="who-for">
+        <div class="container">
+            <h2 class="section-title">Per chi è questo?</h2>
+            <div class="cards">
+                <div class="card">
+                    <h3>Imprenditori italiani alla ricerca di finanziamenti</h3>
+                    <p>Il nostro generatore di business plan AI aiuta gli imprenditori italiani a creare business plan professionali per impressionare i potenziali investitori e ottenere finanziamenti nel mercato italiano.</p>
+                </div>
+                <div class="card">
+                    <h3>Business owners che cercano prestiti bancari</h3>
+                    <p>Il nostro generatore di business plan AI segue i modelli di business plan delle banche italiane e delle istituzioni finanziarie nazionali, garantendo conformità con i requisiti locali.</p>
+                </div>
+                <div class="card">
+                    <h3>Startup e PMI italiane</h3>
+                    <p>Se avete bisogno di un business plan generato dall'intelligenza artificiale per l'autoapprendimento, come riferimento per un progetto o per presentarlo a istituzioni italiane, siamo a vostra disposizione.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Process -->
+    <section class="process">
+        <div class="container">
+            <h2 class="section-title">Il nostro processo</h2>
+            <p class="section-subtitle">Il nostro generatore di business plan AI vi guiderà attraverso alcune domande e, una volta completate, verrà generato un esempio di business plan.</p>
+            <div class="process-steps">
+                <div class="process-step">
+                    <div class="process-number">1</div>
+                    <h3>Primo argomento: Come funziona</h3>
+                    <p>Sono richieste solo informazioni aziendali di base, ad esempio la ragione sociale, il numero di dipendenti e alcuni dati finanziari.</p>
+                </div>
+                <div class="process-step">
+                    <div class="process-number">2</div>
+                    <h3>Modifica e salvataggio</h3>
+                    <p>Una volta creato il piano dell'AI, è possibile modificarlo facilmente con la funzione "Parla con il piano". È possibile inserire ciò che si desidera modificare e l'IA si occuperà del resto.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Testimonials -->
+    <section class="testimonials">
+        <div class="container">
+            <h2 class="section-title">Cosa dicono di noi i clienti</h2>
+            <div class="testimonial-grid">
+                <div class="testimonial">
+                    <div class="testimonial-stars">★★★★★</div>
+                    <p class="testimonial-text">"Il miglior strumento per creare un business plan professionale. In 15 minuti ho avuto un documento completo e dettagliato!"</p>
+                    <p class="testimonial-author">- Zede H.</p>
+                </div>
+                <div class="testimonial">
+                    <div class="testimonial-stars">★★★★★</div>
+                    <p class="testimonial-text">"Facile da usare e i risultati sono impressionanti. Ho ottenuto il finanziamento grazie al business plan generato!"</p>
+                    <p class="testimonial-author">- Jason C.</p>
+                </div>
+                <div class="testimonial">
+                    <div class="testimonial-stars">★★★★★</div>
+                    <p class="testimonial-text">"Risparmiato settimane di lavoro. L'AI capisce perfettamente cosa serve per un business plan professionale."</p>
+                    <p class="testimonial-author">- Parker A.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Example Plan -->
+    <section class="example-plan">
+        <div class="container">
+            <h2 class="section-title">Esempio di Piano Generato dall'IA</h2>
+            <p class="section-subtitle">Visualizza un esempio del nostro piano generato dall'IA</p>
+            <div class="plan-examples">
+                <div class="plan-example">
+                    <div class="plan-badge">Piano Iniziale</div>
+                    <h3>Sintesi Esecutiva</h3>
+                    <div class="plan-preview">
+                        <h4>Panoramica del Business</h4>
+                        <p>Benvenuti al May's Diner, un ristorante familiare situato nel cuore di Atlanta, Georgia. Siamo un'attività emergente a tema unico, dedicata a fornire ai nostri clienti la migliore esperienza culinaria...</p>
+                    </div>
+                    <div class="plan-stats">
+                        <span>10 Pagine</span>
+                        <span>11 Sezioni</span>
+                    </div>
+                </div>
+                <div class="plan-example plan-premium">
+                    <div class="plan-badge premium">Piano Professionale</div>
+                    <h3>Sintesi Esecutiva</h3>
+                    <div class="plan-preview">
+                        <h4>Panoramica del Business</h4>
+                        <p>Il May's Diner è un futuro ristorante situato nel cuore di Atlanta, Georgia. Il nostro obiettivo principale è servire deliziose colazioni, pranzi e cene ai nostri preziosi clienti in un ambiente caldo e accogliente...</p>
+                    </div>
+                    <div class="plan-stats">
+                        <span>20 Pagine</span>
+                        <span>18 Sezioni</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Key Features -->
+    <section class="key-features">
+        <div class="container">
+            <h2 class="section-title">Perché scegliere il nostro servizio</h2>
+            <div class="features-grid">
+                <div class="feature">
+                    <h3>AI specializzata nel mercato italiano</h3>
+                    <p>La nostra intelligenza artificiale è stata addestrata su normative italiane, modelli di business plan delle banche italiane, casi di studio di aziende italiane e best practices del mercato nazionale. Conosce le peculiarità settoriali, normative e culturali del business italiano.</p>
+                </div>
+                <div class="feature">
+                    <h3>Conformità normativa garantita</h3>
+                    <p>Ogni business plan generato rispetta automaticamente le normative italiane vigenti: GDPR, Codice del Consumo, normative settoriali specifiche, principi contabili OIC e requisiti delle istituzioni finanziarie italiane. Non devi preoccuparti della conformità legale.</p>
+                </div>
+                <div class="feature">
+                    <h3>L'intero processo in 15 minuti</h3>
+                    <p>Sono finiti i giorni in cui si passavano settimane a lavorare sui business plan: il nostro generatore di business plan AI può creare un piano completo, conforme alle normative italiane e ottimizzato per il mercato nazionale, in soli 15 minuti.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Blog Section -->
+    <section class="blog-section">
+        <div class="container">
+            <h2 class="section-title">Articoli e Guide</h2>
+            <p class="section-subtitle">Risorse utili per imprenditori e startup italiane</p>
+            <div class="blog-grid">
+                <article class="blog-card">
+                    <div class="blog-card-content">
+                        <h3>Come validare un'idea di business in 7 giorni</h3>
+                        <p>Scopri un metodo pratico e veloce per testare la validità della tua idea imprenditoriale prima di investire tempo e risorse. Una guida step-by-step per validare il tuo business in una settimana.</p>
+                        <a href="validare-idea-business-7-giorni.html" class="blog-link">Leggi l'articolo →</a>
+                    </div>
+                </article>
+                <article class="blog-card">
+                    <div class="blog-card-content">
+                        <h3>Business plan: cos'è davvero e quando serve (e quando no)</h3>
+                        <p>Tutto quello che devi sapere sul business plan: quando è davvero necessario, quando puoi farne a meno, e come crearlo in modo efficace per il mercato italiano.</p>
+                        <a href="business-plan-cose-davvero-quando-serve.html" class="blog-link">Leggi l'articolo →</a>
+                    </div>
+                </article>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta-section">
+        <div class="container">
+            <h2 class="cta-title">Crea il tuo business plan professionale in 15 minuti</h2>
+            <p class="cta-subtitle">Generato dall'intelligenza artificiale, ottimizzato per il mercato italiano con conformità normativa e peculiarità settoriali italiane. Pronto per investitori, banche e istituzioni italiane.</p>
+            <button class="btn-primary btn-large" id="ctaPlanBtn" style="background: white; color: var(--primary);">Inizia ora</button>
+            <p class="cta-link">Hai già un account? <a href="#" id="ctaLoginBtn">Accedi</a></p>
+        </div>
+    </section>
+
+    <!-- Modal for Business Plan Creation -->
+    <div class="modal" id="planModal">
+        <div class="modal-content wizard-content">
+            <span class="close" id="closeModal">&times;</span>
+            
+            <!-- Progress Bar -->
+            <div class="wizard-progress">
+                <div class="progress-bar" id="progressBar"></div>
+                <div class="progress-steps" id="progressSteps"></div>
+            </div>
+
+            <!-- Wizard Steps Container -->
+            <div class="wizard-container" id="wizardContainer">
+                <!-- Steps will be dynamically inserted here -->
+            </div>
+
+            <!-- Navigation Buttons -->
+            <div class="wizard-navigation" id="wizardNavigation" style="display: none;">
+                <button type="button" class="btn-secondary" id="prevBtn" style="display: none;">Indietro</button>
+                <button type="button" class="btn-primary" id="nextBtn">Avanti</button>
+            </div>
+
+            <!-- Loading State -->
+            <div id="loadingState" class="loading-state" style="display: none;">
+                <div class="spinner"></div>
+                <p>L'AI sta generando il tuo business plan... Questo potrebbe richiedere alcuni minuti.</p>
+            </div>
+
+            <!-- Result State -->
+            <div id="resultState" class="result-state" style="display: none;">
+                <h3>Il tuo Business Plan è pronto!</h3>
+                <div id="planContent"></div>
+                <div style="display: flex; gap: 10px; justify-content: center; margin-top: 20px; flex-wrap: wrap;">
+                    <button class="btn-primary" id="downloadPdfBtn">Scarica PDF</button>
+                    <button class="btn-secondary" id="downloadJsonBtn">Scarica JSON</button>
+                    <button class="btn-secondary" id="editPlanBtn">Modifica con AI</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Idea Validation -->
+    <div class="modal" id="validateModal">
+        <div class="modal-content wizard-content">
+            <span class="close" id="closeValidateModal">&times;</span>
+            
+            <!-- Progress Bar -->
+            <div class="wizard-progress">
+                <div class="progress-bar" id="validateProgressBar"></div>
+                <div class="progress-steps" id="validateProgressSteps"></div>
+            </div>
+
+            <!-- Wizard Steps Container -->
+            <div class="wizard-container" id="validateWizardContainer">
+                <!-- Steps will be dynamically inserted here -->
+            </div>
+
+            <!-- Navigation Buttons -->
+            <div class="wizard-navigation" id="validateWizardNavigation" style="display: none;">
+                <button type="button" class="btn-secondary" id="validatePrevBtn" style="display: none;">Indietro</button>
+                <button type="button" class="btn-primary" id="validateNextBtn">Avanti</button>
+            </div>
+
+            <!-- Loading State -->
+            <div id="validateLoadingState" class="loading-state" style="display: none;">
+                <div class="spinner"></div>
+                <p>L'AI sta analizzando la tua idea di business... Questo potrebbe richiedere alcuni minuti.</p>
+            </div>
+
+            <!-- Result State -->
+            <div id="validateResultState" class="result-state" style="display: none;">
+                <h3>Analisi della tua idea completata!</h3>
+                <div id="validateContent"></div>
+                <button class="btn-primary" id="downloadValidatePdfBtn">Scarica PDF</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Market Analysis -->
+    <div class="modal" id="analysisModal">
+        <div class="modal-content wizard-content">
+            <span class="close" id="closeAnalysisModal">&times;</span>
+            
+            <!-- Progress Bar -->
+            <div class="wizard-progress">
+                <div class="progress-bar" id="analysisProgressBar"></div>
+                <div class="progress-steps" id="analysisProgressSteps"></div>
+            </div>
+
+            <!-- Wizard Steps Container -->
+            <div class="wizard-container" id="analysisWizardContainer">
+                <!-- Steps will be dynamically inserted here -->
+            </div>
+
+            <!-- Navigation Buttons -->
+            <div class="wizard-navigation" id="analysisWizardNavigation" style="display: none;">
+                <button type="button" class="btn-secondary" id="analysisPrevBtn" style="display: none;">Indietro</button>
+                <button type="button" class="btn-primary" id="analysisNextBtn">Avanti</button>
+            </div>
+
+            <!-- Loading State -->
+            <div id="analysisLoadingState" class="loading-state" style="display: none;">
+                <div class="spinner"></div>
+                <p>L'AI sta analizzando il mercato... Questo potrebbe richiedere alcuni minuti.</p>
+            </div>
+
+            <!-- Result State -->
+            <div id="analysisResultState" class="result-state" style="display: none;">
+                <h3>Analisi di mercato completata!</h3>
+                <div id="analysisContent"></div>
+                <button class="btn-primary" id="downloadAnalysisPdfBtn">Scarica PDF</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p>Contattateci all'indirizzo: <a href="mailto:help@getbusinessplan.ai">help@getbusinessplan.ai</a></p>
+            <p><a href="#">Politica di rimborso</a> | <a href="#">Informativa sulla privacy</a></p>
+            <p>&copy; 2024 GetBusinessPlan. Tutti i diritti riservati.</p>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>

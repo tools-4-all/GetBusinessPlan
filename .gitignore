@@ -1,0 +1,30 @@
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Editor Files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment variables
+.env
+.env.local
+
+# API Keys (never commit these!)
+config.js
+secrets.js
+
+# Build files (if using a build process)
+dist/
+build/
+
+# Dependencies (if using npm)
+node_modules/
+package-lock.json
