@@ -104,7 +104,17 @@ async def generate_business_plan(request: BusinessPlanRequest):
         with open(prompt_path, "r", encoding="utf-8") as f:
             prompt_config = json.load(f)
         
-        print(f"Modello configurato: {prompt_config.get('model', 'N/A')}")
+        model_name = prompt_config.get('model', 'N/A')
+        print(f"Modello configurato: {model_name}")
+        
+        # Verifica se il modello è valido (lista modelli comuni)
+        valid_models = [
+            'gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-4', 'gpt-3.5-turbo',
+            'o1-preview', 'o1-mini', 'gpt-4o-2024-08-06', 'gpt-4-turbo-2024-04-09'
+        ]
+        if not any(model_name.startswith(vm.split('-')[0]) for vm in valid_models):
+            print(f"⚠️ ATTENZIONE: Il modello '{model_name}' potrebbe non essere valido")
+            print(f"Modelli suggeriti: {', '.join(valid_models[:3])}")
         
         # Prepara i dati utente
         user_data_json = utils.prepare_user_input_json(request.formData)
@@ -148,33 +158,49 @@ async def generate_business_plan(request: BusinessPlanRequest):
         print(f"Chiamata OpenAI con modello {request_body['model']}...")
         print(f"Timestamp inizio OpenAI: {openai_start.isoformat()}")
         print(f"Request body keys: {list(request_body.keys())}")
+        print(f"Numero messaggi: {len(request_body.get('messages', []))}")
         
         try:
-            # Timeout per la chiamata OpenAI (5 minuti)
+            # Chiamata OpenAI sincrona (il client OpenAI gestisce già il timeout interno)
+            # Usiamo asyncio.to_thread per non bloccare l'event loop (Python 3.9+)
             import asyncio
-            from concurrent.futures import ThreadPoolExecutor
-            
-            # Esegui la chiamata OpenAI in un thread separato per evitare di bloccare l'event loop
-            loop = asyncio.get_event_loop()
-            with ThreadPoolExecutor() as executor:
-                response = await asyncio.wait_for(
-                    loop.run_in_executor(executor, lambda: client.chat.completions.create(**request_body)),
-                    timeout=300.0
+            import sys
+            if sys.version_info >= (3, 9):
+                response = await asyncio.to_thread(
+                    client.chat.completions.create,
+                    **request_body
                 )
+            else:
+                # Fallback per versioni precedenti
+                from concurrent.futures import ThreadPoolExecutor
+                loop = asyncio.get_event_loop()
+                with ThreadPoolExecutor() as executor:
+                    response = await loop.run_in_executor(
+                        executor,
+                        lambda: client.chat.completions.create(**request_body)
+                    )
             openai_end = datetime.datetime.now()
             openai_elapsed = (openai_end - openai_start).total_seconds()
             print(f"Timestamp fine OpenAI: {openai_end.isoformat()}")
             print(f"Tempo chiamata OpenAI: {openai_elapsed:.2f} secondi ({openai_elapsed/60:.2f} minuti)")
-            print(f"Risposta ricevuta, lunghezza: {len(str(response.choices[0].message.content)) if response.choices[0].message.content else 0}")
-        except asyncio.TimeoutError:
-            print(f"ERRORE: Timeout chiamata OpenAI dopo 5 minuti")
-            raise HTTPException(status_code=504, detail="Timeout chiamata OpenAI: la generazione ha impiegato troppo tempo")
+            if response.choices and len(response.choices) > 0:
+                content = response.choices[0].message.content
+                print(f"Risposta ricevuta, lunghezza: {len(str(content)) if content else 0}")
+            else:
+                print("ATTENZIONE: Risposta OpenAI senza choices")
         except Exception as openai_error:
-            print(f"ERRORE OpenAI: {str(openai_error)}")
+            openai_end = datetime.datetime.now()
+            openai_elapsed = (openai_end - openai_start).total_seconds()
+            print(f"ERRORE OpenAI dopo {openai_elapsed:.2f} secondi")
             print(f"Tipo errore: {type(openai_error).__name__}")
+            print(f"Messaggio errore: {str(openai_error)}")
             import traceback
             traceback.print_exc()
-            raise HTTPException(status_code=500, detail=f"Errore OpenAI: {str(openai_error)}")
+            # Restituisci un errore più dettagliato
+            error_detail = f"Errore OpenAI: {str(openai_error)}"
+            if "model" in str(openai_error).lower() or "invalid" in str(openai_error).lower():
+                error_detail += f" (Verifica che il modello '{request_body.get('model')}' sia valido)"
+            raise HTTPException(status_code=500, detail=error_detail)
         
         # Estrai il JSON dalla risposta
         content = response.choices[0].message.content
@@ -199,12 +225,21 @@ async def generate_business_plan(request: BusinessPlanRequest):
         })
         
     except json.JSONDecodeError as e:
-        raise HTTPException(status_code=500, detail=f"Errore parsing JSON: {str(e)}")
-    except Exception as e:
-        print(f"Errore: {str(e)}")
+        print(f"ERRORE parsing JSON: {str(e)}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Errore parsing JSON: {str(e)}")
+    except HTTPException:
+        # Rilancia le HTTPException così come sono
+        raise
+    except Exception as e:
+        end_time = datetime.datetime.now()
+        elapsed = (end_time - start_time).total_seconds()
+        print(f"ERRORE GENERALE dopo {elapsed:.2f} secondi: {str(e)}")
+        print(f"Tipo errore: {type(e).__name__}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Errore interno: {str(e)}")
 
 @app.post("/api/generate-pdf")
 async def generate_pdf(request: PDFRequest):

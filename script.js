@@ -1089,10 +1089,18 @@ async function generateWithAI(formData) {
         }
         
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({ detail: 'Errore sconosciuto' }));
+            let errorData;
+            try {
+                const text = await response.text();
+                console.error('Risposta errore (raw):', text);
+                errorData = JSON.parse(text);
+            } catch (e) {
+                errorData = { detail: `Errore HTTP ${response.status}: ${response.statusText}` };
+            }
             console.error('Errore API - Status:', response.status);
             console.error('Dati errore:', errorData);
-            throw new Error(`Errore API: ${response.status} - ${errorData.detail || 'Errore sconosciuto'}`);
+            const errorMessage = errorData.detail || errorData.message || errorData.error || 'Errore sconosciuto';
+            throw new Error(`Errore API: ${response.status} - ${errorMessage}`);
         }
         
         const result = await response.json();
