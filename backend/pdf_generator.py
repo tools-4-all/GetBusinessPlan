@@ -316,15 +316,12 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
         leading=18
     ))
     
-    styles.add(ParagraphStyle(
-        name='Normal',
-        parent=styles['Normal'],
-        fontName='Times-Roman',
-        fontSize=11,
-        textColor=colors.HexColor('#000000'),
-        leading=14,
-        alignment=TA_JUSTIFY
-    ))
+    # Modifica lo stile Normal esistente invece di aggiungerne uno nuovo
+    styles['Normal'].fontName = 'Times-Roman'
+    styles['Normal'].fontSize = 11
+    styles['Normal'].textColor = colors.HexColor('#000000')
+    styles['Normal'].leading = 14
+    styles['Normal'].alignment = TA_JUSTIFY
     
     styles.add(ParagraphStyle(
         name='TOCEntry',
