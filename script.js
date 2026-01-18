@@ -742,11 +742,21 @@ async function generateBusinessPlanFromWizard() {
     try {
         // Salva i dati del wizard in localStorage per recuperarli dopo il redirect
         try {
-            localStorage.setItem('pendingBusinessPlanData', JSON.stringify(wizardData));
+            const dataToSave = JSON.stringify(wizardData);
+            localStorage.setItem('pendingBusinessPlanData', dataToSave);
             localStorage.setItem('pendingDocumentType', 'business-plan');
             console.log('✅ Dati wizard salvati in localStorage');
+            console.log('Dimensione dati salvati:', dataToSave.length, 'caratteri');
+            
+            // Verifica che siano stati salvati correttamente
+            const verify = localStorage.getItem('pendingBusinessPlanData');
+            if (!verify) {
+                throw new Error('Dati non salvati correttamente in localStorage');
+            }
+            console.log('✅ Verifica salvataggio: dati presenti in localStorage');
         } catch (e) {
-            console.warn('⚠️ Impossibile salvare in localStorage:', e);
+            console.error('❌ ERRORE nel salvataggio localStorage:', e);
+            console.warn('⚠️ Fallback: salva in memoria (i dati potrebbero andare persi dopo il redirect)');
             // Fallback: salva in memoria
             window.pendingBusinessPlanData = wizardData;
         }
@@ -1113,9 +1123,11 @@ function initializeEventListeners() {
 
 // Wait for DOM to be fully loaded with retry mechanism
 function initializeAll() {
+    console.log('🚀 ===== INITIALIZE ALL =====');
     console.log('DOM loaded, initializing...');
+    console.log('URL corrente:', window.location.href);
     
-    // Inizializza gli elementi DOM necessari
+    // Inizializza gli elementi DOM necessari PRIMA di tutto
     initializeEventListeners();
     initializeAnalysisListeners();
     
@@ -1124,14 +1136,29 @@ function initializeAll() {
     const paymentStatus = urlParams.get('payment');
     const sessionId = urlParams.get('session_id');
     
+    console.log('Parametri URL:', { paymentStatus, sessionId });
+    
     if (paymentStatus === 'success' && sessionId) {
-        console.log('🔍 Verifica pagamento dopo redirect...');
+        console.log('🔍 ===== VERIFICA PAGAMENTO DOPO REDIRECT =====');
         console.log('Session ID:', sessionId);
         console.log('Payment Status:', paymentStatus);
+        console.log('URL completa:', window.location.href);
         
         // Determina il tipo di documento dal localStorage
         const pendingDocType = localStorage.getItem('pendingDocumentType');
-        console.log('Tipo documento salvato:', pendingDocType);
+        console.log('Tipo documento salvato in localStorage:', pendingDocType);
+        console.log('pendingBusinessPlanData:', localStorage.getItem('pendingBusinessPlanData') ? 'Presente' : 'Assente');
+        console.log('pendingMarketAnalysisData:', localStorage.getItem('pendingMarketAnalysisData') ? 'Presente' : 'Assente');
+        
+        // Alert di debug (rimuovi in produzione)
+        if (!pendingDocType) {
+            console.error('❌ ERRORE CRITICO: pendingDocumentType non trovato in localStorage!');
+            console.error('Tutti i dati localStorage:', {
+                pendingDocumentType: localStorage.getItem('pendingDocumentType'),
+                pendingBusinessPlanData: localStorage.getItem('pendingBusinessPlanData') ? 'Presente' : 'Assente',
+                pendingMarketAnalysisData: localStorage.getItem('pendingMarketAnalysisData') ? 'Presente' : 'Assente'
+            });
+        }
         
         // Verifica solo il tipo di documento corretto
         if (pendingDocType === 'business-plan') {
@@ -1207,7 +1234,9 @@ function initializeAll() {
             }
         });
         } else if (pendingDocType === 'market-analysis') {
+            console.log('📋 Verifica pagamento per market-analysis...');
             verifyPaymentAfterRedirect('market-analysis').then(maVerified => {
+                console.log('📋 Risultato verifica market-analysis:', maVerified);
                 if (maVerified) {
                     window.paymentVerified_analysis = true;
                     window.paymentSessionId_analysis = sessionId;
@@ -1280,14 +1309,78 @@ function initializeAll() {
                 }
             });
         } else {
-            console.warn('⚠️ Tipo documento non trovato in localStorage, prova entrambi...');
-            // Fallback: prova entrambi
+            console.warn('⚠️ Tipo documento non trovato in localStorage!');
+            console.warn('Tentativo di recupero da URL o verifica entrambi...');
+            
+            // Prova a determinare dal sessionId verificando entrambi
             Promise.all([
                 verifyPaymentAfterRedirect('business-plan'),
                 verifyPaymentAfterRedirect('market-analysis')
             ]).then(([bpVerified, maVerified]) => {
-                // Gestisci come prima se necessario
                 console.log('Verifica fallback - BP:', bpVerified, 'MA:', maVerified);
+                
+                if (bpVerified) {
+                    // Prova a recuperare i dati business plan
+                    const savedData = localStorage.getItem('pendingBusinessPlanData');
+                    if (savedData) {
+                        try {
+                            const wizardData = JSON.parse(savedData);
+                            localStorage.removeItem('pendingBusinessPlanData');
+                            localStorage.setItem('pendingDocumentType', 'business-plan');
+                            console.log('✅ Dati business plan recuperati in fallback');
+                            
+                            // Inizializza elementi DOM
+                            if (!planModal) planModal = document.getElementById('planModal');
+                            if (!wizardContainer) wizardContainer = document.getElementById('wizardContainer');
+                            if (!wizardNavigation) wizardNavigation = document.getElementById('wizardNavigation');
+                            
+                            // Apri modal e genera
+                            if (planModal) {
+                                planModal.style.display = 'block';
+                                document.body.style.overflow = 'hidden';
+                                if (wizardContainer) wizardContainer.style.display = 'none';
+                                if (wizardNavigation) wizardNavigation.style.display = 'none';
+                                setTimeout(() => generateBusinessPlanAfterPayment(wizardData), 300);
+                            }
+                        } catch (e) {
+                            console.error('Errore parsing dati business plan:', e);
+                        }
+                    } else {
+                        console.error('❌ Dati business plan non trovati in localStorage');
+                    }
+                } else if (maVerified) {
+                    // Prova a recuperare i dati analisi
+                    const savedData = localStorage.getItem('pendingMarketAnalysisData');
+                    if (savedData) {
+                        try {
+                            const analysisWizardData = JSON.parse(savedData);
+                            localStorage.removeItem('pendingMarketAnalysisData');
+                            localStorage.setItem('pendingDocumentType', 'market-analysis');
+                            console.log('✅ Dati analisi recuperati in fallback');
+                            
+                            // Inizializza elementi DOM
+                            if (!analysisModal) analysisModal = document.getElementById('analysisModal');
+                            if (!analysisWizardContainer) analysisWizardContainer = document.getElementById('analysisWizardContainer');
+                            if (!analysisWizardNavigation) analysisWizardNavigation = document.getElementById('analysisWizardNavigation');
+                            
+                            // Apri modal e genera
+                            if (analysisModal) {
+                                analysisModal.style.display = 'block';
+                                document.body.style.overflow = 'hidden';
+                                if (analysisWizardContainer) analysisWizardContainer.style.display = 'none';
+                                if (analysisWizardNavigation) analysisWizardNavigation.style.display = 'none';
+                                setTimeout(() => generateMarketAnalysisAfterPayment(analysisWizardData), 300);
+                            }
+                        } catch (e) {
+                            console.error('Errore parsing dati analisi:', e);
+                        }
+                    } else {
+                        console.error('❌ Dati analisi non trovati in localStorage');
+                    }
+                } else {
+                    console.error('❌ Nessun pagamento verificato in fallback');
+                    alert('Errore: impossibile verificare il pagamento. Se hai già pagato, contatta il supporto.');
+                }
             });
         }
     }
@@ -3472,11 +3565,21 @@ async function generateMarketAnalysis() {
     try {
         // Salva i dati del wizard in localStorage per recuperarli dopo il redirect
         try {
-            localStorage.setItem('pendingMarketAnalysisData', JSON.stringify(analysisWizardData));
+            const dataToSave = JSON.stringify(analysisWizardData);
+            localStorage.setItem('pendingMarketAnalysisData', dataToSave);
             localStorage.setItem('pendingDocumentType', 'market-analysis');
             console.log('✅ Dati analisi salvati in localStorage');
+            console.log('Dimensione dati salvati:', dataToSave.length, 'caratteri');
+            
+            // Verifica che siano stati salvati correttamente
+            const verify = localStorage.getItem('pendingMarketAnalysisData');
+            if (!verify) {
+                throw new Error('Dati non salvati correttamente in localStorage');
+            }
+            console.log('✅ Verifica salvataggio: dati presenti in localStorage');
         } catch (e) {
-            console.warn('⚠️ Impossibile salvare in localStorage:', e);
+            console.error('❌ ERRORE nel salvataggio localStorage:', e);
+            console.warn('⚠️ Fallback: salva in memoria (i dati potrebbero andare persi dopo il redirect)');
             // Fallback: salva in memoria
             window.pendingMarketAnalysisData = analysisWizardData;
         }
