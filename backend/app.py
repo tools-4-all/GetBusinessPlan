@@ -220,6 +220,9 @@ class VerifyPaymentRequest(BaseModel):
     sessionId: str
     documentType: str  # "business-plan" o "market-analysis"
 
+class ValidateIdeaRequest(BaseModel):
+    formData: dict
+
 @app.get("/")
 async def root():
     return {"message": "GetBusinessPlan API", "status": "running"}
@@ -1039,3 +1042,122 @@ Rispondi SOLO con un JSON array di stringhe, esempio:
             "suggestions": [],
             "error": str(e)
         })
+
+@app.post("/api/validate-idea")
+async def validate_idea(request: ValidateIdeaRequest):
+    """Valida un'idea di business e fornisce un report di validazione"""
+    import datetime
+    start_time = datetime.datetime.now()
+    print(f"=== INIZIO VALIDAZIONE IDEA ===")
+    print(f"Timestamp: {start_time.isoformat()}")
+    print(f"Dati ricevuti: {len(str(request.formData))} caratteri")
+    
+    try:
+        # Prepara i dati utente
+        idea_data = {
+            "idea": request.formData.get('idea', ''),
+            "problema": request.formData.get('problem', ''),
+            "soluzione": request.formData.get('solution', ''),
+            "mercato_target": request.formData.get('targetMarket', ''),
+            "concorrenti": request.formData.get('competitors', ''),
+            "vantaggio_competitivo": request.formData.get('competitiveAdvantage', ''),
+            "modello_ricavi": request.formData.get('revenueModel', ''),
+            "traction": request.formData.get('traction', ''),
+            "team": request.formData.get('team', ''),
+            "risorse_necessarie": request.formData.get('resources', '')
+        }
+        
+        idea_data_json = json.dumps(idea_data, ensure_ascii=False, indent=2)
+        
+        # Prompt per la validazione dell'idea
+        validation_prompt = f"""Sei un esperto consulente per startup e imprenditori italiani. 
+Il tuo compito è validare un'idea di business e fornire un report completo e professionale.
+
+Dati dell'idea di business:
+{idea_data_json}
+
+Analizza l'idea e fornisci un report di validazione strutturato in formato JSON con le seguenti sezioni:
+
+1. **Executive Summary**: Un riepilogo breve (2-3 paragrafi) dell'idea e della valutazione complessiva
+2. **Analisi del Problema**: Valuta se il problema identificato è reale, significativo e se le persone sono disposte a pagare per risolverlo (score 0-10)
+3. **Analisi della Soluzione**: Valuta se la soluzione proposta è efficace, fattibile e differenziata (score 0-10)
+4. **Analisi del Mercato**: Valuta la dimensione del mercato, la crescita e l'accessibilità (score 0-10)
+5. **Analisi della Competitività**: Valuta la posizione competitiva, i vantaggi e le barriere all'ingresso (score 0-10)
+6. **Analisi del Modello di Business**: Valuta la sostenibilità economica e la scalabilità (score 0-10)
+7. **Punti di Forza**: Elenco dei principali punti di forza dell'idea (minimo 3)
+8. **Punti di Debolezza**: Elenco delle principali criticità e rischi (minimo 3)
+9. **Raccomandazioni**: Suggerimenti concreti per migliorare l'idea e aumentare le probabilità di successo (minimo 5)
+10. **Score Complessivo**: Score finale da 0 a 100 con giustificazione
+11. **Verdetto**: "VALIDATA", "DA MIGLIORARE" o "NON VALIDATA" con spiegazione
+
+Il report deve essere:
+- Professionale e dettagliato
+- Orientato al mercato italiano quando rilevante
+- Costruttivo e pratico
+- Basato su criteri oggettivi di validazione
+
+Rispondi SOLO con un JSON valido con questa struttura:
+{{
+    "executiveSummary": "...",
+    "analisiProblema": {{"score": 8, "valutazione": "..."}},
+    "analisiSoluzione": {{"score": 7, "valutazione": "..."}},
+    "analisiMercato": {{"score": 6, "valutazione": "..."}},
+    "analisiCompetitivita": {{"score": 7, "valutazione": "..."}},
+    "analisiModelloBusiness": {{"score": 8, "valutazione": "..."}},
+    "puntiForza": ["...", "..."],
+    "puntiDebolezza": ["...", "..."],
+    "raccomandazioni": ["...", "..."],
+    "scoreComplessivo": 72,
+    "verdetto": "DA MIGLIORARE",
+    "spiegazioneVerdetto": "..."
+}}
+"""
+
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "Sei un esperto consulente per startup e imprenditori. Fornisci sempre risposte in formato JSON valido, strutturate e professionali."},
+                {"role": "user", "content": validation_prompt}
+            ],
+            temperature=0.7,
+            max_tokens=4000
+        )
+        
+        content = response.choices[0].message.content.strip()
+        
+        # Estrai JSON dalla risposta (potrebbe essere dentro markdown code blocks)
+        if content.startswith("```"):
+            lines = content.split("\n")
+            content = "\n".join(lines[1:-1]) if len(lines) > 2 else content
+            # Rimuovi anche il tipo di linguaggio se presente (es. ```json)
+            if content.startswith("json"):
+                content = "\n".join(lines[2:-1]) if len(lines) > 3 else content
+        
+        # Prova a parsare il JSON
+        try:
+            validation_report = json.loads(content)
+        except json.JSONDecodeError as e:
+            print(f"Errore parsing JSON: {e}")
+            print(f"Contenuto ricevuto: {content[:500]}")
+            raise HTTPException(status_code=500, detail="Errore nella generazione del report di validazione")
+        
+        # Aggiungi metadata
+        validation_report["_metadata"] = {
+            "timestamp": start_time.isoformat(),
+            "processing_time_seconds": (datetime.datetime.now() - start_time).total_seconds()
+        }
+        
+        print(f"✅ Validazione completata in {(datetime.datetime.now() - start_time).total_seconds():.2f} secondi")
+        
+        return JSONResponse(content={
+            "success": True,
+            "json": validation_report
+        })
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Errore nella validazione dell'idea: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Errore interno: {str(e)}")

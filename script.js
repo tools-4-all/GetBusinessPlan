@@ -254,6 +254,20 @@ const questions = [
 ];
 
 // Modal Functions
+function openServicesModal() {
+    const servicesModal = document.getElementById('servicesModal');
+    if (servicesModal) {
+        servicesModal.style.display = 'block';
+    }
+}
+
+function closeServicesModal() {
+    const servicesModal = document.getElementById('servicesModal');
+    if (servicesModal) {
+        servicesModal.style.display = 'none';
+    }
+}
+
 async function openModal() {
     if (!planModal) {
         planModal = document.getElementById('planModal');
@@ -1049,7 +1063,7 @@ function initializeEventListeners() {
     if (createPlanBtn) {
         createPlanBtn.addEventListener('click', () => {
             console.log('createPlanBtn clicked');
-            openModal();
+            openServicesModal();
         });
         console.log('createPlanBtn listener added');
     } else {
@@ -1065,6 +1079,37 @@ function initializeEventListeners() {
         console.warn('ctaPlanBtn not found!');
     }
     if (closeModal) closeModal.addEventListener('click', closeModalFunc);
+    
+    // Services Modal handlers
+    const closeServicesModalBtn = document.getElementById('closeServicesModal');
+    if (closeServicesModalBtn) {
+        closeServicesModalBtn.addEventListener('click', closeServicesModal);
+    }
+    
+    const serviceBusinessPlan = document.getElementById('serviceBusinessPlan');
+    if (serviceBusinessPlan) {
+        serviceBusinessPlan.addEventListener('click', () => {
+            closeServicesModal();
+            openModal();
+        });
+    }
+    
+    const serviceMarketAnalysis = document.getElementById('serviceMarketAnalysis');
+    if (serviceMarketAnalysis) {
+        serviceMarketAnalysis.addEventListener('click', () => {
+            closeServicesModal();
+            openAnalysisModal();
+        });
+    }
+    
+    const serviceValidateIdea = document.getElementById('serviceValidateIdea');
+    if (serviceValidateIdea) {
+        serviceValidateIdea.addEventListener('click', () => {
+            closeServicesModal();
+            openValidationModal();
+        });
+    }
+    
     if (nextBtn) nextBtn.addEventListener('click', nextStep);
     if (prevBtn) prevBtn.addEventListener('click', prevStep);
     if (downloadPdfBtn) downloadPdfBtn.addEventListener('click', generatePDF);
@@ -5282,7 +5327,11 @@ document.addEventListener('click', (e) => {
     if (window.paymentInProgress) {
         return;
     }
+    const servicesModal = document.getElementById('servicesModal');
+    if (servicesModal && e.target === servicesModal) closeServicesModal();
     if (analysisModal && e.target === analysisModal) closeAnalysisModalFunc();
+    const validationModal = document.getElementById('validationModal');
+    if (validationModal && e.target === validationModal) closeValidationModalFunc();
 });
 
 // Funzione per salvare un documento nella dashboard dell'utente (su Firebase Firestore)
@@ -5441,4 +5490,511 @@ function getUserDocuments() {
     }
     
     return [];
+}
+
+// ============================================
+// IDEA VALIDATION WIZARD
+// ============================================
+
+const validationQuestions = [
+    {
+        id: 'idea',
+        title: 'Descrivi la tua idea di business',
+        description: 'Spiega in modo chiaro e conciso la tua idea di business',
+        type: 'textarea',
+        required: true,
+        rows: 5,
+        placeholder: 'Es. Una piattaforma SaaS per gestire le prenotazioni dei ristoranti italiani...'
+    },
+    {
+        id: 'problem',
+        title: 'Quale problema risolve la tua idea?',
+        description: 'Descrivi il problema specifico che la tua idea risolve e perché è importante',
+        type: 'textarea',
+        required: true,
+        rows: 4,
+        placeholder: 'Es. I ristoranti italiani faticano a gestire le prenotazioni in modo efficiente...'
+    },
+    {
+        id: 'solution',
+        title: 'Come risolve il problema?',
+        description: 'Spiega come la tua soluzione risolve il problema in modo unico ed efficace',
+        type: 'textarea',
+        required: true,
+        rows: 4,
+        placeholder: 'Es. La piattaforma automatizza le prenotazioni, riduce i no-show e aumenta i ricavi...'
+    },
+    {
+        id: 'targetMarket',
+        title: 'Chi è il tuo mercato target?',
+        description: 'Descrivi i tuoi clienti ideali: caratteristiche, dimensioni, settore, ecc.',
+        type: 'textarea',
+        required: true,
+        rows: 4,
+        placeholder: 'Es. Ristoranti italiani con 20-50 coperti, situati in città turistiche...'
+    },
+    {
+        id: 'competitors',
+        title: 'Chi sono i tuoi competitor principali?',
+        description: 'Elenca i principali competitor e come ti differenzi da loro',
+        type: 'textarea',
+        required: false,
+        rows: 4,
+        placeholder: 'Es. Competitor A, Competitor B... La mia differenziazione è...'
+    },
+    {
+        id: 'competitiveAdvantage',
+        title: 'Qual è il tuo vantaggio competitivo?',
+        description: 'Cosa rende unica la tua soluzione rispetto ai competitor?',
+        type: 'textarea',
+        required: true,
+        rows: 4,
+        placeholder: 'Es. Tecnologia proprietaria, team esperto, partnership esclusive...'
+    },
+    {
+        id: 'revenueModel',
+        title: 'Come generi ricavi?',
+        description: 'Descrivi il tuo modello di business e come intendi monetizzare',
+        type: 'textarea',
+        required: true,
+        rows: 4,
+        placeholder: 'Es. Abbonamento mensile €99, commissioni su transazioni, pubblicità...'
+    },
+    {
+        id: 'traction',
+        title: 'Hai già qualche trazione o validazione?',
+        description: 'Descrivi eventuali clienti, partnership, test, feedback ricevuti, ecc.',
+        type: 'textarea',
+        required: false,
+        rows: 4,
+        placeholder: 'Es. 5 ristoranti pilota, feedback positivo, interesse da investitori...'
+    },
+    {
+        id: 'team',
+        title: 'Chi fa parte del team?',
+        description: 'Descrivi il team, le competenze e l\'esperienza rilevante',
+        type: 'textarea',
+        required: false,
+        rows: 4,
+        placeholder: 'Es. 2 fondatori con esperienza nel settore tech e ristorazione...'
+    },
+    {
+        id: 'resources',
+        title: 'Quali risorse ti servono per partire?',
+        description: 'Indica le risorse necessarie: finanziamenti, competenze, partnership, ecc.',
+        type: 'textarea',
+        required: false,
+        rows: 4,
+        placeholder: 'Es. €50.000 per sviluppo, 1 sviluppatore, partnership con ristoranti...'
+    }
+];
+
+let validationCurrentStep = 0;
+let validationWizardData = {};
+
+// Validation modal elements
+let validationModal;
+let closeValidationModal;
+let validationWizardContainer;
+let validationWizardNavigation;
+let validationPrevBtn;
+let validationNextBtn;
+let validationProgressBar;
+let validationProgressSteps;
+let validationLoadingState;
+let validationResultState;
+let validationContent;
+let downloadValidationPdfBtn;
+let downloadValidationJsonBtn;
+
+async function openValidationModal() {
+    console.log('openValidationModal chiamata');
+    if (!validationModal) {
+        validationModal = document.getElementById('validationModal');
+    }
+    if (!validationModal) {
+        console.error('validationModal not found nel DOM');
+        alert('Errore: il modal di validazione non è stato trovato. Ricarica la pagina e riprova.');
+        return;
+    }
+    
+    // Verifica autenticazione
+    try {
+        await requireAuth();
+        console.log('✅ Utente autenticato');
+    } catch (error) {
+        console.log('❌ Autenticazione richiesta:', error.message);
+        return;
+    }
+    
+    validationModal.style.display = 'block';
+    document.body.style.overflow = 'hidden';
+    initValidationWizard();
+}
+
+function closeValidationModalFunc() {
+    if (!validationModal) {
+        validationModal = document.getElementById('validationModal');
+    }
+    if (validationModal) {
+        validationModal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+    validationCurrentStep = 0;
+    validationWizardData = {};
+}
+
+function initValidationWizard() {
+    validationCurrentStep = 0;
+    validationWizardData = {};
+    
+    if (!validationWizardContainer) {
+        validationWizardContainer = document.getElementById('validationWizardContainer');
+    }
+    if (!validationWizardNavigation) {
+        validationWizardNavigation = document.getElementById('validationWizardNavigation');
+    }
+    if (!validationProgressBar) {
+        validationProgressBar = document.getElementById('validationProgressBar');
+    }
+    if (!validationProgressSteps) {
+        validationProgressSteps = document.getElementById('validationProgressSteps');
+    }
+    if (!validationLoadingState) {
+        validationLoadingState = document.getElementById('validationLoadingState');
+    }
+    if (!validationResultState) {
+        validationResultState = document.getElementById('validationResultState');
+    }
+    
+    if (validationWizardContainer) validationWizardContainer.style.display = 'block';
+    if (validationWizardNavigation) validationWizardNavigation.style.display = 'flex';
+    if (validationLoadingState) validationLoadingState.style.display = 'none';
+    if (validationResultState) validationResultState.style.display = 'none';
+    
+    renderValidationStep();
+    updateValidationProgress();
+}
+
+function renderValidationStep() {
+    if (!validationWizardContainer) return;
+    
+    const question = validationQuestions[validationCurrentStep];
+    if (!question) return;
+    
+    const stepHTML = `
+        <div class="wizard-step">
+            <h3>${escape(question.title)}</h3>
+            ${question.description ? `<p class="step-description">${escape(question.description)}</p>` : ''}
+            <div class="step-input">
+                ${renderValidationInput(question)}
+            </div>
+        </div>
+    `;
+    
+    validationWizardContainer.innerHTML = stepHTML;
+    
+    // Aggiorna i pulsanti di navigazione
+    if (validationPrevBtn) {
+        validationPrevBtn.style.display = validationCurrentStep > 0 ? 'block' : 'none';
+    }
+    if (validationNextBtn) {
+        validationNextBtn.textContent = validationCurrentStep === validationQuestions.length - 1 ? 'Valida Idea' : 'Avanti';
+    }
+}
+
+function renderValidationInput(question) {
+    const value = validationWizardData[question.id] || '';
+    
+    switch (question.type) {
+        case 'textarea':
+            return `<textarea 
+                id="validationInput_${question.id}" 
+                ${question.required ? 'required' : ''} 
+                rows="${question.rows || 4}"
+                placeholder="${escape(question.placeholder || '')}"
+                style="width: 100%; padding: 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 15px; font-family: inherit; resize: vertical;"
+            >${escape(value)}</textarea>`;
+        case 'text':
+            return `<input 
+                type="text" 
+                id="validationInput_${question.id}" 
+                ${question.required ? 'required' : ''} 
+                value="${escape(value)}"
+                placeholder="${escape(question.placeholder || '')}"
+                style="width: 100%; padding: 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 15px;"
+            />`;
+        default:
+            return '';
+    }
+}
+
+function updateValidationProgress() {
+    if (!validationProgressBar || !validationProgressSteps) return;
+    
+    const progress = ((validationCurrentStep + 1) / validationQuestions.length) * 100;
+    validationProgressBar.style.width = `${progress}%`;
+    
+    validationProgressSteps.innerHTML = validationQuestions.map((q, i) => 
+        `<span class="progress-step ${i <= validationCurrentStep ? 'active' : ''}">${i + 1}</span>`
+    ).join('');
+}
+
+function validationNextStep() {
+    const question = validationQuestions[validationCurrentStep];
+    if (!question) return;
+    
+    const input = document.getElementById(`validationInput_${question.id}`);
+    if (!input) return;
+    
+    if (question.required && !input.value.trim()) {
+        alert('Per favore, compila questo campo per continuare.');
+        input.focus();
+        return;
+    }
+    
+    validationWizardData[question.id] = input.value.trim();
+    
+    if (validationCurrentStep < validationQuestions.length - 1) {
+        validationCurrentStep++;
+        renderValidationStep();
+        updateValidationProgress();
+    } else {
+        // Ultimo step: genera la validazione
+        generateValidation();
+    }
+}
+
+function validationPrevStep() {
+    if (validationCurrentStep > 0) {
+        validationCurrentStep--;
+        renderValidationStep();
+        updateValidationProgress();
+    }
+}
+
+async function generateValidation() {
+    if (!validationWizardContainer || !validationLoadingState || !validationResultState) return;
+    
+    validationWizardContainer.style.display = 'none';
+    if (validationWizardNavigation) validationWizardNavigation.style.display = 'none';
+    validationLoadingState.style.display = 'block';
+    
+    console.log('=== INIZIO VALIDAZIONE IDEA ===');
+    console.log('URL:', `${API_BASE_URL}/api/validate-idea`);
+    console.log('⚠️ NOTA: La validazione dell\'idea può richiedere 2-4 minuti. Attendi...');
+    console.log('⏱️ Timestamp inizio:', new Date().toISOString());
+    
+    // Crea un AbortController per timeout - 10 minuti
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 minuti timeout
+    const startTime = Date.now();
+    
+    let response;
+    try {
+        response = await fetch(`${API_BASE_URL}/api/validate-idea`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                formData: validationWizardData
+            }),
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        const fetchTime = ((Date.now() - startTime) / 1000).toFixed(2);
+        console.log('✅ Fetch completata. Status:', response.status, response.statusText);
+        console.log('⏱️ Tempo impiegato:', fetchTime, 'secondi');
+    } catch (fetchError) {
+        clearTimeout(timeoutId);
+        console.error('❌ Errore nella chiamata fetch:', fetchError);
+        
+        let errorMessage = 'Errore sconosciuto nella chiamata API';
+        if (fetchError.name === 'AbortError') {
+            errorMessage = 'La richiesta ha impiegato troppo tempo. Il server potrebbe essere sovraccarico. Riprova più tardi.';
+            console.error('⏱️ Timeout dopo 10 minuti');
+        } else if (fetchError.message) {
+            errorMessage = fetchError.message;
+        }
+        
+        alert('Errore durante la validazione: ' + errorMessage);
+        validationWizardContainer.style.display = 'block';
+        if (validationWizardNavigation) validationWizardNavigation.style.display = 'flex';
+        validationLoadingState.style.display = 'none';
+        return;
+    }
+    
+    if (!response.ok) {
+        let errorDetail = `Errore HTTP: ${response.status}`;
+        try {
+            const errorData = await response.json();
+            if (errorData.detail) {
+                errorDetail = errorData.detail;
+            }
+        } catch (e) {
+            // Ignora errori di parsing
+        }
+        console.error('❌ Errore HTTP:', response.status, errorDetail);
+        alert('Errore durante la validazione: ' + errorDetail);
+        validationWizardContainer.style.display = 'block';
+        if (validationWizardNavigation) validationWizardNavigation.style.display = 'flex';
+        validationLoadingState.style.display = 'none';
+        return;
+    }
+    
+    try {
+        const data = await response.json();
+        console.log('✅ Risposta ricevuta:', data.success ? 'SUCCESS' : 'ERROR');
+        
+        if (!data.success) {
+            throw new Error(data.error || 'Errore nella validazione');
+        }
+        
+        // Salva i dati per il download
+        window.currentValidationData = data.json;
+        
+        console.log('✅ Validazione completata con successo');
+        console.log('📊 Score complessivo:', data.json.scoreComplessivo || 'N/A');
+        console.log('🎯 Verdetto:', data.json.verdetto || 'N/A');
+        
+        // Mostra i risultati
+        displayValidationResults(data.json);
+        
+    } catch (parseError) {
+        console.error('❌ Errore nel parsing della risposta:', parseError);
+        alert('Errore durante la validazione: ' + parseError.message);
+        validationWizardContainer.style.display = 'block';
+        if (validationWizardNavigation) validationWizardNavigation.style.display = 'flex';
+        validationLoadingState.style.display = 'none';
+    }
+}
+
+function displayValidationResults(validationData) {
+    if (!validationResultState || !validationContent) {
+        validationContent = document.getElementById('validationContent');
+    }
+    if (!validationContent) return;
+    
+    validationLoadingState.style.display = 'none';
+    validationResultState.style.display = 'block';
+    
+    const score = validationData.scoreComplessivo || 0;
+    const verdict = validationData.verdetto || 'DA MIGLIORARE';
+    const scoreColor = score >= 70 ? '#10b981' : score >= 50 ? '#f59e0b' : '#ef4444';
+    
+    let html = `
+        <div style="margin-bottom: 30px; text-align: center;">
+            <div style="font-size: 48px; font-weight: 700; color: ${scoreColor}; margin-bottom: 10px;">${score}/100</div>
+            <div style="font-size: 20px; font-weight: 600; color: var(--text-primary); margin-bottom: 5px;">${escape(verdict)}</div>
+            <p style="color: var(--text-secondary); margin-top: 10px;">${escape(validationData.spiegazioneVerdetto || '')}</p>
+        </div>
+        
+        <div style="margin-bottom: 30px;">
+            <h4 style="font-size: 18px; font-weight: 600; margin-bottom: 15px;">Executive Summary</h4>
+            <p style="color: var(--text-secondary); line-height: 1.7;">${escape(validationData.executiveSummary || '').replace(/\n/g, '<br>')}</p>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px;">
+            <div style="padding: 20px; background: var(--bg-secondary); border-radius: 8px;">
+                <div style="font-size: 14px; color: var(--text-secondary); margin-bottom: 5px;">Problema</div>
+                <div style="font-size: 24px; font-weight: 700; color: var(--text-primary);">${validationData.analisiProblema?.score || 0}/10</div>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-top: 10px;">${escape(validationData.analisiProblema?.valutazione || '').substring(0, 100)}...</p>
+            </div>
+            <div style="padding: 20px; background: var(--bg-secondary); border-radius: 8px;">
+                <div style="font-size: 14px; color: var(--text-secondary); margin-bottom: 5px;">Soluzione</div>
+                <div style="font-size: 24px; font-weight: 700; color: var(--text-primary);">${validationData.analisiSoluzione?.score || 0}/10</div>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-top: 10px;">${escape(validationData.analisiSoluzione?.valutazione || '').substring(0, 100)}...</p>
+            </div>
+            <div style="padding: 20px; background: var(--bg-secondary); border-radius: 8px;">
+                <div style="font-size: 14px; color: var(--text-secondary); margin-bottom: 5px;">Mercato</div>
+                <div style="font-size: 24px; font-weight: 700; color: var(--text-primary);">${validationData.analisiMercato?.score || 0}/10</div>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-top: 10px;">${escape(validationData.analisiMercato?.valutazione || '').substring(0, 100)}...</p>
+            </div>
+            <div style="padding: 20px; background: var(--bg-secondary); border-radius: 8px;">
+                <div style="font-size: 14px; color: var(--text-secondary); margin-bottom: 5px;">Competitività</div>
+                <div style="font-size: 24px; font-weight: 700; color: var(--text-primary);">${validationData.analisiCompetitivita?.score || 0}/10</div>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-top: 10px;">${escape(validationData.analisiCompetitivita?.valutazione || '').substring(0, 100)}...</p>
+            </div>
+            <div style="padding: 20px; background: var(--bg-secondary); border-radius: 8px;">
+                <div style="font-size: 14px; color: var(--text-secondary); margin-bottom: 5px;">Modello Business</div>
+                <div style="font-size: 24px; font-weight: 700; color: var(--text-primary);">${validationData.analisiModelloBusiness?.score || 0}/10</div>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-top: 10px;">${escape(validationData.analisiModelloBusiness?.valutazione || '').substring(0, 100)}...</p>
+            </div>
+        </div>
+        
+        <div style="margin-bottom: 30px;">
+            <h4 style="font-size: 18px; font-weight: 600; margin-bottom: 15px;">Punti di Forza</h4>
+            <ul style="list-style: none; padding: 0;">
+                ${(validationData.puntiForza || []).map(p => `<li style="padding: 10px 0; border-bottom: 1px solid var(--border-light); color: var(--text-secondary);">✓ ${escape(p)}</li>`).join('')}
+            </ul>
+        </div>
+        
+        <div style="margin-bottom: 30px;">
+            <h4 style="font-size: 18px; font-weight: 600; margin-bottom: 15px;">Punti di Debolezza</h4>
+            <ul style="list-style: none; padding: 0;">
+                ${(validationData.puntiDebolezza || []).map(p => `<li style="padding: 10px 0; border-bottom: 1px solid var(--border-light); color: var(--text-secondary);">⚠ ${escape(p)}</li>`).join('')}
+            </ul>
+        </div>
+        
+        <div style="margin-bottom: 30px;">
+            <h4 style="font-size: 18px; font-weight: 600; margin-bottom: 15px;">Raccomandazioni</h4>
+            <ul style="list-style: none; padding: 0;">
+                ${(validationData.raccomandazioni || []).map((r, i) => `<li style="padding: 10px 0; border-bottom: 1px solid var(--border-light); color: var(--text-secondary);"><strong>${i + 1}.</strong> ${escape(r)}</li>`).join('')}
+            </ul>
+        </div>
+    `;
+    
+    validationContent.innerHTML = html;
+}
+
+// Initialize validation listeners
+function initializeValidationListeners() {
+    if (!closeValidationModal) {
+        closeValidationModal = document.getElementById('closeValidationModal');
+    }
+    if (closeValidationModal) {
+        closeValidationModal.addEventListener('click', closeValidationModalFunc);
+    }
+    
+    if (!validationPrevBtn) {
+        validationPrevBtn = document.getElementById('validationPrevBtn');
+    }
+    if (validationPrevBtn) {
+        validationPrevBtn.addEventListener('click', validationPrevStep);
+    }
+    
+    if (!validationNextBtn) {
+        validationNextBtn = document.getElementById('validationNextBtn');
+    }
+    if (validationNextBtn) {
+        validationNextBtn.addEventListener('click', validationNextStep);
+    }
+    
+    if (!downloadValidationJsonBtn) {
+        downloadValidationJsonBtn = document.getElementById('downloadValidationJsonBtn');
+    }
+    if (downloadValidationJsonBtn) {
+        downloadValidationJsonBtn.addEventListener('click', () => {
+            if (!window.currentValidationData) {
+                alert('Nessun dato disponibile per il download.');
+                return;
+            }
+            const jsonString = JSON.stringify(window.currentValidationData, null, 2);
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `validazione-idea-${Date.now()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+    }
+}
+
+// Chiama l'inizializzazione quando il DOM è pronto
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeValidationListeners);
+} else {
+    initializeValidationListeners();
 }
