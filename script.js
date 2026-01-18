@@ -812,10 +812,45 @@ async function generateBusinessPlanFromWizard() {
             resultState: !!resultState
         });
         
-        // Inserisci l'HTML nel contenuto
+        // Inserisci l'HTML nel contenuto (solo preview iniziale)
         if (planContent) {
             console.log('Inserimento HTML in planContent...');
-            planContent.innerHTML = businessPlanHTML;
+            
+            // Mostra solo una preview (primi 15000 caratteri) con pulsante per espandere
+            const previewLength = 15000;
+            const showFullContent = businessPlanHTML.length <= previewLength;
+            
+            if (showFullContent) {
+                // Se il contenuto è breve, mostra tutto
+                planContent.innerHTML = businessPlanHTML;
+            } else {
+                // Mostra solo preview con pulsante per espandere
+                const previewHTML = businessPlanHTML.substring(0, previewLength);
+                // Trova l'ultimo tag chiuso per evitare HTML rotto
+                const lastTagIndex = previewHTML.lastIndexOf('</');
+                const safePreview = lastTagIndex > 0 ? previewHTML.substring(0, previewHTML.indexOf('>', lastTagIndex) + 1) : previewHTML;
+                
+                planContent.innerHTML = safePreview + 
+                    '<div style="margin: 30px 0; padding: 20px; background: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 8px; text-align: center;">' +
+                    '<p style="margin: 0 0 15px 0; color: #64748b; font-size: 1.1em;">📄 Contenuto troncato per migliorare la leggibilità</p>' +
+                    '<button id="showFullContentBtn" style="padding: 12px 24px; background: #2563eb; color: white; border: none; border-radius: 6px; font-size: 1em; cursor: pointer; font-weight: 600;">Mostra tutto il contenuto</button>' +
+                    '<p style="margin: 15px 0 0 0; color: #94a3b8; font-size: 0.9em;">Il PDF completo contiene tutte le informazioni</p>' +
+                    '</div>';
+                
+                // Salva l'HTML completo per quando l'utente clicca "Mostra tutto"
+                planContent.dataset.fullContent = businessPlanHTML;
+                
+                // Aggiungi event listener al pulsante
+                setTimeout(() => {
+                    const showFullBtn = document.getElementById('showFullContentBtn');
+                    if (showFullBtn) {
+                        showFullBtn.addEventListener('click', () => {
+                            planContent.innerHTML = planContent.dataset.fullContent;
+                        });
+                    }
+                }, 100);
+            }
+            
             console.log('HTML inserito. Contenuto planContent:', planContent.innerHTML.substring(0, 200));
         } else {
             console.error('ERRORE: planContent non disponibile!');
