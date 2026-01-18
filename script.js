@@ -6,6 +6,20 @@
 const API_BASE_URL = 'https://getbusinessplan.onrender.com';
 if (typeof console !== 'undefined') console.log('[SeedWise] API Backend:', API_BASE_URL, '(Render)');
 
+// ============================================
+// UTILITY FUNCTIONS
+// ============================================
+// Funzione per sanitizzare HTML (escape)
+function escape(str) {
+    if (str == null) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 // DOM Elements - will be initialized when DOM is ready
 let planModal;
 let closeModal;
@@ -275,6 +289,94 @@ function updateProgressBar() {
     progressBar.style.width = `${progress}%`;
 }
 
+// Funzione per ottenere suggerimenti dall'API
+async function getSuggestions(questionId, questionTitle, questionDescription, currentValue, formType = 'business-plan', contextData = {}) {
+    try {
+        const API_BASE_URL = window.API_BASE_URL || 'https://getbusinessplan.onrender.com';
+        const response = await fetch(`${API_BASE_URL}/api/get-suggestions`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                questionId,
+                questionTitle,
+                questionDescription,
+                currentValue,
+                formType,
+                contextData
+            })
+        });
+        
+        const data = await response.json();
+        return data.success ? data.suggestions : [];
+    } catch (error) {
+        console.error('Errore nel recupero suggerimenti:', error);
+        return [];
+    }
+}
+
+// Funzione per visualizzare i suggerimenti
+function displaySuggestions(suggestions, container, input) {
+    if (!suggestions || suggestions.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+    
+    container.innerHTML = `
+        <div class="suggestions-box">
+            <div class="suggestions-header">
+                <span class="suggestions-icon">💡</span>
+                <span class="suggestions-title">Suggerimenti per migliorare la risposta</span>
+            </div>
+            <ul class="suggestions-list">
+                ${suggestions.map((suggestion, index) => {
+                    const escapedSuggestion = escape(suggestion);
+                    return `
+                    <li class="suggestion-item" data-index="${index}">
+                        <span class="suggestion-text">${escapedSuggestion}</span>
+                        <button class="suggestion-apply-btn" onclick="applySuggestion('${escapedSuggestion.replace(/'/g, "\\'").replace(/\n/g, ' ')}', '${input.id}')">
+                            Usa
+                        </button>
+                    </li>
+                `;
+                }).join('')}
+            </ul>
+        </div>
+    `;
+}
+
+// Funzione per applicare un suggerimento
+function applySuggestion(suggestion, inputId) {
+    const input = document.getElementById(inputId);
+    if (input) {
+        const currentValue = input.value.trim();
+        if (currentValue) {
+            input.value = currentValue + '\n\n' + suggestion;
+        } else {
+            input.value = suggestion;
+        }
+        input.focus();
+        
+        // Salva il valore
+        const questionId = inputId.replace('wizard-', '');
+        if (wizardData) {
+            wizardData[questionId] = input.value;
+        } else if (typeof analysisWizardData !== 'undefined') {
+            analysisWizardData[questionId] = input.value;
+        }
+        
+        // Nascondi i suggerimenti dopo l'applicazione
+        const suggestionsContainer = document.getElementById(`suggestions-${questionId}`);
+        if (suggestionsContainer) {
+            suggestionsContainer.innerHTML = '';
+        }
+        
+        // Trigger input event per salvare
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+}
+
 function renderCurrentStep() {
     if (!wizardContainer) wizardContainer = document.getElementById('wizardContainer');
     if (!wizardContainer) return;
@@ -314,6 +416,11 @@ function renderCurrentStep() {
                     textarea.required = false;
                     textarea.value = '';
                     textarea.placeholder = 'Il mercato target verrà identificato automaticamente in base alle informazioni fornite.';
+                    // Nascondi suggerimenti se auto-detect è attivo
+                    const suggestionsContainer = document.getElementById(`suggestions-${question.id}`);
+                    if (suggestionsContainer) {
+                        suggestionsContainer.innerHTML = '';
+                    }
                 } else {
                     textarea.disabled = false;
                     textarea.required = question.required;
@@ -323,15 +430,79 @@ function renderCurrentStep() {
         }
     }
 
+    // Aggiungi gestione suggerimenti per campi text e textarea
+    const input = wizardContainer.querySelector(`#wizard-${question.id}`);
+    const suggestionsContainer = document.getElementById(`suggestions-${question.id}`);
+    
+    if (input && suggestionsContainer && (question.type === 'text' || question.type === 'textarea')) {
+        let suggestionTimeout;
+        let isLoadingSuggestions = false;
+        
+        // Funzione per caricare e mostrare suggerimenti
+        const loadSuggestions = async () => {
+            if (isLoadingSuggestions) return;
+            
+            // Non mostrare suggerimenti se auto-detect è attivo
+            if (question.allowAutoDetect) {
+                const autoDetectCheckbox = document.getElementById(`${question.id}_auto_detect`);
+                if (autoDetectCheckbox && autoDetectCheckbox.checked) {
+                    suggestionsContainer.innerHTML = '';
+                    return;
+                }
+            }
+            
+            const currentValue = input.value.trim();
+            const contextData = { ...wizardData }; // Dati già compilati
+            
+            isLoadingSuggestions = true;
+            suggestionsContainer.innerHTML = '<div class="suggestions-loading">💡 Caricamento suggerimenti...</div>';
+            
+            try {
+                const suggestions = await getSuggestions(
+                    question.id,
+                    question.title,
+                    question.description || '',
+                    currentValue,
+                    'business-plan',
+                    contextData
+                );
+                
+                if (suggestions && suggestions.length > 0) {
+                    displaySuggestions(suggestions, suggestionsContainer, input);
+                } else {
+                    suggestionsContainer.innerHTML = '';
+                }
+            } catch (error) {
+                console.error('Errore caricamento suggerimenti:', error);
+                suggestionsContainer.innerHTML = '';
+            } finally {
+                isLoadingSuggestions = false;
+            }
+        };
+        
+        // Carica suggerimenti al focus
+        input.addEventListener('focus', () => {
+            clearTimeout(suggestionTimeout);
+            suggestionTimeout = setTimeout(loadSuggestions, 500);
+        });
+        
+        // Carica suggerimenti dopo che l'utente smette di digitare (debounce)
+        input.addEventListener('input', () => {
+            clearTimeout(suggestionTimeout);
+            suggestionTimeout = setTimeout(loadSuggestions, 1500);
+        });
+        
+        // Carica suggerimenti iniziali dopo un breve delay
+        setTimeout(loadSuggestions, 800);
+    }
+
     // Focus on input
-    const input = wizardContainer.querySelector('input:not([type="checkbox"]), select, textarea');
     if (input && !input.disabled) {
         setTimeout(() => input.focus(), 100);
     }
 
     // Load saved value if exists
     if (wizardData[question.id]) {
-        const input = wizardContainer.querySelector('input:not([type="checkbox"]), select, textarea');
         if (input && !input.disabled) {
             input.value = wizardData[question.id];
         }
@@ -340,6 +511,8 @@ function renderCurrentStep() {
 
 function renderInput(question) {
     let html = '';
+    const suggestionContainerId = `suggestions-${question.id}`;
+    const showSuggestions = question.type === 'text' || question.type === 'textarea';
 
     switch (question.type) {
         case 'text':
@@ -350,6 +523,9 @@ function renderInput(question) {
                 placeholder="${question.placeholder || ''}"
                 ${question.required ? 'required' : ''}
             >`;
+            if (showSuggestions) {
+                html += `<div id="${suggestionContainerId}" class="suggestions-container"></div>`;
+            }
             break;
         case 'number':
             html = `<input 
@@ -370,6 +546,10 @@ function renderInput(question) {
                 placeholder="${question.placeholder || ''}"
                 ${question.required && !question.allowAutoDetect ? 'required' : ''}
             ></textarea>`;
+            
+            if (showSuggestions) {
+                html += `<div id="${suggestionContainerId}" class="suggestions-container"></div>`;
+            }
             
             // Aggiungi checkbox per auto-rilevamento se consentito
             if (question.allowAutoDetect) {
@@ -2558,7 +2738,63 @@ function renderAnalysisCurrentStep() {
             </div>
         `;
 
-        const input = analysisWizardContainer.querySelector('input, select, textarea');
+        const input = analysisWizardContainer.querySelector(`#wizard-${question.id}`);
+        const suggestionsContainer = document.getElementById(`suggestions-${question.id}`);
+        
+        // Aggiungi gestione suggerimenti per campi text e textarea
+        if (input && suggestionsContainer && (question.type === 'text' || question.type === 'textarea')) {
+            let suggestionTimeout;
+            let isLoadingSuggestions = false;
+            
+            // Funzione per caricare e mostrare suggerimenti
+            const loadSuggestions = async () => {
+                if (isLoadingSuggestions) return;
+                
+                const currentValue = input.value.trim();
+                const contextData = { ...analysisWizardData }; // Dati già compilati
+                
+                isLoadingSuggestions = true;
+                suggestionsContainer.innerHTML = '<div class="suggestions-loading">💡 Caricamento suggerimenti...</div>';
+                
+                try {
+                    const suggestions = await getSuggestions(
+                        question.id,
+                        question.title,
+                        question.description || '',
+                        currentValue,
+                        'market-analysis',
+                        contextData
+                    );
+                    
+                    if (suggestions && suggestions.length > 0) {
+                        displaySuggestions(suggestions, suggestionsContainer, input);
+                    } else {
+                        suggestionsContainer.innerHTML = '';
+                    }
+                } catch (error) {
+                    console.error('Errore caricamento suggerimenti:', error);
+                    suggestionsContainer.innerHTML = '';
+                } finally {
+                    isLoadingSuggestions = false;
+                }
+            };
+            
+            // Carica suggerimenti al focus
+            input.addEventListener('focus', () => {
+                clearTimeout(suggestionTimeout);
+                suggestionTimeout = setTimeout(loadSuggestions, 500);
+            });
+            
+            // Carica suggerimenti dopo che l'utente smette di digitare (debounce)
+            input.addEventListener('input', () => {
+                clearTimeout(suggestionTimeout);
+                suggestionTimeout = setTimeout(loadSuggestions, 1500);
+            });
+            
+            // Carica suggerimenti iniziali dopo un breve delay
+            setTimeout(loadSuggestions, 800);
+        }
+
         if (input) {
             setTimeout(() => input.focus(), 100);
             if (analysisWizardData[question.id]) {

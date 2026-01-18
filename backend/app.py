@@ -52,6 +52,14 @@ class MarketAnalysisRequest(BaseModel):
 class PDFAnalysisRequest(BaseModel):
     marketAnalysisJson: dict
 
+class SuggestionRequest(BaseModel):
+    questionId: str
+    questionTitle: str
+    questionDescription: Optional[str] = None
+    currentValue: Optional[str] = None
+    formType: str = "business-plan"  # "business-plan" o "market-analysis"
+    contextData: Optional[dict] = None  # Dati già compilati per contesto
+
 @app.get("/")
 async def root():
     return {"message": "GetBusinessPlan API", "status": "running"}
@@ -504,3 +512,102 @@ async def generate_full(request: BusinessPlanRequest):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/get-suggestions")
+async def get_suggestions(request: SuggestionRequest):
+    """Genera suggerimenti professionali per una domanda specifica"""
+    try:
+        # Prepara il prompt per i suggerimenti
+        context_info = ""
+        if request.contextData:
+            # Filtra solo i dati rilevanti per il contesto
+            relevant_context = {}
+            for key, value in request.contextData.items():
+                if value and str(value).strip():
+                    relevant_context[key] = value
+            if relevant_context:
+                context_info = f"\n\nContesto già compilato:\n{json.dumps(relevant_context, ensure_ascii=False, indent=2)}"
+        
+        current_value_info = ""
+        if request.currentValue and request.currentValue.strip():
+            current_value_info = f"\nValore attuale inserito: {request.currentValue[:200]}"
+        
+        description_info = ""
+        if request.questionDescription:
+            description_info = f"\nDescrizione: {request.questionDescription}"
+        
+        suggestion_prompt = f"""Sei un consulente esperto per la creazione di business plan professionali in Italia.
+
+L'utente sta compilando la seguente domanda:
+Domanda: {request.questionTitle}{description_info}{current_value_info}{context_info}
+
+Fornisci 3-5 suggerimenti professionali e concreti per aiutare l'utente a rispondere meglio a questa domanda.
+I suggerimenti devono essere:
+- Specifici e pratici
+- Orientati al mercato italiano quando rilevante
+- Professionali e adatti a un business plan
+- Concisi (max 2-3 frasi ciascuno)
+- Utili per migliorare la qualità della risposta
+
+Rispondi SOLO con un JSON array di stringhe, esempio:
+["Suggerimento 1", "Suggerimento 2", "Suggerimento 3"]
+"""
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",  # Modello veloce per suggerimenti
+            messages=[
+                {"role": "system", "content": "Sei un assistente esperto che fornisce suggerimenti professionali per business plan. Rispondi sempre e solo con un JSON array valido."},
+                {"role": "user", "content": suggestion_prompt}
+            ],
+            temperature=0.7,
+            max_tokens=400
+        )
+        
+        content = response.choices[0].message.content.strip()
+        
+        # Estrai JSON dalla risposta (potrebbe essere dentro markdown code blocks)
+        if content.startswith("```"):
+            # Rimuovi markdown code blocks
+            lines = content.split("\n")
+            content = "\n".join(lines[1:-1]) if len(lines) > 2 else content
+        
+        # Prova a parsare il JSON
+        try:
+            suggestions = json.loads(content)
+            if not isinstance(suggestions, list):
+                suggestions = [suggestions] if suggestions else []
+        except json.JSONDecodeError:
+            # Se non è JSON valido, prova a estrarre array manualmente
+            import re
+            matches = re.findall(r'\[(.*?)\]', content, re.DOTALL)
+            if matches:
+                # Prova a parsare il contenuto dell'array
+                try:
+                    suggestions = json.loads("[" + matches[0] + "]")
+                except:
+                    suggestions = []
+            else:
+                # Fallback: dividi per righe e prendi le prime 5
+                lines = [line.strip() for line in content.split("\n") if line.strip() and not line.strip().startswith(("[", "]"))]
+                suggestions = lines[:5] if lines else []
+        
+        # Assicurati che sia una lista di stringhe
+        if not isinstance(suggestions, list):
+            suggestions = []
+        
+        suggestions = [str(s).strip() for s in suggestions if s and str(s).strip()][:5]
+        
+        return JSONResponse(content={
+            "success": True,
+            "suggestions": suggestions
+        })
+        
+    except Exception as e:
+        print(f"Errore generazione suggerimenti: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(content={
+            "success": False,
+            "suggestions": [],
+            "error": str(e)
+        })

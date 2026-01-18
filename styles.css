@@ -2213,3 +2213,127 @@ html {
         padding: 16px;
     }
 }
+
+/* ============================================
+   SUGGERIMENTI AI
+   ============================================ */
+.suggestions-container {
+    margin-top: 12px;
+}
+
+.suggestions-box {
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+    border: 1px solid #bae6fd;
+    border-radius: 8px;
+    padding: 16px;
+    box-shadow: 0 2px 8px rgba(14, 165, 233, 0.1);
+    animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.suggestions-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    font-weight: 600;
+    color: #0369a1;
+    font-size: 14px;
+}
+
+.suggestions-icon {
+    font-size: 18px;
+}
+
+.suggestions-title {
+    flex: 1;
+}
+
+.suggestions-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.suggestion-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px;
+    background: white;
+    border-radius: 6px;
+    margin-bottom: 8px;
+    transition: all 0.2s ease;
+}
+
+.suggestion-item:hover {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
+}
+
+.suggestion-item:last-child {
+    margin-bottom: 0;
+}
+
+.suggestion-text {
+    flex: 1;
+    color: #1e293b;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.suggestion-apply-btn {
+    background: #0ea5e9;
+    color: white;
+    border: none;
+    padding: 6px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    font-family: inherit;
+}
+
+.suggestion-apply-btn:hover {
+    background: #0284c7;
+    transform: scale(1.05);
+}
+
+.suggestion-apply-btn:active {
+    transform: scale(0.98);
+}
+
+.suggestions-loading {
+    color: #64748b;
+    font-size: 14px;
+    padding: 12px;
+    text-align: center;
+}
+
+/* Responsive per suggerimenti */
+@media (max-width: 768px) {
+    .suggestion-item {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .suggestion-apply-btn {
+        width: 100%;
+    }
+    
+    .suggestions-box {
+        padding: 12px;
+    }
+}
