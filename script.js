@@ -742,19 +742,19 @@ async function generateBusinessPlanFromWizard() {
         // Aggiorna il messaggio di loading
         const loadingText = loadingState.querySelector('p');
         if (loadingText) {
-            loadingText.textContent = 'L\'AI sta generando il tuo business plan con GPT... Questo può richiedere 3-5 minuti. Attendi, non chiudere la pagina.';
+            loadingText.textContent = 'Stiamo creando il tuo business plan professionale... Questo può richiedere 3-5 minuti. Attendi, non chiudere la pagina.';
             
             // Aggiungi un indicatore di progresso dopo 30 secondi
             setTimeout(() => {
                 if (loadingText && loadingState.style.display !== 'none') {
-                    loadingText.textContent = 'Generazione in corso... La richiesta è ancora attiva, attendi ancora qualche minuto.';
+                    loadingText.textContent = 'Generazione in corso... Stiamo analizzando i dati e creando il documento. Attendi ancora qualche minuto.';
                 }
             }, 30000);
             
             // Aggiorna dopo 2 minuti
             setTimeout(() => {
                 if (loadingText && loadingState.style.display !== 'none') {
-                    loadingText.textContent = 'Generazione ancora in corso... Alcuni modelli richiedono più tempo. Attendi ancora.';
+                    loadingText.textContent = 'Generazione ancora in corso... Stiamo finalizzando tutti i dettagli del tuo business plan. Attendi ancora.';
                 }
             }, 120000);
         }
@@ -816,8 +816,8 @@ async function generateBusinessPlanFromWizard() {
         if (planContent) {
             console.log('Inserimento HTML in planContent...');
             
-            // Mostra solo una preview (primi 15000 caratteri) con pulsante per espandere
-            const previewLength = 15000;
+            // Mostra solo una preview (primi 6000 caratteri) con pulsante per espandere
+            const previewLength = 6000;
             const showFullContent = businessPlanHTML.length <= previewLength;
             
             if (showFullContent) {
@@ -887,15 +887,10 @@ async function generateBusinessPlanFromWizard() {
             console.warn('⚠️ JSON non disponibile - potrebbe essere stato usato il template fallback');
         }
         
-        // Genera automaticamente il PDF standalone (browser-based)
+        // Il PDF verrà generato tramite backend quando l'utente clicca "Scarica PDF"
         if (jsonData) {
-            console.log('📄 Generazione PDF automatica standalone...');
-            try {
-                await generatePDFStandaloneFromJSON(jsonData);
-            } catch (pdfError) {
-                console.warn('⚠️ Generazione PDF automatica fallita:', pdfError.message);
-                console.log('💡 Puoi generare il PDF manualmente usando il pulsante "Scarica PDF"');
-            }
+            console.log('📄 JSON disponibile per generazione PDF tramite backend');
+            console.log('💡 Usa il pulsante "Scarica PDF" per generare il documento professionale');
         }
         
         console.log('=== GENERAZIONE COMPLETATA ===');
@@ -1499,50 +1494,80 @@ function markdownToHTML(markdown) {
 }
 
 function convertBusinessPlanJSONToHTML(bpData) {
-    let html = '';
+    let html = '<div class="analysis-output">';
     
     // Helper per escape HTML
     const escape = (str) => String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     const formatCurrency = (num) => num?.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00';
     const formatNumber = (num) => num?.toLocaleString('it-IT') || '0';
 
-    // PDF Layout - Titolo e sottotitolo
+    // PDF Layout - Titolo e sottotitolo (stile come analisi di mercato)
     if (bpData.pdf_layout) {
-        html += `<div style="text-align: center; margin-bottom: 40px; border-bottom: 3px solid #2563eb; padding-bottom: 20px;">`;
-        html += `<h1 style="color: #2563eb; font-size: 2.5rem; margin: 0 0 10px 0;">${escape(bpData.pdf_layout.titolo_documento || 'Business Plan')}</h1>`;
+        html += `<div class="analysis-header">`;
+        html += `<h1>${escape(bpData.pdf_layout.titolo_documento || 'Business Plan')}</h1>`;
         if (bpData.pdf_layout.sottotitolo) {
-            html += `<h2 style="color: #64748b; font-size: 1.5rem; margin: 0; font-weight: 400;">${escape(bpData.pdf_layout.sottotitolo)}</h2>`;
+            html += `<h2>${escape(bpData.pdf_layout.sottotitolo)}</h2>`;
+        }
+        // Meta info
+        const meta = bpData.meta || {};
+        const data = bpData.data || {};
+        if (meta.data_generazione || data.company_name) {
+            html += `<div class="meta-info">`;
+            if (data.company_name) {
+                html += `<span>Azienda: ${escape(data.company_name)}</span>`;
+            }
+            if (meta.data_generazione) {
+                html += `<span>Generato il: ${escape(meta.data_generazione)}</span>`;
+            }
+            html += `</div>`;
         }
         html += `</div>`;
     }
 
-    // Executive Summary
+    // Executive Summary (stile come analisi di mercato)
     if (bpData.executive_summary) {
-        html += `<h4>Sintesi Esecutiva</h4>`;
+        html += `<div class="analysis-section">`;
+        html += `<h3>Executive Summary</h3>`;
+        
         if (bpData.executive_summary.sintesi) {
-            html += markdownToHTML(bpData.executive_summary.sintesi);
+            html += `<div class="analysis-card">${markdownToHTML(bpData.executive_summary.sintesi)}</div>`;
         }
+        
         if (bpData.executive_summary.punti_chiave && bpData.executive_summary.punti_chiave.length > 0) {
-            html += `<p><strong>Punti Chiave:</strong></p><ul>`;
+            html += `<h4>Punti Chiave</h4>`;
+            html += `<ul>`;
             bpData.executive_summary.punti_chiave.forEach(punto => {
                 html += `<li>${escape(punto)}</li>`;
             });
             html += `</ul>`;
         }
+        
         if (bpData.executive_summary.kpi_principali && bpData.executive_summary.kpi_principali.length > 0) {
-            html += `<p><strong>KPI Principali:</strong></p><ul>`;
+            html += `<h4>KPI Principali</h4>`;
+            html += `<div class="analysis-info-box">`;
+            html += `<table style="width: 100%; border-collapse: collapse;">`;
+            html += `<thead><tr><th>KPI</th><th>Valore</th><th>Scenario</th></tr></thead>`;
+            html += `<tbody>`;
             bpData.executive_summary.kpi_principali.forEach(kpi => {
-                html += `<li><strong>${escape(kpi.nome)}:</strong> ${formatNumber(kpi.valore)} ${escape(kpi.unita)} (scenario ${escape(kpi.scenario)})</li>`;
+                html += `<tr>`;
+                html += `<td><strong>${escape(kpi.nome)}</strong></td>`;
+                html += `<td>${formatNumber(kpi.valore)} ${escape(kpi.unita)}</td>`;
+                html += `<td>${escape(kpi.scenario)}</td>`;
+                html += `</tr>`;
             });
-            html += `</ul>`;
+            html += `</tbody></table>`;
+            html += `</div>`;
         }
+        
         if (bpData.executive_summary.raccomandazioni_30_60_90 && bpData.executive_summary.raccomandazioni_30_60_90.length > 0) {
-            html += `<p><strong>Raccomandazioni 30-60-90 giorni:</strong></p><ul>`;
+            html += `<h4>Raccomandazioni 30-60-90 giorni</h4>`;
+            html += `<ol>`;
             bpData.executive_summary.raccomandazioni_30_60_90.forEach(rec => {
                 html += `<li><strong>${rec.orizzonte_giorni} giorni:</strong> ${escape(rec.azione)} (priorità: ${escape(rec.priorita)}) - ${escape(rec.motivazione)}</li>`;
             });
-            html += `</ul>`;
+            html += `</ol>`;
         }
+        html += `</div>`;
     }
 
     // Narrative Chapters - seguendo l'ordine di pdf_layout.chapter_order se disponibile
@@ -1560,9 +1585,10 @@ function convertBusinessPlanJSONToHTML(bpData) {
             : bpData.narrative.chapters;
         
         orderedChapters.forEach(chapter => {
-            html += `<h4>${escape(chapter.titolo || chapter.id)}</h4>`;
+            html += `<div class="analysis-section">`;
+            html += `<h3>${escape(chapter.titolo || chapter.id)}</h3>`;
             if (chapter.contenuto_markdown) {
-                html += markdownToHTML(chapter.contenuto_markdown);
+                html += `<div class="analysis-card">${markdownToHTML(chapter.contenuto_markdown)}</div>`;
             }
             
             // Aggiungi grafici associati al capitolo se presenti
@@ -1570,8 +1596,8 @@ function convertBusinessPlanJSONToHTML(bpData) {
                 chapter.chart_ids.forEach(chartId => {
                     const chart = bpData.charts.find(c => c.id === chartId);
                     if (chart) {
-                        html += `<div style="margin: 20px 0; padding: 15px; border: 1px solid #e2e8f0; border-radius: 8px;">`;
-                        html += `<h5>${escape(chart.titolo)}</h5>`;
+                        html += `<div class="analysis-info-box">`;
+                        html += `<h4>${escape(chart.titolo)}</h4>`;
                         html += `<p><em>Tipo:</em> ${escape(chart.tipo)} | <em>X:</em> ${escape(chart.x_label)} | <em>Y:</em> ${escape(chart.y_label)}</p>`;
                         if (chart.series && chart.series.length > 0) {
                             html += `<table style="width: 100%; border-collapse: collapse; margin: 10px 0;">`;
@@ -1592,15 +1618,18 @@ function convertBusinessPlanJSONToHTML(bpData) {
                     }
                 });
             }
+            html += `</div>`;
         });
     }
 
     // Financials - Tabelle dettagliate mensili
     if (bpData.data && bpData.data.financials && bpData.data.financials.scenarios) {
-        html += `<h4>Proiezioni Finanziarie Dettagliate</h4>`;
+        html += `<div class="analysis-section">`;
+        html += `<h3>Proiezioni Finanziarie Dettagliate</h3>`;
         
         bpData.data.financials.scenarios.forEach(scenario => {
-            html += `<h5>Scenario ${escape(scenario.name)}</h5>`;
+            html += `<div class="analysis-card">`;
+            html += `<h4>Scenario ${escape(scenario.name)}</h4>`;
             
             if (scenario.assumption_deltas && scenario.assumption_deltas.length > 0) {
                 html += `<p><strong>Assunzioni:</strong></p><ul>`;
@@ -1651,37 +1680,50 @@ function convertBusinessPlanJSONToHTML(bpData) {
                 html += `<li><strong>Saldo finale di cassa:</strong> €${formatCurrency(scenario.summary.end_cash_balance)}</li>`;
                 html += `</ul>`;
             }
+            html += `</div>`;
         });
+        html += `</div>`;
     }
 
     // Assumptions
     if (bpData.assumptions && bpData.assumptions.length > 0) {
-        html += `<h4>Assunzioni</h4><ul>`;
+        html += `<div class="analysis-section">`;
+        html += `<h3>Assunzioni</h3>`;
+        html += `<ul>`;
         bpData.assumptions.forEach(ass => {
             html += `<li>${escape(ass)}</li>`;
         });
         html += `</ul>`;
+        html += `</div>`;
     }
 
     // Dati Mancanti
     if (bpData.dati_mancanti && bpData.dati_mancanti.length > 0) {
-        html += `<h4>Dati Mancanti</h4><ul>`;
+        html += `<div class="analysis-section">`;
+        html += `<h3>Dati Mancanti</h3>`;
+        html += `<ul>`;
         bpData.dati_mancanti.forEach(dato => {
             html += `<li>${escape(dato)}</li>`;
         });
         html += `</ul>`;
+        html += `</div>`;
     }
 
     // Disclaimer
     if (bpData.disclaimer) {
-        html += `<h4>Disclaimer</h4><p><em>${escape(bpData.disclaimer)}</em></p>`;
+        html += `<div class="analysis-section">`;
+        html += `<h3>Disclaimer</h3>`;
+        html += `<div class="analysis-card"><p><em>${escape(bpData.disclaimer)}</em></p></div>`;
+        html += `</div>`;
     }
 
+    html += `</div>`; // Chiude analysis-output
+
     // Se non è stato generato nessun contenuto, mostra un messaggio
-    if (html.trim() === '') {
+    if (html.trim() === '<div class="analysis-output"></div>') {
         console.warn('convertBusinessPlanJSONToHTML: Nessun contenuto generato!');
-        html = '<p><strong>Attenzione:</strong> Il JSON ricevuto non contiene dati visualizzabili.</p>';
-        html += '<p>Dati ricevuti: <pre>' + escape(JSON.stringify(bpData, null, 2).substring(0, 500)) + '</pre></p>';
+        html = '<div class="analysis-output"><p><strong>Attenzione:</strong> Il JSON ricevuto non contiene dati visualizzabili.</p>';
+        html += '<p>Dati ricevuti: <pre>' + escape(JSON.stringify(bpData, null, 2).substring(0, 500)) + '</pre></p></div>';
     }
     
     console.log('convertBusinessPlanJSONToHTML completata. Lunghezza HTML finale:', html.length);
@@ -2229,162 +2271,12 @@ function buildHtmlFromJSON(model) {
 }
 
 // Funzione per generare PDF standalone usando window.print() (qualità professionale)
+// Funzione rimossa: la generazione PDF viene ora gestita completamente dal backend
+// Usa generatePDF() che chiama /api/generate-pdf
 async function generatePDFStandaloneFromJSON(jsonData) {
-    try {
-        console.log('📄 Generazione HTML per PDF...');
-        
-        // Genera HTML completo dal JSON
-        const html = buildHtmlFromJSON(jsonData);
-        
-        // Crea una nuova finestra per la stampa
-        // Prova prima senza parametri per evitare blocchi popup
-        let printWindow = window.open('', '_blank');
-        
-        // Se fallisce, prova con parametri
-        if (!printWindow) {
-            printWindow = window.open('', '_blank', 'width=800,height=600');
-        }
-        
-        // Se ancora fallisce, usa un approccio alternativo con iframe
-        if (!printWindow) {
-            console.log('⚠️ Popup bloccato, uso iframe come fallback...');
-            const iframe = document.createElement('iframe');
-            iframe.style.position = 'fixed';
-            iframe.style.top = '0';
-            iframe.style.left = '0';
-            iframe.style.width = '100%';
-            iframe.style.height = '100%';
-            iframe.style.border = 'none';
-            iframe.style.zIndex = '99999';
-            document.body.appendChild(iframe);
-            
-            const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-            iframeDoc.open();
-            iframeDoc.write(html);
-            iframeDoc.close();
-            
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            
-            // Carica Chart.js nell'iframe
-            const script = iframeDoc.createElement('script');
-            script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js';
-            iframeDoc.head.appendChild(script);
-            await new Promise(resolve => {
-                script.onload = resolve;
-                setTimeout(resolve, 3000);
-            });
-            
-            // Esegui lo script dei grafici
-            const scriptMatch = html.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
-            if (scriptMatch && scriptMatch[1] && !scriptMatch[0].includes('src=')) {
-                try {
-                    iframe.contentWindow.eval(scriptMatch[1]);
-                    console.log('✅ Script grafici eseguito nell\'iframe');
-                } catch (e) {
-                    console.warn('Errore nell\'esecuzione dello script dei grafici:', e);
-                }
-            }
-            
-            // Aspetta che i grafici siano renderizzati
-            let attempts = 0;
-            while (attempts < 40) {
-                if (iframe.contentWindow.__CHARTS_RENDERED__) {
-                    break;
-                }
-                await new Promise(resolve => setTimeout(resolve, 200));
-                attempts++;
-            }
-            
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            // Stampa dall'iframe
-            iframe.contentWindow.print();
-            
-            // Rimuovi l'iframe dopo la stampa
-            setTimeout(() => {
-                if (iframe.parentNode) {
-                    document.body.removeChild(iframe);
-                }
-            }, 1000);
-            
-            return true;
-        }
-        
-        // Scrivi l'HTML nella nuova finestra
-        printWindow.document.write(html);
-        printWindow.document.close();
-        
-        // Aspetta che il contenuto sia caricato
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        // Carica Chart.js nella nuova finestra se necessario
-        console.log('📊 Caricamento Chart.js nella finestra di stampa...');
-        const script = printWindow.document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js';
-        printWindow.document.head.appendChild(script);
-        await new Promise((resolve, reject) => {
-            script.onload = () => {
-                console.log('✅ Chart.js caricato nella finestra di stampa');
-                resolve();
-            };
-            script.onerror = () => {
-                console.warn('⚠️ Errore nel caricamento di Chart.js');
-                resolve(); // Continua comunque
-            };
-            setTimeout(resolve, 5000);
-        });
-        
-        // Verifica che Chart.js sia disponibile
-        if (!printWindow.Chart) {
-            console.warn('⚠️ Chart.js non disponibile, aspetto ancora...');
-            await new Promise(resolve => setTimeout(resolve, 2000));
-        }
-        
-        // Esegui lo script dei grafici
-        const scriptMatch = html.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
-        if (scriptMatch && scriptMatch[1] && !scriptMatch[0].includes('src=')) {
-            try {
-                console.log('📊 Esecuzione script grafici...');
-                printWindow.eval(scriptMatch[1]);
-                console.log('✅ Script grafici eseguito');
-            } catch (e) {
-                console.error('❌ Errore nell\'esecuzione dello script dei grafici:', e);
-            }
-        }
-        
-        // Aspetta che i grafici siano renderizzati
-        console.log('⏳ Attesa rendering grafici...');
-        let attempts = 0;
-        while (attempts < 40) {
-            if (printWindow.__CHARTS_RENDERED__) {
-                console.log('✅ Grafici renderizzati!');
-                break;
-            }
-            await new Promise(resolve => setTimeout(resolve, 200));
-            attempts++;
-        }
-        
-        if (!printWindow.__CHARTS_RENDERED__) {
-            console.warn('⚠️ Grafici non renderizzati completamente');
-            // Verifica se ci sono canvas
-            const canvases = printWindow.document.querySelectorAll('canvas');
-            console.log('📊 Canvas trovati:', canvases.length);
-        }
-        
-        // Aspetta ancora un po' per assicurarsi che tutto sia renderizzato
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        
-        // Apri la finestra di stampa
-        console.log('🖨️ Apertura finestra di stampa...');
-        printWindow.print();
-        
-        console.log('✅ Finestra di stampa aperta! Seleziona "Salva come PDF" come destinazione.');
-        
-        return true;
-    } catch (error) {
-        console.error('Errore nella generazione PDF standalone:', error);
-        throw error;
-    }
+    // Redirect alla funzione che usa il backend
+    console.log('📄 Generazione PDF tramite backend...');
+    return await generatePDF();
 }
 
 async function generatePDFAnalysis(marketAnalysisJSON) {
