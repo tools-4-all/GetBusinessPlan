@@ -276,6 +276,12 @@ async function openModal() {
 }
 
 function closeModalFunc() {
+    // Non chiudere se c'è un pagamento in corso
+    if (window.paymentInProgress) {
+        console.log('⚠️ Tentativo di chiudere modal durante pagamento - bloccato');
+        return;
+    }
+    
     if (!planModal) {
         planModal = document.getElementById('planModal');
     }
@@ -776,9 +782,8 @@ async function generateBusinessPlanFromWizard() {
     if (!resultState) resultState = document.getElementById('resultState');
     if (!planContent) planContent = document.getElementById('planContent');
     
-    // Hide wizard
-    if (wizardContainer) wizardContainer.style.display = 'none';
-    if (wizardNavigation) wizardNavigation.style.display = 'none';
+    // NON nascondere il wizard qui - rimane visibile fino al pagamento
+    // Il wizard verrà nascosto solo dopo il redirect da Stripe
     
     // PRIMA: Richiedi il pagamento prima di generare il documento
     try {
@@ -795,15 +800,14 @@ async function generateBusinessPlanFromWizard() {
         
         await handlePayment('business-plan');
         // Se il pagamento è stato avviato, la funzione reindirizza a Stripe
-        // Il codice qui sotto verrà eseguito solo se l'utente annulla
+        // Il wizard rimane visibile durante il redirect
+        // Dopo il redirect, il wizard verrà nascosto e verrà mostrato il loading
         return;
     } catch (error) {
         if (error.message !== 'Pagamento annullato') {
             alert('Errore nel pagamento: ' + error.message);
         }
-        // Ripristina il wizard se l'utente annulla
-        if (wizardContainer) wizardContainer.style.display = 'block';
-        if (wizardNavigation) wizardNavigation.style.display = 'flex';
+        // Se l'utente annulla, il wizard rimane visibile (non serve ripristinarlo)
         return;
     }
 }
@@ -971,18 +975,15 @@ async function generateBusinessPlanAfterPayment(wizardData) {
             console.warn('⚠️ JSON non disponibile - potrebbe essere stato usato il template fallback');
         }
         
-        // Mostra offerta upsell prima del risultato
-        showUpsellOffer('business-plan', jsonData).then(accepted => {
-            if (accepted) {
-                // L'utente ha accettato l'upsell, genereremo anche l'analisi di mercato
-                console.log('✅ Upsell accettato, procederemo con entrambi i servizi');
-            }
-            // Mostra il risultato dopo l'upsell (accettato o rifiutato)
-            if (resultState) {
-                resultState.style.display = 'block';
-                console.log('✅ Result mostrato');
-            }
-        });
+        // Disattiva il flag di pagamento in corso - la generazione è completata
+        window.paymentInProgress = false;
+        console.log('✅ Flag paymentInProgress disattivato - generazione completata');
+        
+        // Mostra direttamente il risultato (senza upsell)
+        if (resultState) {
+            resultState.style.display = 'block';
+            console.log('✅ Result mostrato');
+        }
         
         console.log('=== GENERAZIONE COMPLETATA ===');
         
@@ -990,6 +991,9 @@ async function generateBusinessPlanAfterPayment(wizardData) {
         console.error('=== ERRORE NELLA GENERAZIONE ===');
         console.error('Errore completo:', error);
         console.error('Stack:', error.stack);
+        // Disattiva il flag anche in caso di errore
+        window.paymentInProgress = false;
+        console.log('✅ Flag paymentInProgress disattivato - errore nella generazione');
         alert('Si è verificato un errore durante la generazione del business plan: ' + error.message + '\n\nControlla la console per maggiori dettagli.');
         if (wizardContainer) wizardContainer.style.display = 'block';
         if (wizardNavigation) wizardNavigation.style.display = 'flex';
@@ -1146,18 +1150,21 @@ function initializeEventListeners() {
         });
     }
     
-    if (ctaLoginBtn) {
-        ctaLoginBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            console.log('CTA Login button clicked');
-            alert('Funzionalità di login in sviluppo');
-        });
-    }
+    // ctaLoginBtn non esiste più nell'HTML, codice rimosso
 
-    // Close modals when clicking outside
+    // Close modals when clicking outside (ma non se c'è un pagamento in corso)
     window.addEventListener('click', (e) => {
+        // Non chiudere se c'è un pagamento in corso
+        if (window.paymentInProgress) {
+            console.log('⚠️ Pagamento in corso, non chiudere il modal');
+            return;
+        }
+        
         if (planModal && e.target === planModal) {
             closeModalFunc();
+        }
+        if (analysisModal && e.target === analysisModal) {
+            closeAnalysisModalFunc();
         }
     });
 
@@ -1181,6 +1188,118 @@ function initializeAll() {
     console.log('DOM loaded, initializing...');
     console.log('URL corrente:', window.location.href);
     
+    // Verifica PRIMA se c'è un pagamento in corso - questo deve essere fatto immediatamente
+    const urlParams = new URLSearchParams(window.location.search);
+    let paymentStatus = urlParams.get('payment');
+    let sessionId = urlParams.get('session_id');
+    
+    // Correggi il caso in cui l'URL ha un formato errato (?payment=success?session_id=...)
+    // Stripe a volte usa ? invece di & per il secondo parametro
+    if (paymentStatus && paymentStatus.includes('?session_id=')) {
+        const parts = paymentStatus.split('?session_id=');
+        paymentStatus = parts[0]; // Prendi solo "success"
+        if (parts.length > 1 && !sessionId) {
+            sessionId = parts[1]; // Prendi il session_id dalla parte dopo il ?
+        }
+        console.log('⚠️ URL corretto - paymentStatus:', paymentStatus, 'sessionId:', sessionId);
+    }
+    
+    // Se sessionId è ancora null, prova a leggerlo direttamente dall'URL
+    if (!sessionId) {
+        const urlMatch = window.location.href.match(/[?&]session_id=([^&]+)/);
+        if (urlMatch) {
+            sessionId = urlMatch[1];
+            console.log('✅ Session ID recuperato dall\'URL:', sessionId);
+        }
+    }
+    
+    // Se c'è un pagamento success, apri immediatamente il modal appropriato
+    if (paymentStatus === 'success' && sessionId) {
+        console.log('🔍 ===== PAGAMENTO RILEVATO ALL\'AVVIO =====');
+        console.log('Session ID:', sessionId);
+        console.log('Payment Status:', paymentStatus);
+        
+        // Determina il tipo di documento
+        const pendingDocType = localStorage.getItem('pendingDocumentType');
+        console.log('Tipo documento da localStorage:', pendingDocType);
+        
+        // Imposta flag per impedire la chiusura
+        window.paymentInProgress = true;
+        window.paymentSessionId = sessionId;
+        
+        if (pendingDocType === 'market-analysis') {
+            // Apri il modal dell'analisi immediatamente
+            const analysisModal = document.getElementById('analysisModal');
+            console.log('Analysis modal trovato:', !!analysisModal);
+            if (analysisModal) {
+                analysisModal.style.display = 'block';
+                document.body.style.overflow = 'hidden';
+                window.paymentDocumentType = 'market-analysis';
+                console.log('✅ Modal analisi aperto immediatamente');
+                console.log('Modal display style:', analysisModal.style.display);
+                
+                // Nascondi il wizard e mostra il loading immediatamente
+                const analysisWizardContainer = document.getElementById('analysisWizardContainer');
+                const analysisWizardNavigation = document.getElementById('analysisWizardNavigation');
+                const analysisLoadingState = document.getElementById('analysisLoadingState');
+                const analysisResultState = document.getElementById('analysisResultState');
+                
+                if (analysisWizardContainer) {
+                    analysisWizardContainer.style.display = 'none';
+                    console.log('✅ Wizard analisi nascosto');
+                }
+                if (analysisWizardNavigation) {
+                    analysisWizardNavigation.style.display = 'none';
+                }
+                if (analysisResultState) {
+                    analysisResultState.style.display = 'none';
+                }
+                if (analysisLoadingState) {
+                    analysisLoadingState.style.display = 'block';
+                    console.log('✅ Loading analisi mostrato');
+                }
+            } else {
+                console.error('❌ Analysis modal NON trovato!');
+            }
+        } else if (pendingDocType === 'business-plan') {
+            // Apri il modal del business plan immediatamente
+            const planModal = document.getElementById('planModal');
+            console.log('Plan modal trovato:', !!planModal);
+            if (planModal) {
+                planModal.style.display = 'block';
+                document.body.style.overflow = 'hidden';
+                window.paymentDocumentType = 'business-plan';
+                console.log('✅ Modal business plan aperto immediatamente');
+                console.log('Modal display style:', planModal.style.display);
+                
+                // Nascondi il wizard e mostra il loading immediatamente
+                const wizardContainer = document.getElementById('wizardContainer');
+                const wizardNavigation = document.getElementById('wizardNavigation');
+                const loadingState = document.getElementById('loadingState');
+                const resultState = document.getElementById('resultState');
+                
+                if (wizardContainer) {
+                    wizardContainer.style.display = 'none';
+                    console.log('✅ Wizard business plan nascosto');
+                }
+                if (wizardNavigation) {
+                    wizardNavigation.style.display = 'none';
+                }
+                if (resultState) {
+                    resultState.style.display = 'none';
+                }
+                if (loadingState) {
+                    loadingState.style.display = 'block';
+                    console.log('✅ Loading business plan mostrato');
+                }
+            } else {
+                console.error('❌ Plan modal NON trovato!');
+            }
+        } else {
+            console.warn('⚠️ Tipo documento non trovato:', pendingDocType);
+        }
+    }
+    
     // Inizializza gli elementi DOM necessari PRIMA di tutto
     initializeEventListeners();
     initializeAnalysisListeners();
@@ -1188,10 +1307,7 @@ function initializeAll() {
     // Inizializza autenticazione Firebase
     initializeAuth();
     
-    // Verifica pagamento dopo redirect da Stripe
-    const urlParams = new URLSearchParams(window.location.search);
-    const paymentStatus = urlParams.get('payment');
-    const sessionId = urlParams.get('session_id');
+    // Verifica pagamento dopo redirect da Stripe (già fatto sopra, ma ripetiamo per sicurezza)
     
     // Usa anche i valori salvati all'avvio se disponibili
     const finalPaymentStatus = paymentStatus || window.paymentStatus;
@@ -1224,165 +1340,273 @@ function initializeAll() {
         
         // Verifica solo il tipo di documento corretto
         if (pendingDocType === 'business-plan') {
-            verifyPaymentAfterRedirect('business-plan').then(bpVerified => {
-            if (bpVerified) {
-                window.paymentVerified = true;
-                window.paymentSessionId = finalSessionId;
-                console.log('✅ Pagamento business plan verificato');
-                
-                // Se include upsell per analisi di mercato, verifica anche quello
-                if (window.upsellPaid && window.upsellType === 'market-analysis') {
-                    window.paymentVerified_analysis = true;
-                    window.paymentSessionId_analysis = finalSessionId;
-                    console.log('✅ Upsell analisi di mercato incluso nel pagamento');
-                }
-                
-                // Genera il business plan dopo il pagamento verificato
-                // Recupera i dati da localStorage o da memoria
-                let wizardData = null;
+            // Usa async/await per gestire correttamente l'autenticazione
+            (async () => {
                 try {
-                    const savedData = localStorage.getItem('pendingBusinessPlanData');
-                    if (savedData) {
-                        wizardData = JSON.parse(savedData);
-                        localStorage.removeItem('pendingBusinessPlanData');
-                        localStorage.removeItem('pendingDocumentType');
-                        console.log('✅ Dati wizard recuperati da localStorage');
-                    } else if (window.pendingBusinessPlanData) {
-                        wizardData = window.pendingBusinessPlanData;
-                        window.pendingBusinessPlanData = null;
-                        console.log('✅ Dati wizard recuperati da memoria');
+                    // Aspetta che Firebase Auth ripristini lo stato di autenticazione
+                    console.log('⏳ Aspetto che Firebase Auth ripristini lo stato...');
+                    let attempts = 0;
+                    while ((!authInitialized || !currentUser) && attempts < 20) {
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                        attempts++;
                     }
-                } catch (e) {
-                    console.error('Errore nel recupero dati wizard:', e);
-                }
-                
-                // Dopo il pagamento verificato, genera direttamente il documento
-                if (wizardData && Object.keys(wizardData).length > 0) {
-                    console.log('📄 Generazione business plan dopo pagamento verificato...');
-                    console.log('Dati wizard recuperati:', Object.keys(wizardData));
                     
-                    // Assicurati che gli elementi DOM siano inizializzati
-                    if (!planModal) planModal = document.getElementById('planModal');
-                    if (!wizardContainer) wizardContainer = document.getElementById('wizardContainer');
-                    if (!wizardNavigation) wizardNavigation = document.getElementById('wizardNavigation');
-                    if (!loadingState) loadingState = document.getElementById('loadingState');
-                    if (!resultState) resultState = document.getElementById('resultState');
-                    if (!planContent) planContent = document.getElementById('planContent');
-                    
-                    // Apri il modal del business plan
-                    if (planModal) {
-                        planModal.style.display = 'block';
-                        document.body.style.overflow = 'hidden';
-                        console.log('✅ Modal business plan aperto');
-                        
-                        // Nascondi wizard e mostra loading
-                        if (wizardContainer) wizardContainer.style.display = 'none';
-                        if (wizardNavigation) wizardNavigation.style.display = 'none';
-                        if (resultState) resultState.style.display = 'none';
-                        if (loadingState) loadingState.style.display = 'block';
-                        
-                        // Genera il business plan dopo un breve delay per assicurare che il DOM sia pronto
-                        setTimeout(() => {
-                            console.log('🚀 Avvio generazione business plan...');
-                            generateBusinessPlanAfterPayment(wizardData).catch(error => {
-                                console.error('❌ Errore nella generazione:', error);
-                                alert('Errore nella generazione del business plan: ' + error.message);
-                                if (loadingState) loadingState.style.display = 'none';
-                            });
-                        }, 500);
+                    // Se dopo l'attesa l'utente è ancora non autenticato, richiedi autenticazione
+                    if (!currentUser || !currentUser.uid) {
+                        console.log('⚠️ Utente non autenticato dopo attesa, richiedo autenticazione...');
+                        await requireAuth();
+                        console.log('✅ Utente autenticato dopo requireAuth');
                     } else {
-                        console.error('❌ Modal business plan non trovato');
-                        alert('Errore: modal non trovato. Ricarica la pagina.');
+                        console.log('✅ Utente già autenticato:', currentUser.email);
                     }
-                } else {
-                    console.error('❌ Dati wizard non trovati dopo il pagamento');
-                    alert('Errore: dati del wizard non trovati. Completa nuovamente il wizard.');
-                }
-            } else {
-                console.error('❌ Pagamento business plan non verificato');
-            }
-        });
-        } else if (pendingDocType === 'market-analysis') {
-            console.log('📋 Verifica pagamento per market-analysis...');
-            verifyPaymentAfterRedirect('market-analysis').then(maVerified => {
-                console.log('📋 Risultato verifica market-analysis:', maVerified);
-                if (maVerified) {
-                    window.paymentVerified_analysis = true;
-                    window.paymentSessionId_analysis = finalSessionId;
-                    console.log('✅ Pagamento analisi di mercato verificato');
                     
-                    // Se include upsell per business plan, verifica anche quello
-                    if (window.upsellPaid && window.upsellType === 'business-plan') {
+                    // Poi verifica il pagamento
+                    const bpVerified = await verifyPaymentAfterRedirect('business-plan');
+                    if (bpVerified) {
                         window.paymentVerified = true;
                         window.paymentSessionId = finalSessionId;
-                        console.log('✅ Upsell business plan incluso nel pagamento');
-                    }
-                    
-                    // Genera l'analisi di mercato dopo il pagamento verificato
-                    // Recupera i dati da localStorage o da memoria
-                    let analysisWizardData = null;
-                    try {
-                        const savedData = localStorage.getItem('pendingMarketAnalysisData');
-                        if (savedData) {
-                            analysisWizardData = JSON.parse(savedData);
-                            localStorage.removeItem('pendingMarketAnalysisData');
-                            localStorage.removeItem('pendingDocumentType');
-                            console.log('✅ Dati analisi recuperati da localStorage');
-                        } else if (window.pendingMarketAnalysisData) {
-                            analysisWizardData = window.pendingMarketAnalysisData;
-                            window.pendingMarketAnalysisData = null;
-                            console.log('✅ Dati analisi recuperati da memoria');
+                        console.log('✅ Pagamento business plan verificato');
+                        
+                        // Se include upsell per analisi di mercato, verifica anche quello
+                        if (window.upsellPaid && window.upsellType === 'market-analysis') {
+                            window.paymentVerified_analysis = true;
+                            window.paymentSessionId_analysis = finalSessionId;
+                            console.log('✅ Upsell analisi di mercato incluso nel pagamento');
                         }
-                    } catch (e) {
-                        console.error('Errore nel recupero dati analisi:', e);
+                        
+                        // Genera il business plan dopo il pagamento verificato
+                        // Recupera i dati da localStorage o da memoria
+                        let wizardData = null;
+                        try {
+                            const savedData = localStorage.getItem('pendingBusinessPlanData');
+                            if (savedData) {
+                                wizardData = JSON.parse(savedData);
+                                localStorage.removeItem('pendingBusinessPlanData');
+                                localStorage.removeItem('pendingDocumentType');
+                                console.log('✅ Dati wizard recuperati da localStorage');
+                            } else if (window.pendingBusinessPlanData) {
+                                wizardData = window.pendingBusinessPlanData;
+                                window.pendingBusinessPlanData = null;
+                                console.log('✅ Dati wizard recuperati da memoria');
+                            }
+                        } catch (e) {
+                            console.error('Errore nel recupero dati wizard:', e);
+                        }
+                        
+                        // Dopo il pagamento verificato, genera direttamente il documento
+                        if (wizardData && Object.keys(wizardData).length > 0) {
+                            console.log('📄 Generazione business plan dopo pagamento verificato...');
+                            console.log('Dati wizard recuperati:', Object.keys(wizardData));
+                            console.log('Numero di campi:', Object.keys(wizardData).length);
+                            console.log('Utente autenticato:', currentUser?.email);
+                            
+                            // Assicurati che gli elementi DOM siano inizializzati
+                            if (!planModal) planModal = document.getElementById('planModal');
+                            if (!wizardContainer) wizardContainer = document.getElementById('wizardContainer');
+                            if (!wizardNavigation) wizardNavigation = document.getElementById('wizardNavigation');
+                            if (!loadingState) loadingState = document.getElementById('loadingState');
+                            if (!resultState) resultState = document.getElementById('resultState');
+                            if (!planContent) planContent = document.getElementById('planContent');
+                            
+                            // Apri il modal del business plan
+                            if (planModal) {
+                                planModal.style.display = 'block';
+                                document.body.style.overflow = 'hidden';
+                                console.log('✅ Modal business plan aperto');
+                                
+                                // Nascondi wizard e mostra loading
+                                if (wizardContainer) wizardContainer.style.display = 'none';
+                                if (wizardNavigation) wizardNavigation.style.display = 'none';
+                                if (resultState) resultState.style.display = 'none';
+                                if (loadingState) loadingState.style.display = 'block';
+                                
+                                // Genera il business plan dopo un breve delay per assicurare che il DOM sia pronto
+                                setTimeout(() => {
+                                    console.log('🚀 Avvio generazione business plan...');
+                                    console.log('Utente autenticato:', currentUser?.email);
+                                    generateBusinessPlanAfterPayment(wizardData).catch(error => {
+                                        console.error('❌ Errore nella generazione:', error);
+                                        console.error('Stack:', error.stack);
+                                        alert('Errore nella generazione del business plan: ' + error.message);
+                                        if (loadingState) loadingState.style.display = 'none';
+                                        // Ripristina il wizard in caso di errore
+                                        if (wizardContainer) wizardContainer.style.display = 'block';
+                                        if (wizardNavigation) wizardNavigation.style.display = 'flex';
+                                    });
+                                }, 500);
+                            } else {
+                                console.error('❌ Modal business plan non trovato');
+                                alert('Errore: modal non trovato. Ricarica la pagina.');
+                            }
+                        } else {
+                            console.error('❌ Dati wizard non trovati dopo il pagamento');
+                            console.error('wizardData:', wizardData);
+                            console.error('localStorage pendingBusinessPlanData:', localStorage.getItem('pendingBusinessPlanData'));
+                            alert('Errore: dati del wizard non trovati. Completa nuovamente il wizard.');
+                        }
+                    } else {
+                        console.error('❌ Pagamento business plan non verificato');
+                    }
+                } catch (error) {
+                    console.error('❌ Errore nel processo post-pagamento business plan:', error);
+                    console.error('Stack:', error.stack);
+                    alert('Errore dopo il pagamento: ' + error.message);
+                }
+            })();
+        } else if (pendingDocType === 'market-analysis') {
+            console.log('📋 Verifica pagamento per market-analysis...');
+            // Usa async/await per gestire correttamente l'autenticazione
+            (async () => {
+                try {
+                    // Aspetta che Firebase Auth ripristini lo stato di autenticazione
+                    console.log('⏳ Aspetto che Firebase Auth ripristini lo stato...');
+                    let attempts = 0;
+                    while ((!authInitialized || !currentUser) && attempts < 20) {
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                        attempts++;
                     }
                     
-                    // Dopo il pagamento verificato, genera direttamente l'analisi
-                    if (analysisWizardData && Object.keys(analysisWizardData).length > 0) {
-                        console.log('📄 Generazione analisi di mercato dopo pagamento verificato...');
-                        console.log('Dati analisi recuperati:', Object.keys(analysisWizardData));
+                    // Se dopo l'attesa l'utente è ancora non autenticato, richiedi autenticazione
+                    if (!currentUser || !currentUser.uid) {
+                        console.log('⚠️ Utente non autenticato dopo attesa, richiedo autenticazione...');
+                        await requireAuth();
+                        console.log('✅ Utente autenticato dopo requireAuth');
+                    } else {
+                        console.log('✅ Utente già autenticato:', currentUser.email);
+                    }
+                    
+                    // Poi verifica il pagamento
+                    const maVerified = await verifyPaymentAfterRedirect('market-analysis');
+                    console.log('📋 Risultato verifica market-analysis:', maVerified);
+                    if (maVerified) {
+                        window.paymentVerified_analysis = true;
+                        window.paymentSessionId_analysis = finalSessionId;
+                        console.log('✅ Pagamento analisi di mercato verificato');
                         
-                        // Assicurati che gli elementi DOM siano inizializzati
-                        if (!analysisModal) analysisModal = document.getElementById('analysisModal');
-                        if (!analysisWizardContainer) analysisWizardContainer = document.getElementById('analysisWizardContainer');
-                        if (!analysisWizardNavigation) analysisWizardNavigation = document.getElementById('analysisWizardNavigation');
-                        if (!analysisLoadingState) analysisLoadingState = document.getElementById('analysisLoadingState');
-                        if (!analysisResultState) analysisResultState = document.getElementById('analysisResultState');
-                        if (!analysisContent) analysisContent = document.getElementById('analysisContent');
+                        // Se include upsell per business plan, verifica anche quello
+                        if (window.upsellPaid && window.upsellType === 'business-plan') {
+                            window.paymentVerified = true;
+                            window.paymentSessionId = finalSessionId;
+                            console.log('✅ Upsell business plan incluso nel pagamento');
+                        }
                         
-                        // Apri il modal dell'analisi
-                        if (analysisModal) {
+                        // Genera l'analisi di mercato dopo il pagamento verificato
+                        // Recupera i dati da localStorage o da memoria
+                        let analysisWizardData = null;
+                        try {
+                            const savedData = localStorage.getItem('pendingMarketAnalysisData');
+                            if (savedData) {
+                                analysisWizardData = JSON.parse(savedData);
+                                localStorage.removeItem('pendingMarketAnalysisData');
+                                localStorage.removeItem('pendingDocumentType');
+                                console.log('✅ Dati analisi recuperati da localStorage');
+                            } else if (window.pendingMarketAnalysisData) {
+                                analysisWizardData = window.pendingMarketAnalysisData;
+                                window.pendingMarketAnalysisData = null;
+                                console.log('✅ Dati analisi recuperati da memoria');
+                            }
+                        } catch (e) {
+                            console.error('Errore nel recupero dati analisi:', e);
+                        }
+                        
+                        // Dopo il pagamento verificato, genera direttamente l'analisi
+                        if (analysisWizardData && Object.keys(analysisWizardData).length > 0) {
+                            console.log('📄 ===== GENERAZIONE ANALISI DOPO PAGAMENTO =====');
+                            console.log('Dati analisi recuperati:', Object.keys(analysisWizardData));
+                            console.log('Numero di campi:', Object.keys(analysisWizardData).length);
+                            console.log('Utente autenticato:', currentUser?.email);
+                            console.log('Session ID:', finalSessionId);
+                        
+                            // Assicurati che gli elementi DOM siano inizializzati
+                            if (!analysisModal) analysisModal = document.getElementById('analysisModal');
+                            if (!analysisWizardContainer) analysisWizardContainer = document.getElementById('analysisWizardContainer');
+                            if (!analysisWizardNavigation) analysisWizardNavigation = document.getElementById('analysisWizardNavigation');
+                            if (!analysisLoadingState) analysisLoadingState = document.getElementById('analysisLoadingState');
+                            if (!analysisResultState) analysisResultState = document.getElementById('analysisResultState');
+                            if (!analysisContent) analysisContent = document.getElementById('analysisContent');
+                            
+                            console.log('Elementi DOM:', {
+                                modal: !!analysisModal,
+                                wizardContainer: !!analysisWizardContainer,
+                                loadingState: !!analysisLoadingState,
+                                resultState: !!analysisResultState,
+                                content: !!analysisContent
+                            });
+                            
+                            // Apri il modal dell'analisi PRIMA di tutto
+                            if (!analysisModal) {
+                                console.error('❌ Modal analisi non trovato');
+                                alert('Errore: modal non trovato. Ricarica la pagina.');
+                                return;
+                            }
+                            
+                            // Apri il modal
                             analysisModal.style.display = 'block';
                             document.body.style.overflow = 'hidden';
                             console.log('✅ Modal analisi aperto');
                             
                             // Nascondi wizard e mostra loading
-                            if (analysisWizardContainer) analysisWizardContainer.style.display = 'none';
-                            if (analysisWizardNavigation) analysisWizardNavigation.style.display = 'none';
-                            if (analysisResultState) analysisResultState.style.display = 'none';
-                            if (analysisLoadingState) analysisLoadingState.style.display = 'block';
+                            if (analysisWizardContainer) {
+                                analysisWizardContainer.style.display = 'none';
+                                console.log('✅ Wizard nascosto');
+                            }
+                            if (analysisWizardNavigation) {
+                                analysisWizardNavigation.style.display = 'none';
+                            }
+                            if (analysisResultState) {
+                                analysisResultState.style.display = 'none';
+                            }
+                            if (analysisLoadingState) {
+                                analysisLoadingState.style.display = 'block';
+                                console.log('✅ Loading mostrato');
+                                // Assicurati che il testo di loading sia visibile
+                                const loadingText = analysisLoadingState.querySelector('p');
+                                if (loadingText) {
+                                    loadingText.textContent = 'Stiamo creando la tua analisi di mercato professionale... Questo può richiedere 3-5 minuti. Attendi, non chiudere la pagina.';
+                                }
+                            } else {
+                                console.error('❌ Loading state non trovato!');
+                            }
                             
                             // Genera l'analisi dopo un breve delay per assicurare che il DOM sia pronto
+                            console.log('⏳ Attendo 500ms prima di avviare la generazione...');
                             setTimeout(() => {
-                                console.log('🚀 Avvio generazione analisi di mercato...');
-                                generateMarketAnalysisAfterPayment(analysisWizardData).catch(error => {
-                                    console.error('❌ Errore nella generazione:', error);
-                                    alert('Errore nella generazione dell\'analisi: ' + error.message);
-                                    if (analysisLoadingState) analysisLoadingState.style.display = 'none';
-                                });
+                                console.log('🚀 ===== AVVIO GENERAZIONE ANALISI =====');
+                                console.log('Utente autenticato:', currentUser?.email);
+                                console.log('Modal aperto:', analysisModal.style.display);
+                                console.log('Loading visibile:', analysisLoadingState?.style.display);
+                                console.log('Dati da inviare:', Object.keys(analysisWizardData));
+                                
+                                // Chiama la funzione di generazione
+                                generateMarketAnalysisAfterPayment(analysisWizardData)
+                                    .then(() => {
+                                        console.log('✅ Generazione analisi completata con successo');
+                                    })
+                                    .catch(error => {
+                                        console.error('❌ Errore nella generazione:', error);
+                                        console.error('Stack:', error.stack);
+                                        alert('Errore nella generazione dell\'analisi: ' + error.message);
+                                        if (analysisLoadingState) analysisLoadingState.style.display = 'none';
+                                        // Ripristina il wizard in caso di errore
+                                        if (analysisWizardContainer) analysisWizardContainer.style.display = 'block';
+                                        if (analysisWizardNavigation) analysisWizardNavigation.style.display = 'flex';
+                                    });
                             }, 500);
                         } else {
-                            console.error('❌ Modal analisi non trovato');
-                            alert('Errore: modal non trovato. Ricarica la pagina.');
+                            console.error('❌ Dati analisi non trovati dopo il pagamento');
+                            console.error('analysisWizardData:', analysisWizardData);
+                            console.error('localStorage pendingMarketAnalysisData:', localStorage.getItem('pendingMarketAnalysisData'));
+                            alert('Errore: dati dell\'analisi non trovati. Completa nuovamente il wizard.');
                         }
                     } else {
-                        console.error('❌ Dati analisi non trovati dopo il pagamento');
-                        alert('Errore: dati dell\'analisi non trovati. Completa nuovamente il wizard.');
+                        console.error('❌ Pagamento analisi di mercato non verificato');
                     }
-                } else {
-                    console.error('❌ Pagamento analisi di mercato non verificato');
+                } catch (error) {
+                    console.error('❌ Errore nel processo post-pagamento analisi:', error);
+                    console.error('Stack:', error.stack);
+                    alert('Errore dopo il pagamento: ' + error.message);
                 }
-            });
+            })();
         } else {
             console.warn('⚠️ Tipo documento non trovato in localStorage!');
             console.warn('Tentativo di recupero da URL o verifica entrambi...');
@@ -1484,13 +1708,61 @@ function initializeAll() {
 // Controlla immediatamente se c'è un pagamento in corso (anche prima che il DOM sia completamente caricato)
 (function checkPaymentImmediately() {
     const urlParams = new URLSearchParams(window.location.search);
-    const paymentStatus = urlParams.get('payment');
-    const sessionId = urlParams.get('session_id');
+    let paymentStatus = urlParams.get('payment');
+    let sessionId = urlParams.get('session_id');
+    
+    // Correggi il caso in cui l'URL ha un formato errato (?payment=success?session_id=...)
+    if (paymentStatus && paymentStatus.includes('?session_id=')) {
+        const parts = paymentStatus.split('?session_id=');
+        paymentStatus = parts[0];
+        if (parts.length > 1 && !sessionId) {
+            sessionId = parts[1];
+        }
+    }
+    
+    // Se sessionId è ancora null, prova a leggerlo direttamente dall'URL
+    if (!sessionId) {
+        const urlMatch = window.location.href.match(/[?&]session_id=([^&]+)/);
+        if (urlMatch) {
+            sessionId = urlMatch[1];
+        }
+    }
     
     if (paymentStatus === 'success' && sessionId) {
-        console.log('🚨 PAGAMENTO RILEVATO - Esegui verifica immediata');
-        // Non fare nulla qui, lascia che initializeAll gestisca tutto
-        // Ma assicurati che initializeAll venga chiamato
+        console.log('🚨 PAGAMENTO RILEVATO - Apri modal immediatamente');
+        // Prova ad aprire il modal immediatamente, anche se il DOM non è completamente caricato
+        const tryOpenModal = () => {
+            const pendingDocType = localStorage.getItem('pendingDocumentType');
+            if (pendingDocType === 'market-analysis') {
+                const analysisModal = document.getElementById('analysisModal');
+                if (analysisModal) {
+                    analysisModal.style.display = 'block';
+                    document.body.style.overflow = 'hidden';
+                    console.log('✅ Modal analisi aperto immediatamente (pre-DOM)');
+                    return true;
+                }
+            } else if (pendingDocType === 'business-plan') {
+                const planModal = document.getElementById('planModal');
+                if (planModal) {
+                    planModal.style.display = 'block';
+                    document.body.style.overflow = 'hidden';
+                    console.log('✅ Modal business plan aperto immediatamente (pre-DOM)');
+                    return true;
+                }
+            }
+            return false;
+        };
+        
+        // Prova immediatamente
+        if (!tryOpenModal()) {
+            // Se non funziona, riprova dopo un breve delay
+            setTimeout(() => {
+                if (!tryOpenModal()) {
+                    // Ultimo tentativo dopo un delay più lungo
+                    setTimeout(tryOpenModal, 500);
+                }
+            }, 100);
+        }
     }
 })();
 
@@ -3477,8 +3749,25 @@ async function handlePayment(documentType) {
 // Verifica il pagamento dopo il redirect da Stripe
 async function verifyPaymentAfterRedirect(documentType) {
     const urlParams = new URLSearchParams(window.location.search);
-    let sessionId = urlParams.get('session_id');
     let paymentStatus = urlParams.get('payment');
+    let sessionId = urlParams.get('session_id');
+    
+    // Correggi il caso in cui l'URL ha un formato errato (?payment=success?session_id=...)
+    if (paymentStatus && paymentStatus.includes('?session_id=')) {
+        const parts = paymentStatus.split('?session_id=');
+        paymentStatus = parts[0];
+        if (parts.length > 1 && !sessionId) {
+            sessionId = parts[1];
+        }
+    }
+    
+    // Se sessionId è ancora null, prova a leggerlo direttamente dall'URL
+    if (!sessionId) {
+        const urlMatch = window.location.href.match(/[?&]session_id=([^&]+)/);
+        if (urlMatch) {
+            sessionId = urlMatch[1];
+        }
+    }
     
     // Usa anche i valori salvati all'avvio se disponibili
     if (!sessionId && window.paymentSessionId) {
@@ -3914,9 +4203,20 @@ async function openAnalysisModal() {
 }
 
 function closeAnalysisModalFunc() {
-    analysisModal.style.display = 'none';
-    document.body.style.overflow = 'auto';
-    resetAnalysisWizard();
+    // Non chiudere se c'è un pagamento in corso
+    if (window.paymentInProgress) {
+        console.log('⚠️ Tentativo di chiudere modal analisi durante pagamento - bloccato');
+        return;
+    }
+    
+    if (!analysisModal) {
+        analysisModal = document.getElementById('analysisModal');
+    }
+    if (analysisModal) {
+        analysisModal.style.display = 'none';
+        document.body.style.overflow = 'auto';
+        resetAnalysisWizard();
+    }
 }
 
 function resetAnalysisWizard() {
@@ -4244,9 +4544,8 @@ async function generateMarketAnalysis() {
     if (!analysisResultState) analysisResultState = document.getElementById('analysisResultState');
     if (!analysisContent) analysisContent = document.getElementById('analysisContent');
     
-    // Hide wizard
-    if (analysisWizardContainer) analysisWizardContainer.style.display = 'none';
-    if (analysisWizardNavigation) analysisWizardNavigation.style.display = 'none';
+    // NON nascondere il wizard qui - rimane visibile fino al pagamento
+    // Il wizard verrà nascosto solo dopo il redirect da Stripe
     
     // PRIMA: Richiedi il pagamento prima di generare il documento
     try {
@@ -4263,29 +4562,65 @@ async function generateMarketAnalysis() {
         
         await handlePayment('market-analysis');
         // Se il pagamento è stato avviato, la funzione reindirizza a Stripe
-        // Il codice qui sotto verrà eseguito solo se l'utente annulla
+        // Il wizard rimane visibile durante il redirect
+        // Dopo il redirect, il wizard verrà nascosto e verrà mostrato il loading
         return;
     } catch (error) {
         if (error.message !== 'Pagamento annullato') {
             alert('Errore nel pagamento: ' + error.message);
         }
-        // Ripristina il wizard se l'utente annulla
-        if (analysisWizardContainer) analysisWizardContainer.style.display = 'block';
-        if (analysisWizardNavigation) analysisWizardNavigation.style.display = 'flex';
+        // Se l'utente annulla, il wizard rimane visibile (non serve ripristinarlo)
         return;
     }
 }
 
 // Funzione per generare l'analisi di mercato dopo il pagamento verificato
 async function generateMarketAnalysisAfterPayment(analysisWizardData) {
+    console.log('🎯 ===== generateMarketAnalysisAfterPayment CHIAMATA =====');
+    console.log('Dati ricevuti:', analysisWizardData ? Object.keys(analysisWizardData) : 'null');
+    console.log('Timestamp:', new Date().toISOString());
+    
+    // Assicurati che il modal sia aperto
+    if (!analysisModal) analysisModal = document.getElementById('analysisModal');
+    if (analysisModal && analysisModal.style.display !== 'block') {
+        analysisModal.style.display = 'block';
+        document.body.style.overflow = 'hidden';
+        console.log('✅ Modal analisi riaperto in generateMarketAnalysisAfterPayment');
+    }
+    
     if (!analysisLoadingState) analysisLoadingState = document.getElementById('analysisLoadingState');
     if (!analysisContent) analysisContent = document.getElementById('analysisContent');
     if (!analysisResultState) analysisResultState = document.getElementById('analysisResultState');
     
-    analysisLoadingState.style.display = 'block';
+    console.log('Elementi DOM in funzione:', {
+        modal: !!analysisModal,
+        loadingState: !!analysisLoadingState,
+        content: !!analysisContent,
+        resultState: !!analysisResultState
+    });
+    
+    // Assicurati che il wizard sia nascosto
+    if (!analysisWizardContainer) analysisWizardContainer = document.getElementById('analysisWizardContainer');
+    if (!analysisWizardNavigation) analysisWizardNavigation = document.getElementById('analysisWizardNavigation');
+    if (analysisWizardContainer) analysisWizardContainer.style.display = 'none';
+    if (analysisWizardNavigation) analysisWizardNavigation.style.display = 'none';
+    
+    // Mostra loading
+    if (analysisLoadingState) {
+        analysisLoadingState.style.display = 'block';
+        console.log('✅ Loading mostrato in generateMarketAnalysisAfterPayment');
+        const loadingText = analysisLoadingState.querySelector('p');
+        if (loadingText) {
+            loadingText.textContent = 'Stiamo creando la tua analisi di mercato professionale... Questo può richiedere 3-5 minuti. Attendi, non chiudere la pagina.';
+        }
+    } else {
+        console.error('❌ Loading state non trovato in generateMarketAnalysisAfterPayment!');
+    }
 
     try {
+        console.log('🔄 Chiamata generateAnalysisWithAI...');
         const result = await generateAnalysisWithAI(analysisWizardData);
+        console.log('✅ generateAnalysisWithAI completata, risultato ricevuto');
         
         // Gestisci sia il caso in cui viene restituito un oggetto {html, json} che una stringa
         let analysisHTML;
@@ -4303,8 +4638,31 @@ async function generateMarketAnalysisAfterPayment(analysisWizardData) {
             throw new Error('generateAnalysisWithAI ha restituito un formato non valido: ' + typeof result);
         }
         
-        analysisContent.innerHTML = analysisHTML;
-        analysisLoadingState.style.display = 'none';
+        // Assicurati che il modal sia ancora aperto
+        if (!analysisModal) analysisModal = document.getElementById('analysisModal');
+        if (analysisModal && analysisModal.style.display !== 'block') {
+            analysisModal.style.display = 'block';
+            document.body.style.overflow = 'hidden';
+            console.log('✅ Modal analisi riaperto prima di mostrare il risultato');
+        }
+        
+        // Assicurati che il wizard sia nascosto
+        if (!analysisWizardContainer) analysisWizardContainer = document.getElementById('analysisWizardContainer');
+        if (!analysisWizardNavigation) analysisWizardNavigation = document.getElementById('analysisWizardNavigation');
+        if (analysisWizardContainer) analysisWizardContainer.style.display = 'none';
+        if (analysisWizardNavigation) analysisWizardNavigation.style.display = 'none';
+        
+        // Mostra il contenuto
+        if (analysisContent) {
+            analysisContent.innerHTML = analysisHTML;
+            console.log('✅ Contenuto analisi inserito nel DOM');
+        }
+        
+        // Nascondi loading
+        if (analysisLoadingState) {
+            analysisLoadingState.style.display = 'none';
+            console.log('✅ Loading nascosto');
+        }
         
         // Salva i dati
         window.currentAnalysisData = {
@@ -4330,23 +4688,26 @@ async function generateMarketAnalysisAfterPayment(analysisWizardData) {
             });
         }
         
-        // Mostra offerta upsell prima del risultato
-        showUpsellOffer('market-analysis', marketAnalysisJSON).then(accepted => {
-            if (accepted) {
-                // L'utente ha accettato l'upsell, genereremo anche il business plan
-                console.log('✅ Upsell accettato, procederemo con entrambi i servizi');
-            }
-            // Mostra il risultato dopo l'upsell (accettato o rifiutato)
-            if (analysisResultState) {
-                analysisResultState.style.display = 'block';
-            }
-        });
+        // Disattiva il flag di pagamento in corso - la generazione è completata
+        window.paymentInProgress = false;
+        console.log('✅ Flag paymentInProgress disattivato - generazione completata');
+        
+        // Mostra direttamente il risultato (senza upsell)
+        if (analysisResultState) {
+            analysisResultState.style.display = 'block';
+            console.log('✅ Risultato analisi mostrato');
+        } else {
+            console.error('❌ analysisResultState non trovato');
+        }
     } catch (error) {
         console.error('Errore nell\'analisi:', error);
+        // Disattiva il flag anche in caso di errore
+        window.paymentInProgress = false;
+        console.log('✅ Flag paymentInProgress disattivato - errore nella generazione');
         alert('Si è verificato un errore durante l\'analisi. Riprova.');
-        analysisWizardContainer.style.display = 'block';
-        analysisWizardNavigation.style.display = 'flex';
-        analysisLoadingState.style.display = 'none';
+        if (analysisWizardContainer) analysisWizardContainer.style.display = 'block';
+        if (analysisWizardNavigation) analysisWizardNavigation.style.display = 'flex';
+        if (analysisLoadingState) analysisLoadingState.style.display = 'none';
     }
 }
 
@@ -4896,8 +5257,12 @@ function generatePDFFromContent(data, filename) {
 }
 
 // Close modals when clicking outside - this is handled in initializeEventListeners
-// Additional handlers for analysis modal
+// Additional handlers for analysis modal (ma non durante pagamento)
 document.addEventListener('click', (e) => {
+    // Non chiudere se c'è un pagamento in corso
+    if (window.paymentInProgress) {
+        return;
+    }
     if (analysisModal && e.target === analysisModal) closeAnalysisModalFunc();
 });
 
