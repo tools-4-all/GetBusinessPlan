@@ -251,3 +251,124 @@ def validate_market_analysis_word_count(market_analysis_json: dict) -> Tuple[boo
             report["warnings"].append(f"{key}: {words} parole (minimo 200)")
     
     return report["valid"], report
+
+def validate_business_plan_quality(business_plan_json: dict) -> Tuple[bool, Dict[str, Any]]:
+    """
+    Valida che il business plan rispetti i requisiti minimi di qualità.
+    Restituisce (is_valid, validation_report)
+    """
+    report = {
+        "valid": True,
+        "warnings": [],
+        "details": {}
+    }
+    
+    # Requisiti minimi per capitoli
+    min_words_per_chapter = {
+        "CH1_VALUE": 350,
+        "CH2_MARKET": 550,
+        "CH3_BUSINESS_MODEL": 450,
+        "CH4_FINANCIALS": 550,
+        "CH5_ITALIA": 300,
+        "CH6_RISKS_ROADMAP": 500,
+        "CH7_CHARTS": 300,
+        "CH8_APPENDIX": 200
+    }
+    
+    # Valida executive summary
+    exec_summary = business_plan_json.get("executive_summary", {})
+    sintesi_words = count_words(exec_summary.get("sintesi", ""))
+    report["details"]["executive_summary.sintesi"] = {
+        "words": sintesi_words,
+        "required": 400,
+        "valid": sintesi_words >= 400
+    }
+    if sintesi_words < 400:
+        report["valid"] = False
+        report["warnings"].append(f"Executive Summary: {sintesi_words} parole (minimo 400)")
+    
+    # Valida ogni capitolo
+    chapters = business_plan_json.get("narrative", {}).get("chapters", [])
+    for chapter in chapters:
+        chapter_id = chapter.get("id", "")
+        content = chapter.get("contenuto_markdown", "")
+        words = count_words(content)
+        
+        min_words = min_words_per_chapter.get(chapter_id, 200)
+        report["details"][f"chapter.{chapter_id}"] = {
+            "words": words,
+            "required": min_words,
+            "valid": words >= min_words
+        }
+        
+        if words < min_words:
+            report["valid"] = False
+            report["warnings"].append(
+                f"Capitolo {chapter_id}: {words} parole (minimo {min_words})"
+            )
+        
+        # Verifica struttura: paragrafi, sottosezioni, liste
+        has_subsection = "##" in content or "###" in content
+        has_list = "- " in content or "* " in content or re.search(r'\d+\.\s', content)
+        
+        if not has_subsection:
+            report["warnings"].append(f"Capitolo {chapter_id}: manca sottosezione (## o ###)")
+        if not has_list:
+            report["warnings"].append(f"Capitolo {chapter_id}: manca elenco puntato")
+    
+    # Verifica coerenza finanziaria
+    financials = business_plan_json.get("data", {}).get("financials", {})
+    scenarios = financials.get("scenarios", [])
+    for scenario in scenarios:
+        scenario_name = scenario.get("name", "unknown")
+        monthly = scenario.get("monthly", [])
+        for month_data in monthly:
+            revenue = month_data.get("revenue", 0)
+            cogs = month_data.get("cogs", 0)
+            gross_profit = month_data.get("gross_profit", 0)
+            expected_gp = revenue - cogs
+            
+            # Tolleranza per arrotondamenti
+            if abs(gross_profit - expected_gp) > 0.01:
+                report["valid"] = False
+                report["warnings"].append(
+                    f"Coerenza contabile ({scenario_name}): mese {month_data.get('month')} - "
+                    f"gross_profit atteso {expected_gp:.2f}, trovato {gross_profit:.2f}"
+                )
+            
+            # Verifica net_cash_flow
+            cash_in = month_data.get("cash_in", 0)
+            cash_out = month_data.get("cash_out", 0)
+            net_cash_flow = month_data.get("net_cash_flow", 0)
+            expected_ncf = cash_in - cash_out
+            
+            if abs(net_cash_flow - expected_ncf) > 0.01:
+                report["valid"] = False
+                report["warnings"].append(
+                    f"Coerenza contabile ({scenario_name}): mese {month_data.get('month')} - "
+                    f"net_cash_flow atteso {expected_ncf:.2f}, trovato {net_cash_flow:.2f}"
+                )
+    
+    # Verifica presenza grafici minimi
+    charts = business_plan_json.get("charts", [])
+    if len(charts) < 6:
+        report["warnings"].append(f"Grafici: {len(charts)} trovati (minimo 6 consigliato)")
+    
+    return report["valid"], report
+
+def enhance_business_plan_quality(business_plan_json: dict) -> dict:
+    """
+    Migliora la qualità del business plan con post-processing
+    """
+    # Assicura che i capitoli abbiano struttura minima
+    chapters = business_plan_json.get("narrative", {}).get("chapters", [])
+    for chapter in chapters:
+        content = chapter.get("contenuto_markdown", "")
+        
+        # Se manca una sottosezione, aggiungi un'introduzione
+        if "##" not in content and "###" not in content and content.strip():
+            # Aggiungi una sottosezione introduttiva solo se il contenuto esiste
+            intro = "## Introduzione\n\n"
+            chapter["contenuto_markdown"] = intro + content
+    
+    return business_plan_json

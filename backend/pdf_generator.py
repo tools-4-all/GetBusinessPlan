@@ -22,11 +22,27 @@ def escape_for_pdf(s):
 
 
 def markdown_to_paragraphs(text, styles):
-    """Converte markdown in paragrafi ReportLab"""
+    """Converte markdown in paragrafi ReportLab con supporto migliorato per grassetto e corsivo"""
     elements = []
     
     if not text:
         return elements
+    
+    # Funzione helper per convertire markdown inline a HTML per ReportLab
+    def convert_inline_markdown(line_text):
+        """Converte **grassetto** e *corsivo* in HTML"""
+        # Escape caratteri HTML speciali prima
+        line_text = line_text.replace('&', '&amp;')
+        line_text = line_text.replace('<', '&lt;').replace('>', '&gt;')
+        
+        # Converti **grassetto** in <b>grassetto</b>
+        line_text = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', line_text)
+        
+        # Converti *corsivo* in <i>corsivo</i> (ma non **)
+        # Usa lookahead e lookbehind per evitare di matchare **
+        line_text = re.sub(r'(?<!\*)\*([^*]+?)\*(?!\*)', r'<i>\1</i>', line_text)
+        
+        return line_text
     
     # Dividi per righe
     lines = text.split('\n')
@@ -37,7 +53,9 @@ def markdown_to_paragraphs(text, styles):
         
         if not line:
             if current_paragraph:
-                elements.append(Paragraph(' '.join(current_paragraph), styles['Normal']))
+                para_text = ' '.join(current_paragraph)
+                para_text = convert_inline_markdown(para_text)
+                elements.append(Paragraph(para_text, styles['Normal']))
                 elements.append(Spacer(1, 0.3*cm))
                 current_paragraph = []
             continue
@@ -45,56 +63,65 @@ def markdown_to_paragraphs(text, styles):
         # Titoli
         if line.startswith('###'):
             if current_paragraph:
-                elements.append(Paragraph(' '.join(current_paragraph), styles['Normal']))
+                para_text = ' '.join(current_paragraph)
+                para_text = convert_inline_markdown(para_text)
+                elements.append(Paragraph(para_text, styles['Normal']))
                 current_paragraph = []
             title = line.replace('###', '').strip()
-            # Escape HTML entities
-            title = title.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            title = convert_inline_markdown(title)
             elements.append(Paragraph(title, styles['Heading3']))
             elements.append(Spacer(1, 0.2*cm))
         elif line.startswith('##'):
             if current_paragraph:
-                elements.append(Paragraph(' '.join(current_paragraph), styles['Normal']))
+                para_text = ' '.join(current_paragraph)
+                para_text = convert_inline_markdown(para_text)
+                elements.append(Paragraph(para_text, styles['Normal']))
                 current_paragraph = []
             title = line.replace('##', '').strip()
-            title = title.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            title = convert_inline_markdown(title)
             elements.append(Paragraph(title, styles['Heading2']))
             elements.append(Spacer(1, 0.3*cm))
         elif line.startswith('#'):
             if current_paragraph:
-                elements.append(Paragraph(' '.join(current_paragraph), styles['Normal']))
+                para_text = ' '.join(current_paragraph)
+                para_text = convert_inline_markdown(para_text)
+                elements.append(Paragraph(para_text, styles['Normal']))
                 current_paragraph = []
             title = line.replace('#', '').strip()
-            title = title.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            title = convert_inline_markdown(title)
             elements.append(Paragraph(title, styles['Heading1']))
             elements.append(Spacer(1, 0.4*cm))
         # Liste
         elif line.startswith('- ') or line.startswith('* '):
             if current_paragraph:
-                elements.append(Paragraph(' '.join(current_paragraph), styles['Normal']))
+                para_text = ' '.join(current_paragraph)
+                para_text = convert_inline_markdown(para_text)
+                elements.append(Paragraph(para_text, styles['Normal']))
                 current_paragraph = []
             item = line[2:].strip()
-            # Escape HTML entities
-            item = item.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            item = convert_inline_markdown(item)
             elements.append(Paragraph(f"• {item}", styles['Normal']))
             elements.append(Spacer(1, 0.2*cm))
         # Liste numerate
         elif re.match(r'^\d+\.\s', line):
             if current_paragraph:
-                elements.append(Paragraph(' '.join(current_paragraph), styles['Normal']))
+                para_text = ' '.join(current_paragraph)
+                para_text = convert_inline_markdown(para_text)
+                elements.append(Paragraph(para_text, styles['Normal']))
                 current_paragraph = []
             item = re.sub(r'^\d+\.\s', '', line).strip()
-            item = item.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            item = convert_inline_markdown(item)
             elements.append(Paragraph(f"• {item}", styles['Normal']))
             elements.append(Spacer(1, 0.2*cm))
         else:
-            # Testo normale
-            line = line.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            # Testo normale - aggiungi alla riga corrente
             current_paragraph.append(line)
     
     # Aggiungi ultimo paragrafo
     if current_paragraph:
-        elements.append(Paragraph(' '.join(current_paragraph), styles['Normal']))
+        para_text = ' '.join(current_paragraph)
+        para_text = convert_inline_markdown(para_text)
+        elements.append(Paragraph(para_text, styles['Normal']))
         elements.append(Spacer(1, 0.3*cm))
     
     return elements
@@ -532,17 +559,39 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
         
         sintesi = exec_summary.get('sintesi', '')
         if sintesi:
-            sintesi_clean = sintesi.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-            story.append(Paragraph(sintesi_clean, styles['Normal']))
-            story.append(Spacer(1, 0.5*cm))
+            # Dividi in paragrafi se contiene doppie newline
+            paragraphs = sintesi.split('\n\n')
+            for para in paragraphs:
+                if para.strip():
+                    # Usa markdown_to_paragraphs per supportare formattazione
+                    para_elements = markdown_to_paragraphs(para.strip(), styles)
+                    story.extend(para_elements)
+            story.append(Spacer(1, 0.3*cm))
         
         punti_chiave = exec_summary.get('punti_chiave', [])
         if punti_chiave:
             story.append(Paragraph("<b>Punti Chiave:</b>", styles['Heading3']))
-            for punto in punti_chiave:
-                punto_clean = punto.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-                story.append(Paragraph(f"• {punto_clean}", styles['Normal']))
-            story.append(Spacer(1, 0.3*cm))
+            story.append(Spacer(1, 0.2*cm))
+            
+            # Box colorato per punti chiave
+            key_points_data = []
+            for i, punto in enumerate(punti_chiave):
+                punto_clean = escape_for_pdf(punto)
+                key_points_data.append([Paragraph(f"<b>{i+1}.</b> {punto_clean}", styles['Normal'])])
+            
+            if key_points_data:
+                key_points_table = Table(key_points_data, colWidths=[16*cm])
+                key_points_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f0f4ff')),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 12),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 12),
+                    ('TOPPADDING', (0, 0), (-1, -1), 8),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                    ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#3b82f6')),
+                    ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ]))
+                story.append(key_points_table)
+                story.append(Spacer(1, 0.3*cm))
         
         # KPI principali come tabella
         kpis = exec_summary.get('kpi_principali', [])
@@ -602,7 +651,11 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
     # Crea un dizionario dei grafici per accesso rapido
     charts_dict = {chart['id']: chart for chart in business_plan_json.get('charts', [])}
     
+    # Dati per tabelle riassuntive
+    data = business_plan_json.get('data', {})
+    
     for chapter in chapters:
+        chapter_id = chapter.get('id', '')
         titolo_ch = chapter.get('titolo', '')
         contenuto = chapter.get('contenuto_markdown', '')
         chart_ids = chapter.get('chart_ids', [])
@@ -610,6 +663,150 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
         if titolo_ch:
             story.append(Paragraph(titolo_ch, styles['CustomHeading1']))
             story.append(Spacer(1, 0.3*cm))
+        
+        # Aggiungi tabelle riassuntive per capitoli specifici
+        if chapter_id == "CH3_BUSINESS_MODEL":
+            business_model = data.get("business_model", {})
+            pricing = business_model.get("pricing", {})
+            
+            if pricing.get("piani"):
+                story.append(Paragraph("<b>Piani di Pricing:</b>", styles['Heading3']))
+                story.append(Spacer(1, 0.2*cm))
+                
+                pricing_table_data = [["Piano", "Prezzo", "Periodicità"]]
+                for piano in pricing["piani"]:
+                    prezzo_eur = piano.get('prezzo_eur', 0)
+                    try:
+                        prezzo = f"{float(prezzo_eur):,.0f} €"
+                    except:
+                        prezzo = str(prezzo_eur)
+                    periodicita = piano.get("periodicita", "").replace("_", " ").title()
+                    pricing_table_data.append([
+                        piano.get("nome", ""),
+                        prezzo,
+                        periodicita
+                    ])
+                
+                if len(pricing_table_data) > 1:
+                    pricing_table = Table(pricing_table_data, colWidths=[6*cm, 4*cm, 4*cm])
+                    pricing_table.setStyle(TableStyle([
+                        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c3e50')),
+                        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                        ('ALIGN', (1, 0), (2, -1), 'RIGHT'),
+                        ('FONTNAME', (0, 0), (-1, 0), 'Times-Bold'),
+                        ('FONTNAME', (0, 1), (-1, -1), 'Times-Roman'),
+                        ('FONTSIZE', (0, 0), (-1, 0), 11),
+                        ('FONTSIZE', (0, 1), (-1, -1), 10),
+                        ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+                        ('TOPPADDING', (0, 0), (-1, 0), 10),
+                        ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
+                        ('TOPPADDING', (0, 1), (-1, -1), 6),
+                        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
+                        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f9f9f9')]),
+                    ]))
+                    story.append(pricing_table)
+                    story.append(Spacer(1, 0.3*cm))
+            
+            # Unit Economics
+            unit_econ = business_model.get("unit_economics", {})
+            if unit_econ:
+                story.append(Paragraph("<b>Unit Economics:</b>", styles['Heading3']))
+                story.append(Spacer(1, 0.2*cm))
+                
+                ue_data = []
+                if unit_econ.get("cac_eur"):
+                    ue_data.append(["CAC (Customer Acquisition Cost)", f"{unit_econ.get('cac_eur', 0):,.0f} €"])
+                if unit_econ.get("ltv_eur"):
+                    ue_data.append(["LTV (Lifetime Value)", f"{unit_econ.get('ltv_eur', 0):,.0f} €"])
+                if unit_econ.get("margine_lordo_percent"):
+                    ue_data.append(["Margine Lordo", f"{unit_econ.get('margine_lordo_percent', 0):.1f}%"])
+                if unit_econ.get("payback_mesi"):
+                    ue_data.append(["Payback Period", f"{unit_econ.get('payback_mesi', 0):.1f} mesi"])
+                
+                if ue_data:
+                    ue_table = Table(ue_data, colWidths=[10*cm, 6*cm])
+                    ue_table.setStyle(TableStyle([
+                        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f0f4ff')),
+                        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                        ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+                        ('FONTNAME', (0, 0), (-1, -1), 'Times-Roman'),
+                        ('FONTSIZE', (0, 0), (-1, -1), 10),
+                        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                        ('TOPPADDING', (0, 0), (-1, -1), 6),
+                        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
+                        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                    ]))
+                    story.append(ue_table)
+                    story.append(Spacer(1, 0.3*cm))
+        
+        elif chapter_id == "CH2_MARKET":
+            market = data.get("market", {})
+            tam_sam_som = market.get("tam_sam_som", {})
+            
+            if tam_sam_som:
+                story.append(Paragraph("<b>Dimensioni del Mercato:</b>", styles['Heading3']))
+                story.append(Spacer(1, 0.2*cm))
+                
+                market_data = []
+                if tam_sam_som.get("tam_eur_annuo"):
+                    market_data.append(["TAM (Total Addressable Market)", f"{tam_sam_som.get('tam_eur_annuo', 0):,.0f} €"])
+                if tam_sam_som.get("sam_eur_annuo"):
+                    market_data.append(["SAM (Serviceable Addressable Market)", f"{tam_sam_som.get('sam_eur_annuo', 0):,.0f} €"])
+                if tam_sam_som.get("som_eur_annuo"):
+                    market_data.append(["SOM (Serviceable Obtainable Market)", f"{tam_sam_som.get('som_eur_annuo', 0):,.0f} €"])
+                
+                if market_data:
+                    market_table = Table(market_data, colWidths=[10*cm, 6*cm])
+                    market_table.setStyle(TableStyle([
+                        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f0f4ff')),
+                        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                        ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+                        ('FONTNAME', (0, 0), (-1, -1), 'Times-Roman'),
+                        ('FONTSIZE', (0, 0), (-1, -1), 10),
+                        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                        ('TOPPADDING', (0, 0), (-1, -1), 6),
+                        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
+                        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                    ]))
+                    story.append(market_table)
+                    story.append(Spacer(1, 0.3*cm))
+        
+        elif chapter_id == "CH6_RISKS_ROADMAP":
+            risks = data.get("risks", [])
+            if risks:
+                story.append(Paragraph("<b>Rischi Principali:</b>", styles['Heading3']))
+                story.append(Spacer(1, 0.2*cm))
+                
+                risks_data = [["Categoria", "Probabilità", "Impatto"]]
+                for risk in risks[:5]:  # Mostra i primi 5 rischi
+                    risks_data.append([
+                        risk.get("categoria", "").replace("_", " ").title(),
+                        risk.get("probabilita", "").title(),
+                        risk.get("impatto", "").title()
+                    ])
+                
+                if len(risks_data) > 1:
+                    risks_table = Table(risks_data, colWidths=[6*cm, 4*cm, 4*cm])
+                    risks_table.setStyle(TableStyle([
+                        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c3e50')),
+                        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                        ('FONTNAME', (0, 0), (-1, 0), 'Times-Bold'),
+                        ('FONTNAME', (0, 1), (-1, -1), 'Times-Roman'),
+                        ('FONTSIZE', (0, 0), (-1, 0), 11),
+                        ('FONTSIZE', (0, 1), (-1, -1), 10),
+                        ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+                        ('TOPPADDING', (0, 0), (-1, 0), 10),
+                        ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
+                        ('TOPPADDING', (0, 1), (-1, -1), 6),
+                        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
+                        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f9f9f9')]),
+                    ]))
+                    story.append(risks_table)
+                    story.append(Spacer(1, 0.3*cm))
         
         if contenuto:
             elements = markdown_to_paragraphs(contenuto, styles)

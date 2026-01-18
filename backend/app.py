@@ -248,6 +248,19 @@ async def generate_business_plan(request: BusinessPlanRequest):
         # Sanitizza i dati (come in generate.js)
         utils.sanitize_italia_regime_note(business_plan_json)
         
+        # Migliora la qualità con post-processing
+        business_plan_json = utils.enhance_business_plan_quality(business_plan_json)
+        
+        # Valida la qualità del business plan
+        is_valid, validation_report = utils.validate_business_plan_quality(business_plan_json)
+        if not is_valid:
+            print("⚠️ ATTENZIONE: Il business plan non rispetta tutti i requisiti minimi di qualità")
+            print(f"Avvisi: {len(validation_report['warnings'])}")
+            for warning in validation_report['warnings']:
+                print(f"  - {warning}")
+        else:
+            print("✅ Validazione qualità: tutti i requisiti minimi rispettati")
+        
         end_time = datetime.datetime.now()
         elapsed = (end_time - start_time).total_seconds()
         print(f"=== FINE GENERAZIONE BUSINESS PLAN ===")
@@ -257,7 +270,8 @@ async def generate_business_plan(request: BusinessPlanRequest):
         return JSONResponse(content={
             "success": True,
             "json": business_plan_json,
-            "generation_time_seconds": elapsed
+            "generation_time_seconds": elapsed,
+            "validation": validation_report if not is_valid else None  # Includi solo se ci sono problemi
         })
         
     except json.JSONDecodeError as e:
