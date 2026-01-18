@@ -331,14 +331,12 @@ function displaySuggestions(suggestions, container, input) {
             <ul class="suggestions-list">
                 ${suggestions.map((suggestion, index) => {
                     const escapedSuggestion = escape(suggestion);
+                    const safeSuggestion = escapedSuggestion.replace(/'/g, "\\'").replace(/\n/g, ' ');
                     return `
-                    <li class="suggestion-item" data-index="${index}">
+                    <li class="suggestion-item" data-index="${index}" onclick="applySuggestion('${safeSuggestion}', '${input.id}')">
                         <div class="suggestion-content">
                             <span class="suggestion-text">${escapedSuggestion}</span>
                         </div>
-                        <button class="suggestion-apply-btn" onclick="applySuggestion('${escapedSuggestion.replace(/'/g, "\\'").replace(/\n/g, ' ')}', '${input.id}')">
-                            Usa
-                        </button>
                     </li>
                 `;
                 }).join('')}
