@@ -982,13 +982,13 @@ Rispondi SOLO con un JSON array di stringhe, esempio:
 """
 
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",  # Modello veloce per suggerimenti
+            model="gpt-4o-mini",  # Modello economico per suggerimenti (più economico di gpt-3.5-turbo)
             messages=[
                 {"role": "system", "content": "Sei un assistente esperto che fornisce suggerimenti professionali per business plan. Rispondi sempre e solo con un JSON array valido."},
                 {"role": "user", "content": suggestion_prompt}
             ],
             temperature=0.7,
-            max_tokens=400
+            max_tokens=300  # Ridotto per risparmiare costi
         )
         
         content = response.choices[0].message.content.strip()
