@@ -9,9 +9,11 @@ if (typeof console !== 'undefined') console.log('[SeedWise] API Backend:', API_B
 // ============================================
 // FIREBASE AUTHENTICATION
 // ============================================
-// Stato autenticazione
+// Stato autenticazione (esposto globalmente per dashboard.html)
 let currentUser = null;
+window.currentUser = null; // Esposto globalmente
 let authInitialized = false;
+window.authInitialized = false; // Esposto globalmente
 
 // Funzioni Firebase Auth (caricate dall'HTML)
 function getAuthFunctions() {
@@ -364,7 +366,7 @@ async function getSuggestions(questionId, questionTitle, questionDescription, cu
     }
 }
 
-// Funzione per visualizzare i suggerimenti
+// Funzione per visualizzare i suggerimenti (solo visualizzazione, non cliccabili)
 function displaySuggestions(suggestions, container, input) {
     if (!suggestions || suggestions.length === 0) {
         container.innerHTML = '';
@@ -379,9 +381,8 @@ function displaySuggestions(suggestions, container, input) {
             <ul class="suggestions-list">
                 ${suggestions.map((suggestion, index) => {
                     const escapedSuggestion = escape(suggestion);
-                    const safeSuggestion = escapedSuggestion.replace(/'/g, "\\'").replace(/\n/g, ' ');
                     return `
-                    <li class="suggestion-item" data-index="${index}" onclick="applySuggestion('${safeSuggestion}', '${input.id}')">
+                    <li class="suggestion-item" data-index="${index}" style="cursor: default; pointer-events: none;">
                         <div class="suggestion-content">
                             <span class="suggestion-text">${escapedSuggestion}</span>
                         </div>
@@ -957,6 +958,7 @@ async function generateBusinessPlanAfterPayment(wizardData) {
         
         // Salva il documento nella dashboard dell'utente
         if (currentUser && currentUser.uid) {
+            console.log('💾 Chiamata saveDocumentToDashboard per business plan...');
             saveDocumentToDashboard({
                 type: 'business-plan',
                 title: wizardData.companyName || 'Business Plan',
@@ -964,7 +966,11 @@ async function generateBusinessPlanAfterPayment(wizardData) {
                 html: businessPlanHTML,
                 json: jsonData,
                 wizardData: wizardData
+            }).catch(error => {
+                console.error('❌ Errore nel salvataggio business plan:', error);
             });
+        } else {
+            console.warn('⚠️ Utente non autenticato, documento business plan non salvato');
         }
         
         console.log('Dati salvati in window.currentPlanData');
@@ -3167,6 +3173,7 @@ async function requireAuth() {
             console.warn('⚠️ Token scaduto, richiedo autenticazione:', tokenError);
             // Il token è scaduto, procedi con la verifica completa
             currentUser = null;
+            window.currentUser = null;
         }
     }
     
@@ -3174,6 +3181,7 @@ async function requireAuth() {
     const currentFirebaseUser = window.firebaseAuth.currentUser;
     if (currentFirebaseUser && currentFirebaseUser.uid) {
         currentUser = currentFirebaseUser;
+        window.currentUser = currentFirebaseUser;
         try {
             await currentFirebaseUser.getIdToken(true);
             console.log('✅ Utente Firebase trovato:', currentFirebaseUser.email);
@@ -3181,6 +3189,7 @@ async function requireAuth() {
         } catch (tokenError) {
             console.warn('⚠️ Errore nel rinnovo token Firebase:', tokenError);
             currentUser = null;
+            window.currentUser = null;
         }
     }
     
@@ -3190,6 +3199,7 @@ async function requireAuth() {
         const authenticatedUser = await showAuthModal();
         if (authenticatedUser && authenticatedUser.uid) {
             currentUser = authenticatedUser;
+            window.currentUser = authenticatedUser;
             console.log('✅ Utente autenticato dopo login:', authenticatedUser.email);
             return authenticatedUser;
         } else {
@@ -3502,6 +3512,7 @@ function updateAuthUI() {
                         const { signOut } = authFunctions;
                         await signOut(window.firebaseAuth);
                         currentUser = null;
+                        window.currentUser = null;
                         updateAuthUI();
                         console.log('✅ Logout effettuato');
                     }
@@ -3537,6 +3548,7 @@ function initializeAuth() {
     const { onAuthStateChanged } = authFunctions;
     onAuthStateChanged(window.firebaseAuth, (user) => {
         currentUser = user;
+        window.currentUser = user; // Esposto globalmente per dashboard.html
         updateAuthUI();
         authInitialized = true;
         console.log('✅ Auth state initialized:', user ? user.email : 'Non autenticato');
@@ -3561,6 +3573,7 @@ async function handlePayment(documentType) {
             // Assicurati che currentUser sia impostato
             if (authenticatedUser) {
                 currentUser = authenticatedUser;
+                window.currentUser = authenticatedUser;
                 console.log('✅ Utente autenticato dopo requireAuth:', authenticatedUser.email);
                 console.log('UID:', authenticatedUser.uid);
             } else {
@@ -4678,6 +4691,7 @@ async function generateMarketAnalysisAfterPayment(analysisWizardData) {
         
         // Salva il documento nella dashboard dell'utente
         if (currentUser && currentUser.uid) {
+            console.log('💾 Chiamata saveDocumentToDashboard per analisi di mercato...');
             saveDocumentToDashboard({
                 type: 'market-analysis',
                 title: analysisWizardData.companyName || analysisWizardData.productName || 'Analisi di Mercato',
@@ -4685,7 +4699,11 @@ async function generateMarketAnalysisAfterPayment(analysisWizardData) {
                 html: analysisHTML,
                 json: marketAnalysisJSON,
                 wizardData: analysisWizardData
+            }).catch(error => {
+                console.error('❌ Errore nel salvataggio analisi di mercato:', error);
             });
+        } else {
+            console.warn('⚠️ Utente non autenticato, documento analisi non salvato');
         }
         
         // Disattiva il flag di pagamento in corso - la generazione è completata
@@ -5266,44 +5284,140 @@ document.addEventListener('click', (e) => {
     if (analysisModal && e.target === analysisModal) closeAnalysisModalFunc();
 });
 
-// Funzione per salvare un documento nella dashboard dell'utente
-function saveDocumentToDashboard(document) {
+// Funzione per salvare un documento nella dashboard dell'utente (su Firebase Firestore)
+async function saveDocumentToDashboard(document) {
+    console.log('💾 ===== SALVATAGGIO DOCUMENTO NELLA DASHBOARD =====');
+    console.log('Documento da salvare:', {
+        type: document.type,
+        title: document.title,
+        hasHtml: !!document.html,
+        hasJson: !!document.json
+    });
+    
     if (!currentUser || !currentUser.uid) {
         console.warn('⚠️ Utente non autenticato, documento non salvato nella dashboard');
+        console.warn('currentUser:', currentUser);
         return;
     }
     
+    console.log('✅ Utente autenticato:', currentUser.email, 'UID:', currentUser.uid);
+    console.log('Firestore disponibile:', !!window.firebaseDb);
+    
     try {
-        const userId = currentUser.uid;
-        const storageKey = `user_documents_${userId}`;
+        // Verifica che Firestore sia disponibile
+        if (!window.firebaseDb) {
+            console.error('❌ Firestore non inizializzato, salvo in localStorage come fallback');
+            // Fallback a localStorage
+            const userId = currentUser.uid;
+            const storageKey = `user_documents_${userId}`;
+            let documents = [];
+            const existingData = localStorage.getItem(storageKey);
+            if (existingData) {
+                try {
+                    documents = JSON.parse(existingData);
+                } catch (e) {
+                    documents = [];
+                }
+            }
+            const docId = Date.now().toString();
+            documents.push({
+                id: docId,
+                ...document
+            });
+            if (documents.length > 50) {
+                documents = documents.slice(-50);
+            }
+            localStorage.setItem(storageKey, JSON.stringify(documents));
+            console.log('✅ Documento salvato in localStorage (fallback):', document.type, document.title);
+            return;
+        }
         
-        // Recupera i documenti esistenti
+        const userId = currentUser.uid;
+        const docId = Date.now().toString();
+        
+        console.log('📝 Preparazione documento per Firestore...');
+        console.log('Doc ID:', docId);
+        console.log('User ID:', userId);
+        
+        // Prepara il documento per Firestore (rimuovi campi non serializzabili)
+        const docData = {
+            id: docId,
+            userId: userId,
+            type: document.type,
+            title: document.title,
+            date: document.date || new Date().toISOString(),
+            html: document.html,
+            json: document.json ? JSON.stringify(document.json) : null, // Salva JSON come stringa
+            wizardData: document.wizardData ? JSON.stringify(document.wizardData) : null,
+            createdAt: new Date().toISOString()
+        };
+        
+        console.log('📦 Dati preparati per Firestore:', {
+            id: docData.id,
+            type: docData.type,
+            title: docData.title,
+            htmlLength: docData.html ? docData.html.length : 0,
+            hasJson: !!docData.json,
+            hasWizardData: !!docData.wizardData
+        });
+        
+        // Salva su Firestore
+        console.log('🔄 Importazione moduli Firestore...');
+        const { collection, addDoc, setDoc, doc } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
+        console.log('✅ Moduli Firestore importati');
+        
+        console.log('🔄 Creazione riferimento documento...');
+        const docRef = doc(window.firebaseDb, 'users', userId, 'documents', docId);
+        console.log('✅ Riferimento documento creato');
+        
+        console.log('🔄 Salvataggio su Firestore...');
+        await setDoc(docRef, docData);
+        console.log('✅ Documento salvato su Firebase Firestore:', document.type, document.title);
+        console.log('📍 Percorso Firestore: users/' + userId + '/documents/' + docId);
+        
+        // Salva anche in localStorage come backup
+        const storageKey = `user_documents_${userId}`;
         let documents = [];
         const existingData = localStorage.getItem(storageKey);
         if (existingData) {
             try {
                 documents = JSON.parse(existingData);
             } catch (e) {
-                console.error('Errore nel parsing documenti esistenti:', e);
                 documents = [];
             }
         }
-        
-        // Aggiungi il nuovo documento
         documents.push({
-            id: Date.now().toString(),
+            id: docId,
             ...document
         });
-        
-        // Salva in localStorage (limite a 50 documenti per utente)
         if (documents.length > 50) {
-            documents = documents.slice(-50); // Mantieni solo gli ultimi 50
+            documents = documents.slice(-50);
         }
-        
         localStorage.setItem(storageKey, JSON.stringify(documents));
-        console.log('✅ Documento salvato nella dashboard:', document.type, document.title);
+        
     } catch (error) {
-        console.error('Errore nel salvataggio documento nella dashboard:', error);
+        console.error('❌ Errore nel salvataggio documento su Firestore:', error);
+        // Fallback a localStorage in caso di errore
+        try {
+            const userId = currentUser.uid;
+            const storageKey = `user_documents_${userId}`;
+            let documents = [];
+            const existingData = localStorage.getItem(storageKey);
+            if (existingData) {
+                documents = JSON.parse(existingData);
+            }
+            documents.push({
+                id: Date.now().toString(),
+                ...document
+            });
+            if (documents.length > 50) {
+                documents = documents.slice(-50);
+            }
+            localStorage.setItem(storageKey, JSON.stringify(documents));
+            console.log('✅ Documento salvato in localStorage come fallback');
+        } catch (fallbackError) {
+            console.error('❌ Errore anche nel fallback localStorage:', fallbackError);
+        }
     }
 }
 

@@ -17,6 +17,7 @@
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
         import { getAuth } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
         import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
         
         // Configurazione Firebase - DA SOSTITUIRE CON LE TUE CREDENZIALI
@@ -33,9 +34,11 @@
         // Inizializza Firebase
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
+        const db = getFirestore(app);
         
-        // Esponi auth e funzioni globalmente
+        // Esponi auth, firestore e funzioni globalmente
         window.firebaseAuth = auth;
+        window.firebaseDb = db;
         window.firebaseAuthFunctions = {
             signInWithEmailAndPassword,
             createUserWithEmailAndPassword,
@@ -43,7 +46,7 @@
             onAuthStateChanged
         };
         
-        console.log('✅ Firebase inizializzato');
+        console.log('✅ Firebase inizializzato (Auth + Firestore)');
     </script>
 </head>
 <body>

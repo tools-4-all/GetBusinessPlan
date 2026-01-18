@@ -13,6 +13,7 @@
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
         import { getAuth } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
         import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
         
         // Configurazione Firebase
@@ -29,9 +30,11 @@
         // Inizializza Firebase
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
+        const db = getFirestore(app);
         
-        // Esponi auth e funzioni globalmente
+        // Esponi auth, firestore e funzioni globalmente
         window.firebaseAuth = auth;
+        window.firebaseDb = db;
         window.firebaseAuthFunctions = {
             signInWithEmailAndPassword,
             createUserWithEmailAndPassword,
@@ -39,7 +42,7 @@
             onAuthStateChanged
         };
         
-        console.log('✅ Firebase inizializzato');
+        console.log('✅ Firebase inizializzato (Auth + Firestore)');
     </script>
     <style>
         .dashboard-container {
@@ -61,22 +64,33 @@
         }
         .documents-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 24px;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 28px;
             margin-top: 30px;
+        }
+        
+        @media (max-width: 768px) {
+            .documents-grid {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
         }
         .document-card {
             background: white;
             border: 2px solid var(--border);
-            border-radius: 12px;
-            padding: 24px;
+            border-radius: 16px;
+            padding: 28px;
             transition: all 0.3s ease;
-            cursor: pointer;
+            cursor: default;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+            display: flex;
+            flex-direction: column;
+            height: 100%;
         }
         .document-card:hover {
             border-color: var(--accent);
-            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.1);
-            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(37, 99, 235, 0.15);
+            transform: translateY(-4px);
         }
         .document-card-header {
             display: flex;
@@ -85,23 +99,26 @@
             margin-bottom: 16px;
         }
         .document-icon {
-            width: 48px;
-            height: 48px;
-            border-radius: 8px;
+            width: 56px;
+            height: 56px;
+            border-radius: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 24px;
+            font-size: 28px;
             background: var(--accent-light);
             color: var(--accent);
+            flex-shrink: 0;
         }
         .document-icon.business-plan {
-            background: #dbeafe;
+            background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
             color: #2563eb;
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.2);
         }
         .document-icon.market-analysis {
-            background: #fef3c7;
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
             color: #d97706;
+            box-shadow: 0 2px 8px rgba(217, 119, 6, 0.2);
         }
         .document-title {
             font-size: 1.2rem;
@@ -143,6 +160,87 @@
             color: var(--text-secondary);
             margin-bottom: 24px;
         }
+        
+        /* Modal per visualizzare i documenti */
+        .document-view-modal {
+            display: none;
+            position: fixed;
+            z-index: 10000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            overflow: auto;
+        }
+        .document-view-modal-content {
+            background-color: white;
+            margin: 2% auto;
+            padding: 0;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 900px;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+        }
+        .document-view-modal-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+        .document-view-modal-header h2 {
+            margin: 0;
+            font-size: 1.5rem;
+            color: var(--text-primary);
+        }
+        .document-view-modal-close {
+            background: none;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
+            color: var(--text-secondary);
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+        .document-view-modal-close:hover {
+            background: var(--border);
+            color: var(--text-primary);
+        }
+        .document-view-modal-body {
+            padding: 24px;
+            overflow-y: auto;
+            flex: 1;
+            line-height: 1.8;
+            color: #1e293b;
+        }
+        .document-view-modal-body h1 {
+            color: #000000;
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+        .document-view-modal-body h2 {
+            color: #000000;
+            font-size: 2rem;
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+        }
+        .document-view-modal-body h3 {
+            color: #000000;
+            font-size: 1.5rem;
+            margin-top: 1.5rem;
+            margin-bottom: 0.75rem;
+        }
     </style>
 </head>
 <body>
@@ -179,11 +277,24 @@
         </div>
     </section>
 
+    <!-- Modal per visualizzare i documenti -->
+    <div id="documentViewModal" class="document-view-modal">
+        <div class="document-view-modal-content">
+            <div class="document-view-modal-header">
+                <h2 id="documentViewModalTitle">Documento</h2>
+                <button class="document-view-modal-close" id="documentViewModalClose">&times;</button>
+            </div>
+            <div class="document-view-modal-body" id="documentViewModalBody">
+                <!-- Il contenuto del documento verrà inserito qui -->
+            </div>
+        </div>
+    </div>
+
     <script src="script.js"></script>
     <script>
-        // Stato autenticazione
-        let currentUser = null;
-        let authInitialized = false;
+        // Usa currentUser e authInitialized globali da script.js invece di dichiararne di nuovi
+        // let currentUser = null; // RIMOSSO - usa quello globale da script.js
+        // let authInitialized = false; // RIMOSSO - usa quello globale da script.js
 
         // Funzioni Firebase Auth
         function getAuthFunctions() {
@@ -200,7 +311,14 @@
 
             const { onAuthStateChanged } = authFunctions;
             onAuthStateChanged(window.firebaseAuth, (user) => {
-                currentUser = user;
+                // Usa currentUser globale da script.js
+                if (typeof window !== 'undefined' && window.currentUser !== undefined) {
+                    window.currentUser = user;
+                } else {
+                    // Se non esiste, crealo
+                    window.currentUser = user;
+                }
+                const currentUser = window.currentUser; // Riferimento locale per questo scope
                 authInitialized = true;
                 updateAuthUI();
                 if (user) {
@@ -230,7 +348,7 @@
                             if (authFunctions && window.firebaseAuth) {
                                 const { signOut } = authFunctions;
                                 await signOut(window.firebaseAuth);
-                                currentUser = null;
+                                window.currentUser = null;
                                 updateAuthUI();
                                 showLoginRequired();
                             }
@@ -263,26 +381,91 @@
             `;
         }
 
-        // Carica documenti
-        function loadDocuments() {
+        // Carica documenti da Firebase Firestore
+        async function loadDocuments() {
+            // Usa currentUser globale da script.js
+            const currentUser = window.currentUser || null;
+            
             if (!currentUser || !currentUser.uid) {
                 showLoginRequired();
                 return;
             }
 
+            const documentsList = document.getElementById('documentsList');
+            documentsList.innerHTML = '<div style="text-align: center; padding: 40px;">Caricamento documenti...</div>';
+
             try {
                 const userId = currentUser.uid;
-                const storageKey = `user_documents_${userId}`;
-                const existingData = localStorage.getItem(storageKey);
-                
                 let documents = [];
-                if (existingData) {
-                    documents = JSON.parse(existingData);
-                    // Ordina per data (più recenti prima)
-                    documents.sort((a, b) => new Date(b.date) - new Date(a.date));
+                
+                // Prova a caricare da Firestore
+                console.log('🔍 Verifica Firestore disponibile:', !!window.firebaseDb);
+                if (window.firebaseDb) {
+                    try {
+                        console.log('📡 Caricamento documenti da Firestore...');
+                        const { collection, getDocs, query, orderBy, limit } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
+                        console.log('✅ Moduli Firestore importati');
+                        
+                        const documentsRef = collection(window.firebaseDb, 'users', userId, 'documents');
+                        console.log('📍 Percorso Firestore: users/' + userId + '/documents');
+                        
+                        const q = query(documentsRef, orderBy('createdAt', 'desc'), limit(50));
+                        console.log('🔄 Esecuzione query Firestore...');
+                        const querySnapshot = await getDocs(q);
+                        console.log('✅ Query completata, documenti trovati:', querySnapshot.docs.length);
+                        
+                        documents = querySnapshot.docs.map(doc => {
+                            const data = doc.data();
+                            return {
+                                id: data.id || doc.id,
+                                type: data.type,
+                                title: data.title,
+                                date: data.date || data.createdAt,
+                                html: data.html,
+                                json: data.json ? JSON.parse(data.json) : null,
+                                wizardData: data.wizardData ? JSON.parse(data.wizardData) : null
+                            };
+                        });
+                        
+                        console.log('✅ Documenti caricati da Firestore:', documents.length);
+                        if (documents.length > 0) {
+                            console.log('Primo documento:', documents[0].title, documents[0].type);
+                        }
+                    } catch (firestoreError) {
+                        console.error('❌ Errore nel caricamento da Firestore:', firestoreError);
+                        console.error('Tipo errore:', firestoreError.constructor.name);
+                        console.error('Codice errore:', firestoreError.code);
+                        console.error('Messaggio:', firestoreError.message);
+                        
+                        // Se è un errore di permesso, mostra un messaggio più chiaro
+                        if (firestoreError.code === 'permission-denied' || firestoreError.message.includes('permission')) {
+                            console.error('❌ ERRORE PERMESSI FIRESTORE: Le regole di sicurezza di Firestore potrebbero bloccare la lettura');
+                            alert('Errore: permessi Firestore insufficienti. Verifica le regole di sicurezza su Firebase Console.');
+                        }
+                        
+                        // Fallback a localStorage
+                        console.log('🔄 Fallback a localStorage...');
+                        const storageKey = `user_documents_${userId}`;
+                        const existingData = localStorage.getItem(storageKey);
+                        if (existingData) {
+                            documents = JSON.parse(existingData);
+                            documents.sort((a, b) => new Date(b.date) - new Date(a.date));
+                            console.log('✅ Documenti caricati da localStorage (fallback):', documents.length);
+                        }
+                    }
+                } else {
+                    // Fallback a localStorage se Firestore non è disponibile
+                    console.log('⚠️ Firestore non disponibile, uso localStorage');
+                    const storageKey = `user_documents_${userId}`;
+                    const existingData = localStorage.getItem(storageKey);
+                    if (existingData) {
+                        documents = JSON.parse(existingData);
+                        documents.sort((a, b) => new Date(b.date) - new Date(a.date));
+                        console.log('✅ Documenti caricati da localStorage:', documents.length);
+                    } else {
+                        console.log('ℹ️ Nessun documento trovato in localStorage');
+                    }
                 }
-
-                const documentsList = document.getElementById('documentsList');
                 
                 if (documents.length === 0) {
                     documentsList.innerHTML = `
@@ -314,12 +497,15 @@
                                     <div class="document-icon ${iconClass}">${icon}</div>
                                     <div>
                                         <h3 class="document-title">${escapeHtml(doc.title)}</h3>
-                                        <div class="document-meta">${typeLabel} • ${dateStr}</div>
+                                        <div class="document-meta">
+                                            <div style="font-weight: 500; margin-bottom: 4px;">${typeLabel}</div>
+                                            <div style="font-size: 0.85rem; opacity: 0.8;">${dateStr}</div>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="document-actions">
-                                    <button class="btn-primary btn-small" onclick="viewDocument('${doc.id}')">Visualizza</button>
-                                    <button class="btn-secondary btn-small" onclick="downloadDocument('${doc.id}')">Scarica PDF</button>
+                                    <button class="btn-primary btn-small" onclick="viewDocument('${doc.id}')" style="flex: 1;">Visualizza</button>
+                                    <button class="btn-secondary btn-small" onclick="downloadDocument('${doc.id}')" style="flex: 1;">Scarica PDF</button>
                                 </div>
                             </div>
                         `;
@@ -338,78 +524,158 @@
         }
 
         // Visualizza documento
-        function viewDocument(docId) {
+        async function viewDocument(docId) {
+            // Usa currentUser globale da script.js
+            const currentUser = window.currentUser || null;
+            
             if (!currentUser || !currentUser.uid) return;
             
             const userId = currentUser.uid;
-            const storageKey = `user_documents_${userId}`;
-            const existingData = localStorage.getItem(storageKey);
+            let doc = null;
             
-            if (existingData) {
-                const documents = JSON.parse(existingData);
-                const doc = documents.find(d => d.id === docId);
-                
-                if (doc) {
-                    // Salva il documento temporaneamente per la visualizzazione
-                    window.currentViewingDocument = doc;
+            // Prova a caricare da Firestore
+            if (window.firebaseDb) {
+                try {
+                    const { doc: docRef, getDoc } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
+                    const docSnap = await getDoc(docRef(window.firebaseDb, 'users', userId, 'documents', docId));
                     
-                    // Apri in una nuova finestra o modal
-                    const newWindow = window.open('', '_blank');
-                    newWindow.document.write(`
-                        <!DOCTYPE html>
-                        <html>
-                        <head>
-                            <title>${escapeHtml(doc.title)}</title>
-                            <style>
-                                body { 
-                                    font-family: 'Inter', Arial, sans-serif; 
-                                    max-width: 800px; 
-                                    margin: 0 auto; 
-                                    padding: 40px 20px; 
-                                    line-height: 1.8;
-                                    color: #1e293b;
-                                }
-                                h1 { color: #000000; font-size: 2.5rem; margin-bottom: 0.5rem; }
-                                h2 { color: #000000; font-size: 2rem; margin-top: 2rem; margin-bottom: 1rem; }
-                                h3 { color: #000000; font-size: 1.5rem; margin-top: 1.5rem; margin-bottom: 0.75rem; }
-                            </style>
-                        </head>
-                        <body>
-                            ${doc.html}
-                        </body>
-                        </html>
-                    `);
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        doc = {
+                            id: data.id || docSnap.id,
+                            type: data.type,
+                            title: data.title,
+                            date: data.date || data.createdAt,
+                            html: data.html,
+                            json: data.json ? JSON.parse(data.json) : null,
+                            wizardData: data.wizardData ? JSON.parse(data.wizardData) : null
+                        };
+                    }
+                } catch (firestoreError) {
+                    console.error('❌ Errore nel caricamento documento da Firestore:', firestoreError);
                 }
+            }
+            
+            // Fallback a localStorage
+            if (!doc) {
+                const storageKey = `user_documents_${userId}`;
+                const existingData = localStorage.getItem(storageKey);
+                if (existingData) {
+                    const documents = JSON.parse(existingData);
+                    doc = documents.find(d => d.id === docId);
+                }
+            }
+            
+            if (doc) {
+                // Salva il documento temporaneamente per la visualizzazione
+                window.currentViewingDocument = doc;
+                
+                // Prova ad aprire in una nuova finestra
+                const newWindow = window.open('', '_blank');
+                
+                if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+                    // Se il popup è stato bloccato, mostra il documento in un modal
+                    console.log('⚠️ Popup bloccato, apro il documento in un modal');
+                    showDocumentModal(doc);
+                } else {
+                    // Popup aperto con successo
+                    try {
+                        newWindow.document.write(`
+                            <!DOCTYPE html>
+                            <html>
+                            <head>
+                                <title>${escapeHtml(doc.title)}</title>
+                                <style>
+                                    body { 
+                                        font-family: 'Inter', Arial, sans-serif; 
+                                        max-width: 800px; 
+                                        margin: 0 auto; 
+                                        padding: 40px 20px; 
+                                        line-height: 1.8;
+                                        color: #1e293b;
+                                    }
+                                    h1 { color: #000000; font-size: 2.5rem; margin-bottom: 0.5rem; }
+                                    h2 { color: #000000; font-size: 2rem; margin-top: 2rem; margin-bottom: 1rem; }
+                                    h3 { color: #000000; font-size: 1.5rem; margin-top: 1.5rem; margin-bottom: 0.75rem; }
+                                </style>
+                            </head>
+                            <body>
+                                ${doc.html}
+                            </body>
+                            </html>
+                        `);
+                        newWindow.document.close();
+                    } catch (error) {
+                        console.error('Errore nella scrittura del documento:', error);
+                        // Fallback al modal
+                        newWindow.close();
+                        showDocumentModal(doc);
+                    }
+                }
+            } else {
+                alert('Documento non trovato');
             }
         }
 
         // Scarica documento come PDF
         async function downloadDocument(docId) {
+            // Usa currentUser globale da script.js
+            const currentUser = window.currentUser || null;
+            
             if (!currentUser || !currentUser.uid) return;
             
             const userId = currentUser.uid;
-            const storageKey = `user_documents_${userId}`;
-            const existingData = localStorage.getItem(storageKey);
+            let doc = null;
             
-            if (existingData) {
-                const documents = JSON.parse(existingData);
-                const doc = documents.find(d => d.id === docId);
-                
-                if (doc) {
-                    // Usa la funzione generatePDFFromContent se disponibile
-                    if (typeof generatePDFFromContent === 'function') {
-                        await generatePDFFromContent(doc, doc.title);
-                    } else {
-                        // Fallback: scarica come HTML
-                        const blob = new Blob([doc.html], { type: 'text/html' });
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = `${doc.title}.html`;
-                        a.click();
-                        URL.revokeObjectURL(url);
+            // Prova a caricare da Firestore
+            if (window.firebaseDb) {
+                try {
+                    const { doc: docRef, getDoc } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
+                    const docSnap = await getDoc(docRef(window.firebaseDb, 'users', userId, 'documents', docId));
+                    
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        doc = {
+                            id: data.id || docSnap.id,
+                            type: data.type,
+                            title: data.title,
+                            date: data.date || data.createdAt,
+                            html: data.html,
+                            json: data.json ? JSON.parse(data.json) : null,
+                            wizardData: data.wizardData ? JSON.parse(data.wizardData) : null
+                        };
                     }
+                } catch (firestoreError) {
+                    console.error('❌ Errore nel caricamento documento da Firestore:', firestoreError);
                 }
+            }
+            
+            // Fallback a localStorage
+            if (!doc) {
+                const storageKey = `user_documents_${userId}`;
+                const existingData = localStorage.getItem(storageKey);
+                if (existingData) {
+                    const documents = JSON.parse(existingData);
+                    doc = documents.find(d => d.id === docId);
+                }
+            }
+            
+            if (doc) {
+                // Usa la funzione generatePDFFromContent se disponibile
+                if (typeof generatePDFFromContent === 'function') {
+                    await generatePDFFromContent(doc, doc.title);
+                } else {
+                    // Fallback: scarica come HTML
+                    const blob = new Blob([doc.html], { type: 'text/html' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${doc.title}.html`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                }
+            } else {
+                alert('Documento non trovato');
             }
         }
 
@@ -418,6 +684,49 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        // Mostra documento in un modal
+        function showDocumentModal(doc) {
+            const modal = document.getElementById('documentViewModal');
+            const modalTitle = document.getElementById('documentViewModalTitle');
+            const modalBody = document.getElementById('documentViewModalBody');
+            const modalClose = document.getElementById('documentViewModalClose');
+            
+            if (!modal || !modalTitle || !modalBody) {
+                console.error('Modal elementi non trovati');
+                return;
+            }
+            
+            modalTitle.textContent = escapeHtml(doc.title);
+            modalBody.innerHTML = doc.html;
+            modal.style.display = 'block';
+            document.body.style.overflow = 'hidden';
+            
+            // Chiudi modal quando si clicca sulla X
+            if (modalClose) {
+                modalClose.onclick = () => {
+                    modal.style.display = 'none';
+                    document.body.style.overflow = 'auto';
+                };
+            }
+            
+            // Chiudi modal quando si clicca fuori
+            modal.onclick = (e) => {
+                if (e.target === modal) {
+                    modal.style.display = 'none';
+                    document.body.style.overflow = 'auto';
+                }
+            };
+            
+            // Chiudi modal con ESC
+            document.addEventListener('keydown', function escHandler(e) {
+                if (e.key === 'Escape' && modal.style.display === 'block') {
+                    modal.style.display = 'none';
+                    document.body.style.overflow = 'auto';
+                    document.removeEventListener('keydown', escHandler);
+                }
+            });
         }
 
         // Inizializza quando il DOM è pronto
