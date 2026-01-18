@@ -251,7 +251,7 @@ const questions = [
 ];
 
 // Modal Functions
-function openModal() {
+async function openModal() {
     if (!planModal) {
         planModal = document.getElementById('planModal');
     }
@@ -259,6 +259,17 @@ function openModal() {
         console.error('planModal not found');
         return;
     }
+    
+    // PRIMA: Verifica autenticazione (solo autenticazione, non pagamento)
+    try {
+        await requireAuth();
+        console.log('✅ Utente autenticato');
+    } catch (error) {
+        console.log('❌ Autenticazione richiesta:', error.message);
+        return; // L'utente ha annullato l'autenticazione
+    }
+    
+    // SECONDO: Apri il wizard (il pagamento verrà richiesto quando l'utente completa il wizard)
     planModal.style.display = 'block';
     document.body.style.overflow = 'hidden';
     initWizard();
@@ -777,18 +788,8 @@ async function generateBusinessPlanFromWizard() {
             localStorage.setItem('pendingBusinessPlanData', dataToSave);
             localStorage.setItem('pendingDocumentType', 'business-plan');
             console.log('✅ Dati wizard salvati in localStorage');
-            console.log('Dimensione dati salvati:', dataToSave.length, 'caratteri');
-            
-            // Verifica che siano stati salvati correttamente
-            const verify = localStorage.getItem('pendingBusinessPlanData');
-            if (!verify) {
-                throw new Error('Dati non salvati correttamente in localStorage');
-            }
-            console.log('✅ Verifica salvataggio: dati presenti in localStorage');
         } catch (e) {
             console.error('❌ ERRORE nel salvataggio localStorage:', e);
-            console.warn('⚠️ Fallback: salva in memoria (i dati potrebbero andare persi dopo il redirect)');
-            // Fallback: salva in memoria
             window.pendingBusinessPlanData = wizardData;
         }
         
@@ -800,11 +801,6 @@ async function generateBusinessPlanFromWizard() {
         if (error.message !== 'Pagamento annullato') {
             alert('Errore nel pagamento: ' + error.message);
         }
-        // Rimuovi i dati salvati se l'utente annulla
-        try {
-            localStorage.removeItem('pendingBusinessPlanData');
-            localStorage.removeItem('pendingDocumentType');
-        } catch (e) {}
         // Ripristina il wizard se l'utente annulla
         if (wizardContainer) wizardContainer.style.display = 'block';
         if (wizardNavigation) wizardNavigation.style.display = 'flex';
@@ -953,6 +949,18 @@ async function generateBusinessPlanAfterPayment(wizardData) {
         if (jsonData) {
             window.lastBusinessPlanJSON = jsonData;
             console.log('✅ JSON salvato anche in window.lastBusinessPlanJSON per compatibilità');
+        }
+        
+        // Salva il documento nella dashboard dell'utente
+        if (currentUser && currentUser.uid) {
+            saveDocumentToDashboard({
+                type: 'business-plan',
+                title: wizardData.companyName || 'Business Plan',
+                date: new Date().toISOString(),
+                html: businessPlanHTML,
+                json: jsonData,
+                wizardData: wizardData
+            });
         }
         
         console.log('Dati salvati in window.currentPlanData');
@@ -1107,10 +1115,20 @@ function initializeEventListeners() {
         });
     }
     if (featureAnalysisBtn) {
-        featureAnalysisBtn.addEventListener('click', () => {
+        featureAnalysisBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
             console.log('featureAnalysisBtn clicked');
-            openAnalysisModal();
+            try {
+                openAnalysisModal();
+            } catch (error) {
+                console.error('Errore nell\'apertura del modal di analisi:', error);
+                alert('Errore nell\'apertura del form di analisi. Ricarica la pagina e riprova.');
+            }
         });
+        console.log('featureAnalysisBtn listener aggiunto correttamente');
+    } else {
+        console.warn('featureAnalysisBtn non trovato!');
     }
 
 
@@ -1238,7 +1256,8 @@ function initializeAll() {
                     console.error('Errore nel recupero dati wizard:', e);
                 }
                 
-                if (wizardData) {
+                // Dopo il pagamento verificato, genera direttamente il documento
+                if (wizardData && Object.keys(wizardData).length > 0) {
                     console.log('📄 Generazione business plan dopo pagamento verificato...');
                     console.log('Dati wizard recuperati:', Object.keys(wizardData));
                     
@@ -1318,7 +1337,8 @@ function initializeAll() {
                         console.error('Errore nel recupero dati analisi:', e);
                     }
                     
-                    if (analysisWizardData) {
+                    // Dopo il pagamento verificato, genera direttamente l'analisi
+                    if (analysisWizardData && Object.keys(analysisWizardData).length > 0) {
                         console.log('📄 Generazione analisi di mercato dopo pagamento verificato...');
                         console.log('Dati analisi recuperati:', Object.keys(analysisWizardData));
                         
@@ -1357,7 +1377,6 @@ function initializeAll() {
                         }
                     } else {
                         console.error('❌ Dati analisi non trovati dopo il pagamento');
-                        console.log('localStorage pendingMarketAnalysisData:', localStorage.getItem('pendingMarketAnalysisData'));
                         alert('Errore: dati dell\'analisi non trovati. Completa nuovamente il wizard.');
                     }
                 } else {
@@ -2860,33 +2879,54 @@ async function showUpsellOffer(currentDocumentType, currentJsonData) {
 
 // Verifica se l'utente è autenticato
 async function requireAuth() {
-    return new Promise((resolve, reject) => {
-        const authFunctions = getAuthFunctions();
-        if (!window.firebaseAuth || !authFunctions) {
-            reject(new Error('Firebase non inizializzato'));
-            return;
+    const authFunctions = getAuthFunctions();
+    if (!window.firebaseAuth || !authFunctions) {
+        throw new Error('Firebase non inizializzato. Ricarica la pagina.');
+    }
+    
+    // PRIMA: Verifica se abbiamo già un utente corrente valido (sincrono)
+    if (currentUser && currentUser.uid) {
+        try {
+            // Verifica che il token sia ancora valido
+            await currentUser.getIdToken(true);
+            console.log('✅ Utente già autenticato:', currentUser.email);
+            return currentUser;
+        } catch (tokenError) {
+            console.warn('⚠️ Token scaduto, richiedo autenticazione:', tokenError);
+            // Il token è scaduto, procedi con la verifica completa
+            currentUser = null;
         }
-        
-        const { onAuthStateChanged } = authFunctions;
-        
-        // Verifica lo stato attuale
-        onAuthStateChanged(window.firebaseAuth, (user) => {
-            if (user) {
-                currentUser = user;
-                resolve(user);
-            } else {
-                // Mostra modal di autenticazione
-                showAuthModal().then((authenticatedUser) => {
-                    if (authenticatedUser) {
-                        currentUser = authenticatedUser;
-                        resolve(authenticatedUser);
-                    } else {
-                        reject(new Error('Autenticazione richiesta'));
-                    }
-                }).catch(reject);
-            }
-        });
-    });
+    }
+    
+    // SECONDO: Verifica lo stato attuale con Firebase (sincrono)
+    const currentFirebaseUser = window.firebaseAuth.currentUser;
+    if (currentFirebaseUser && currentFirebaseUser.uid) {
+        currentUser = currentFirebaseUser;
+        try {
+            await currentFirebaseUser.getIdToken(true);
+            console.log('✅ Utente Firebase trovato:', currentFirebaseUser.email);
+            return currentFirebaseUser;
+        } catch (tokenError) {
+            console.warn('⚠️ Errore nel rinnovo token Firebase:', tokenError);
+            currentUser = null;
+        }
+    }
+    
+    // TERZO: Se non c'è un utente corrente, mostra il modal di autenticazione
+    console.log('🔐 Nessun utente autenticato, mostro modal login...');
+    try {
+        const authenticatedUser = await showAuthModal();
+        if (authenticatedUser && authenticatedUser.uid) {
+            currentUser = authenticatedUser;
+            console.log('✅ Utente autenticato dopo login:', authenticatedUser.email);
+            return authenticatedUser;
+        } else {
+            throw new Error('Autenticazione annullata o fallita');
+        }
+    } catch (error) {
+        console.error('❌ Errore nel processo di autenticazione:', error);
+        throw new Error('Autenticazione richiesta: ' + error.message);
+    }
 }
 
 // Mostra il modal di autenticazione con form unificato intelligente
@@ -3093,11 +3133,31 @@ function showAuthModal() {
                     }
                     
                     // Successo!
-                    currentUser = userCredential.user;
+                    const newUser = userCredential.user;
+                    currentUser = newUser;
+                    
+                    // Verifica che firebaseAuth.currentUser sia sincronizzato
+                    console.log('✅ Login completato');
+                    console.log('Utente:', newUser.email, 'UID:', newUser.uid);
+                    console.log('firebaseAuth.currentUser:', window.firebaseAuth.currentUser?.email);
+                    
+                    // Forza il refresh del token dopo il login per assicurarsi che sia valido
+                    try {
+                        const token = await newUser.getIdToken(true);
+                        console.log('✅ Token rinnovato dopo login, length:', token.length);
+                    } catch (tokenError) {
+                        console.warn('⚠️ Errore nel rinnovo token dopo login:', tokenError);
+                        // Non bloccare il flusso, ma avvisa
+                    }
+                    
                     authModal.style.display = 'none';
                     resetForm();
                     updateAuthUI();
-                    resolve(userCredential.user);
+                    
+                    // Piccolo delay per assicurarsi che tutto sia sincronizzato
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    
+                    resolve(newUser);
                     
                 } catch (error) {
                     console.error('Errore autenticazione:', error);
@@ -3153,12 +3213,14 @@ function updateAuthUI() {
     const userInfo = document.getElementById('userInfo');
     const userEmail = document.getElementById('userEmail');
     const logoutBtn = document.getElementById('logoutBtn');
+    const dashboardLink = document.getElementById('dashboardLink');
     
     if (currentUser) {
         // Utente autenticato
         if (authBtn) authBtn.style.display = 'none';
         if (userInfo) userInfo.style.display = 'flex';
         if (userEmail) userEmail.textContent = currentUser.email || 'Utente';
+        if (dashboardLink) dashboardLink.style.display = 'block';
         
         if (logoutBtn) {
             logoutBtn.onclick = async () => {
@@ -3184,6 +3246,7 @@ function updateAuthUI() {
             // Non serve aggiungerlo qui per evitare duplicati
         }
         if (userInfo) userInfo.style.display = 'none';
+        if (dashboardLink) dashboardLink.style.display = 'none';
     }
 }
 
@@ -3210,13 +3273,39 @@ function initializeAuth() {
 
 // Funzione per gestire il pagamento Stripe
 async function handlePayment(documentType) {
+    console.log('💳 ===== INIZIO handlePayment =====');
+    console.log('Tipo documento:', documentType);
+    
     return new Promise(async (resolve, reject) => {
-        // PRIMA: Verifica autenticazione
+        // PRIMA: Verifica autenticazione - questa funzione imposta currentUser se l'utente è autenticato
+        let authenticatedUser = null;
         try {
-            await requireAuth();
+            console.log('🔐 Verifica autenticazione...');
+            console.log('currentUser prima di requireAuth:', currentUser?.email || 'null');
+            console.log('firebaseAuth.currentUser:', window.firebaseAuth?.currentUser?.email || 'null');
+            
+            authenticatedUser = await requireAuth();
+            
+            // Assicurati che currentUser sia impostato
+            if (authenticatedUser) {
+                currentUser = authenticatedUser;
+                console.log('✅ Utente autenticato dopo requireAuth:', authenticatedUser.email);
+                console.log('UID:', authenticatedUser.uid);
+            } else {
+                throw new Error('requireAuth ha restituito null');
+            }
         } catch (error) {
-            console.log('Autenticazione richiesta:', error.message);
-            reject(error);
+            console.error('❌ Errore autenticazione:', error);
+            console.error('Stack:', error.stack);
+            reject(new Error('Autenticazione richiesta: ' + error.message));
+            return;
+        }
+        
+        // Verifica che abbiamo un utente autenticato
+        if (!authenticatedUser || !authenticatedUser.uid) {
+            console.error('❌ Utente non valido dopo requireAuth');
+            console.error('authenticatedUser:', authenticatedUser);
+            reject(new Error('Utente non autenticato. Effettua il login per continuare.'));
             return;
         }
         
@@ -3252,10 +3341,46 @@ async function handlePayment(documentType) {
         };
         
         try {
-            // Ottieni il token ID per inviarlo al backend
+            // Usa l'utente autenticato ottenuto da requireAuth
+            const user = authenticatedUser;
+            
+            // Ottieni il token ID per inviarlo al backend (forza il refresh per evitare token scaduti)
+            console.log('🔄 Richiesta token Firebase (forzato refresh)...');
+            console.log('Utente:', user.email, 'UID:', user.uid);
+            
             let idToken = null;
-            if (currentUser) {
-                idToken = await currentUser.getIdToken();
+            try {
+                // Usa getIdToken(true) per forzare il refresh del token
+                console.log('🔄 Richiesta token con refresh forzato...');
+                idToken = await user.getIdToken(true);
+                
+                if (!idToken || idToken.trim() === '') {
+                    throw new Error('Token Firebase vuoto o non valido');
+                }
+                
+                console.log('✅ Token Firebase ottenuto (forzato refresh)');
+                console.log('Token length:', idToken.length);
+                console.log('Token preview (primi 50 caratteri):', idToken.substring(0, 50) + '...');
+                
+                // Verifica che il token abbia il formato corretto (dovrebbe iniziare con "eyJ")
+                if (!idToken.startsWith('eyJ')) {
+                    console.warn('⚠️ Token non ha il formato JWT standard');
+                }
+                
+            } catch (tokenError) {
+                console.error('❌ Errore nell\'ottenere il token:', tokenError);
+                console.error('Errore code:', tokenError.code);
+                console.error('Errore message:', tokenError.message);
+                
+                // Se il token non può essere ottenuto, potrebbe essere necessario rifare login
+                if (tokenError.code === 'auth/user-token-expired' || 
+                    tokenError.code === 'auth/user-disabled' ||
+                    tokenError.code === 'auth/user-not-found' ||
+                    tokenError.message.includes('expired') ||
+                    tokenError.message.includes('invalid')) {
+                    throw new Error('Sessione scaduta. Effettua nuovamente il login e riprova.');
+                }
+                throw new Error('Errore nell\'autenticazione. Effettua nuovamente il login: ' + (tokenError.message || tokenError.code || 'Errore sconosciuto'));
             }
             
             // Crea la sessione di checkout
@@ -3267,22 +3392,59 @@ async function handlePayment(documentType) {
                                  window.upsellOtherServiceType && 
                                  window.upsellOtherServiceType !== documentType;
             
+            const requestBody = {
+                documentType: documentType,
+                successUrl: successUrl,
+                cancelUrl: cancelUrl,
+                includeUpsell: includeUpsell
+            };
+            
+            console.log('📡 Invio richiesta checkout session...');
+            console.log('URL:', `${API_BASE_URL}/api/create-checkout-session`);
+            console.log('Headers:', {
+                'Content-Type': 'application/json',
+                'Authorization': idToken ? `Bearer ${idToken.substring(0, 20)}...` : 'MISSING'
+            });
+            
             const response = await fetch(`${API_BASE_URL}/api/create-checkout-session`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': idToken ? `Bearer ${idToken}` : '',
+                    'Authorization': `Bearer ${idToken}`,
                 },
-                body: JSON.stringify({
-                    documentType: documentType,
-                    successUrl: successUrl,
-                    cancelUrl: cancelUrl,
-                    includeUpsell: includeUpsell
-                })
+                body: JSON.stringify(requestBody)
             });
             
+            console.log('📥 Risposta ricevuta:', response.status, response.statusText);
+            
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ detail: 'Errore sconosciuto' }));
+                let errorData;
+                try {
+                    errorData = await response.json();
+                } catch (e) {
+                    errorData = { detail: `Errore HTTP ${response.status}: ${response.statusText}` };
+                }
+                
+                console.error('❌ Errore nella risposta:', errorData);
+                console.error('Status:', response.status);
+                console.error('Status Text:', response.statusText);
+                
+                // Se l'errore è relativo all'autenticazione (401), potrebbe essere un problema di configurazione backend
+                if (response.status === 401) {
+                    const errorDetail = errorData.detail || 'Token non valido';
+                    console.error('❌ Errore 401 - Token rifiutato dal backend');
+                    console.error('Token inviato (primi 50 caratteri):', idToken.substring(0, 50));
+                    console.error('Dettaglio errore backend:', errorDetail);
+                    
+                    // Se il backend dice che Firebase Admin non è configurato
+                    if (errorDetail.includes('configurazione del server') || errorDetail.includes('Firebase Admin non inizializzato')) {
+                        throw new Error('Errore di configurazione del server. Contatta il supporto.');
+                    }
+                    
+                    // Altrimenti, potrebbe essere un problema con il token o con la configurazione Firebase
+                    throw new Error('Il server non ha accettato il token di autenticazione. Verifica che Firebase Admin sia configurato correttamente sul server. Dettaglio: ' + errorDetail);
+                }
+                
                 throw new Error(errorData.detail || 'Errore nella creazione della sessione di pagamento');
             }
             
@@ -3352,6 +3514,12 @@ async function verifyPaymentAfterRedirect(documentType) {
             
             if (data.success && data.paid) {
                 console.log(`✅ Pagamento ${documentType} verificato con successo`);
+                // Salva il flag di pagamento verificato in localStorage per questo utente
+                if (currentUser && currentUser.uid) {
+                    const paymentKey = `payment_verified_${documentType}_${currentUser.uid}`;
+                    localStorage.setItem(paymentKey, 'true');
+                    console.log(`✅ Flag pagamento salvato: ${paymentKey}`);
+                }
                 // Salva il sessionId per usarlo nella generazione PDF
                 if (documentType === 'business-plan') {
                     window.paymentSessionId = sessionId;
@@ -3707,17 +3875,42 @@ let analysisResultState;
 let analysisContent;
 let downloadAnalysisPdfBtn;
 
-function openAnalysisModal() {
+async function openAnalysisModal() {
+    console.log('openAnalysisModal chiamata');
     if (!analysisModal) {
+        console.log('analysisModal non inizializzato, cerco elemento...');
         analysisModal = document.getElementById('analysisModal');
     }
     if (!analysisModal) {
-        console.error('analysisModal not found');
+        console.error('analysisModal not found nel DOM');
+        alert('Errore: il modal di analisi non è stato trovato. Ricarica la pagina e riprova.');
         return;
     }
-    analysisModal.style.display = 'block';
-    document.body.style.overflow = 'hidden';
-    initAnalysisWizard();
+    
+    // PRIMA: Verifica autenticazione (solo autenticazione, non pagamento)
+    try {
+        await requireAuth();
+        console.log('✅ Utente autenticato');
+    } catch (error) {
+        console.log('❌ Autenticazione richiesta:', error.message);
+        return; // L'utente ha annullato l'autenticazione
+    }
+    
+    // SECONDO: Apri il wizard (il pagamento verrà richiesto quando l'utente completa il wizard)
+    console.log('analysisModal trovato, apro il modal...');
+    try {
+        analysisModal.style.display = 'block';
+        document.body.style.overflow = 'hidden';
+        // Assicurati che i listener siano inizializzati
+        if (typeof initializeAnalysisListeners === 'function') {
+            initializeAnalysisListeners();
+        }
+        initAnalysisWizard();
+        console.log('Modal di analisi aperto correttamente');
+    } catch (error) {
+        console.error('Errore nell\'apertura del modal:', error);
+        alert('Errore nell\'apertura del form di analisi: ' + error.message);
+    }
 }
 
 function closeAnalysisModalFunc() {
@@ -3729,14 +3922,25 @@ function closeAnalysisModalFunc() {
 function resetAnalysisWizard() {
     analysisCurrentStep = 0;
     analysisWizardData = {};
-    analysisWizardContainer.innerHTML = '';
-    analysisProgressSteps.innerHTML = '';
-    analysisWizardNavigation.style.display = 'none';
-    analysisLoadingState.style.display = 'none';
-    analysisResultState.style.display = 'none';
+    // Inizializza gli elementi se non sono già stati inizializzati
+    if (!analysisWizardContainer) analysisWizardContainer = document.getElementById('analysisWizardContainer');
+    if (!analysisProgressSteps) analysisProgressSteps = document.getElementById('analysisProgressSteps');
+    if (!analysisWizardNavigation) analysisWizardNavigation = document.getElementById('analysisWizardNavigation');
+    if (!analysisLoadingState) analysisLoadingState = document.getElementById('analysisLoadingState');
+    if (!analysisResultState) analysisResultState = document.getElementById('analysisResultState');
+    
+    if (analysisWizardContainer) analysisWizardContainer.innerHTML = '';
+    if (analysisProgressSteps) analysisProgressSteps.innerHTML = '';
+    if (analysisWizardNavigation) analysisWizardNavigation.style.display = 'none';
+    if (analysisLoadingState) analysisLoadingState.style.display = 'none';
+    if (analysisResultState) analysisResultState.style.display = 'none';
 }
 
 function initAnalysisWizard() {
+    // Assicurati che tutti gli elementi siano inizializzati
+    if (typeof initializeAnalysisListeners === 'function') {
+        initializeAnalysisListeners();
+    }
     resetAnalysisWizard();
     analysisType = null;
     currentAnalysisQuestions = analysisTypeQuestions;
@@ -3746,6 +3950,13 @@ function initAnalysisWizard() {
 }
 
 function renderAnalysisProgressSteps() {
+    if (!analysisProgressSteps) {
+        analysisProgressSteps = document.getElementById('analysisProgressSteps');
+    }
+    if (!analysisProgressSteps) {
+        console.error('analysisProgressSteps non trovato');
+        return;
+    }
     analysisProgressSteps.innerHTML = '';
     currentAnalysisQuestions.forEach((q, index) => {
         const step = document.createElement('div');
@@ -3757,11 +3968,25 @@ function renderAnalysisProgressSteps() {
 }
 
 function updateAnalysisProgressBar() {
+    if (!analysisProgressBar) {
+        analysisProgressBar = document.getElementById('analysisProgressBar');
+    }
+    if (!analysisProgressBar) {
+        console.error('analysisProgressBar non trovato');
+        return;
+    }
     const progress = currentAnalysisQuestions.length > 0 ? ((analysisCurrentStep + 1) / currentAnalysisQuestions.length) * 100 : 0;
     analysisProgressBar.style.width = `${progress}%`;
 }
 
 function renderAnalysisCurrentStep() {
+    if (!analysisWizardContainer) {
+        analysisWizardContainer = document.getElementById('analysisWizardContainer');
+    }
+    if (!analysisWizardContainer) {
+        console.error('analysisWizardContainer non trovato');
+        return;
+    }
     const question = currentAnalysisQuestions[analysisCurrentStep];
     if (!question) return;
 
@@ -4013,8 +4238,15 @@ function analysisPrevStep() {
 async function generateMarketAnalysis() {
     saveAnalysisCurrentStep();
     
-    analysisWizardContainer.style.display = 'none';
-    analysisWizardNavigation.style.display = 'none';
+    if (!analysisWizardContainer) analysisWizardContainer = document.getElementById('analysisWizardContainer');
+    if (!analysisWizardNavigation) analysisWizardNavigation = document.getElementById('analysisWizardNavigation');
+    if (!analysisLoadingState) analysisLoadingState = document.getElementById('analysisLoadingState');
+    if (!analysisResultState) analysisResultState = document.getElementById('analysisResultState');
+    if (!analysisContent) analysisContent = document.getElementById('analysisContent');
+    
+    // Hide wizard
+    if (analysisWizardContainer) analysisWizardContainer.style.display = 'none';
+    if (analysisWizardNavigation) analysisWizardNavigation.style.display = 'none';
     
     // PRIMA: Richiedi il pagamento prima di generare il documento
     try {
@@ -4024,18 +4256,8 @@ async function generateMarketAnalysis() {
             localStorage.setItem('pendingMarketAnalysisData', dataToSave);
             localStorage.setItem('pendingDocumentType', 'market-analysis');
             console.log('✅ Dati analisi salvati in localStorage');
-            console.log('Dimensione dati salvati:', dataToSave.length, 'caratteri');
-            
-            // Verifica che siano stati salvati correttamente
-            const verify = localStorage.getItem('pendingMarketAnalysisData');
-            if (!verify) {
-                throw new Error('Dati non salvati correttamente in localStorage');
-            }
-            console.log('✅ Verifica salvataggio: dati presenti in localStorage');
         } catch (e) {
             console.error('❌ ERRORE nel salvataggio localStorage:', e);
-            console.warn('⚠️ Fallback: salva in memoria (i dati potrebbero andare persi dopo il redirect)');
-            // Fallback: salva in memoria
             window.pendingMarketAnalysisData = analysisWizardData;
         }
         
@@ -4047,14 +4269,9 @@ async function generateMarketAnalysis() {
         if (error.message !== 'Pagamento annullato') {
             alert('Errore nel pagamento: ' + error.message);
         }
-        // Rimuovi i dati salvati se l'utente annulla
-        try {
-            localStorage.removeItem('pendingMarketAnalysisData');
-            localStorage.removeItem('pendingDocumentType');
-        } catch (e) {}
         // Ripristina il wizard se l'utente annulla
-        analysisWizardContainer.style.display = 'block';
-        analysisWizardNavigation.style.display = 'flex';
+        if (analysisWizardContainer) analysisWizardContainer.style.display = 'block';
+        if (analysisWizardNavigation) analysisWizardNavigation.style.display = 'flex';
         return;
     }
 }
@@ -4099,6 +4316,18 @@ async function generateMarketAnalysisAfterPayment(analysisWizardData) {
         if (marketAnalysisJSON) {
             window.lastMarketAnalysisJSON = marketAnalysisJSON;
             console.log('✅ JSON analisi salvato in window.lastMarketAnalysisJSON');
+        }
+        
+        // Salva il documento nella dashboard dell'utente
+        if (currentUser && currentUser.uid) {
+            saveDocumentToDashboard({
+                type: 'market-analysis',
+                title: analysisWizardData.companyName || analysisWizardData.productName || 'Analisi di Mercato',
+                date: new Date().toISOString(),
+                html: analysisHTML,
+                json: marketAnalysisJSON,
+                wizardData: analysisWizardData
+            });
         }
         
         // Mostra offerta upsell prima del risultato
@@ -4671,3 +4900,65 @@ function generatePDFFromContent(data, filename) {
 document.addEventListener('click', (e) => {
     if (analysisModal && e.target === analysisModal) closeAnalysisModalFunc();
 });
+
+// Funzione per salvare un documento nella dashboard dell'utente
+function saveDocumentToDashboard(document) {
+    if (!currentUser || !currentUser.uid) {
+        console.warn('⚠️ Utente non autenticato, documento non salvato nella dashboard');
+        return;
+    }
+    
+    try {
+        const userId = currentUser.uid;
+        const storageKey = `user_documents_${userId}`;
+        
+        // Recupera i documenti esistenti
+        let documents = [];
+        const existingData = localStorage.getItem(storageKey);
+        if (existingData) {
+            try {
+                documents = JSON.parse(existingData);
+            } catch (e) {
+                console.error('Errore nel parsing documenti esistenti:', e);
+                documents = [];
+            }
+        }
+        
+        // Aggiungi il nuovo documento
+        documents.push({
+            id: Date.now().toString(),
+            ...document
+        });
+        
+        // Salva in localStorage (limite a 50 documenti per utente)
+        if (documents.length > 50) {
+            documents = documents.slice(-50); // Mantieni solo gli ultimi 50
+        }
+        
+        localStorage.setItem(storageKey, JSON.stringify(documents));
+        console.log('✅ Documento salvato nella dashboard:', document.type, document.title);
+    } catch (error) {
+        console.error('Errore nel salvataggio documento nella dashboard:', error);
+    }
+}
+
+// Funzione per recuperare i documenti dell'utente dalla dashboard
+function getUserDocuments() {
+    if (!currentUser || !currentUser.uid) {
+        return [];
+    }
+    
+    try {
+        const userId = currentUser.uid;
+        const storageKey = `user_documents_${userId}`;
+        const existingData = localStorage.getItem(storageKey);
+        
+        if (existingData) {
+            return JSON.parse(existingData);
+        }
+    } catch (error) {
+        console.error('Errore nel recupero documenti dalla dashboard:', error);
+    }
+    
+    return [];
+}

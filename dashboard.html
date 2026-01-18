@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="SeedWise - Dashboard utente con i tuoi documenti generati">
+    <title>Dashboard - SeedWise</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getAuth } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        
+        // Configurazione Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyABZKDDf1biPDKObo37zpaPOwd6TqLzoqw",
+            authDomain: "seedwise-d0457.firebaseapp.com",
+            projectId: "seedwise-d0457",
+            storageBucket: "seedwise-d0457.firebasestorage.app",
+            messagingSenderId: "761293808147",
+            appId: "1:761293808147:web:18ea8bd8a89ac8d529d5e6",
+            measurementId: "G-PFQ3ZGX3RM"
+        };
+        
+        // Inizializza Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        
+        // Esponi auth e funzioni globalmente
+        window.firebaseAuth = auth;
+        window.firebaseAuthFunctions = {
+            signInWithEmailAndPassword,
+            createUserWithEmailAndPassword,
+            signOut,
+            onAuthStateChanged
+        };
+        
+        console.log('✅ Firebase inizializzato');
+    </script>
+    <style>
+        .dashboard-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        .dashboard-header {
+            margin-bottom: 40px;
+        }
+        .dashboard-header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            color: var(--text-primary);
+        }
+        .dashboard-header p {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+        .documents-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 24px;
+            margin-top: 30px;
+        }
+        .document-card {
+            background: white;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .document-card:hover {
+            border-color: var(--accent);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.1);
+            transform: translateY(-2px);
+        }
+        .document-card-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .document-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            background: var(--accent-light);
+            color: var(--accent);
+        }
+        .document-icon.business-plan {
+            background: #dbeafe;
+            color: #2563eb;
+        }
+        .document-icon.market-analysis {
+            background: #fef3c7;
+            color: #d97706;
+        }
+        .document-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 0;
+        }
+        .document-meta {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-bottom: 16px;
+        }
+        .document-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 16px;
+        }
+        .btn-small {
+            padding: 8px 16px;
+            font-size: 0.9rem;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            background: white;
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            margin-top: 40px;
+        }
+        .empty-state-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+        .empty-state h2 {
+            color: var(--text-primary);
+            margin-bottom: 10px;
+        }
+        .empty-state p {
+            color: var(--text-secondary);
+            margin-bottom: 24px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo"><a href="index.html" style="text-decoration: none; color: inherit;">SeedWise</a></div>
+                <nav class="nav">
+                    <div id="authButtons" style="display: flex; gap: 10px; align-items: center;">
+                        <button class="btn-secondary" id="authBtn">Accedi</button>
+                        <div id="userInfo" style="display: none; align-items: center; gap: 10px;">
+                            <span id="userEmail" style="color: var(--text-secondary); font-size: 0.9em;"></span>
+                            <button class="btn-secondary" id="logoutBtn">Esci</button>
+                        </div>
+                    </div>
+                    <a href="index.html" class="btn-link">Home</a>
+                    <a href="dashboard.html" class="btn-link" style="font-weight: 600;">Dashboard</a>
+                    <a href="blog.html" class="btn-link">Blog</a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- Dashboard Content -->
+    <section class="dashboard-container">
+        <div class="dashboard-header">
+            <h1>La tua Dashboard</h1>
+            <p>Qui puoi vedere tutti i documenti che hai generato</p>
+        </div>
+
+        <div id="documentsList" class="documents-grid">
+            <!-- I documenti verranno caricati qui -->
+        </div>
+    </section>
+
+    <script src="script.js"></script>
+    <script>
+        // Stato autenticazione
+        let currentUser = null;
+        let authInitialized = false;
+
+        // Funzioni Firebase Auth
+        function getAuthFunctions() {
+            return window.firebaseAuthFunctions || null;
+        }
+
+        // Inizializza autenticazione
+        function initializeAuth() {
+            const authFunctions = getAuthFunctions();
+            if (!window.firebaseAuth || !authFunctions) {
+                setTimeout(initializeAuth, 500);
+                return;
+            }
+
+            const { onAuthStateChanged } = authFunctions;
+            onAuthStateChanged(window.firebaseAuth, (user) => {
+                currentUser = user;
+                authInitialized = true;
+                updateAuthUI();
+                if (user) {
+                    loadDocuments();
+                } else {
+                    showLoginRequired();
+                }
+            });
+        }
+
+        // Aggiorna UI autenticazione
+        function updateAuthUI() {
+            const authBtn = document.getElementById('authBtn');
+            const userInfo = document.getElementById('userInfo');
+            const userEmail = document.getElementById('userEmail');
+            const logoutBtn = document.getElementById('logoutBtn');
+            
+            if (currentUser) {
+                if (authBtn) authBtn.style.display = 'none';
+                if (userInfo) userInfo.style.display = 'flex';
+                if (userEmail) userEmail.textContent = currentUser.email || 'Utente';
+                
+                if (logoutBtn) {
+                    logoutBtn.onclick = async () => {
+                        try {
+                            const authFunctions = getAuthFunctions();
+                            if (authFunctions && window.firebaseAuth) {
+                                const { signOut } = authFunctions;
+                                await signOut(window.firebaseAuth);
+                                currentUser = null;
+                                updateAuthUI();
+                                showLoginRequired();
+                            }
+                        } catch (error) {
+                            console.error('Errore logout:', error);
+                        }
+                    };
+                }
+            } else {
+                if (authBtn) {
+                    authBtn.style.display = 'block';
+                    authBtn.onclick = () => {
+                        window.location.href = 'index.html';
+                    };
+                }
+                if (userInfo) userInfo.style.display = 'none';
+            }
+        }
+
+        // Mostra messaggio login richiesto
+        function showLoginRequired() {
+            const documentsList = document.getElementById('documentsList');
+            documentsList.innerHTML = `
+                <div class="empty-state" style="grid-column: 1 / -1;">
+                    <div class="empty-state-icon">🔐</div>
+                    <h2>Accesso richiesto</h2>
+                    <p>Devi effettuare l'accesso per vedere i tuoi documenti</p>
+                    <a href="index.html" class="btn-primary">Vai alla home</a>
+                </div>
+            `;
+        }
+
+        // Carica documenti
+        function loadDocuments() {
+            if (!currentUser || !currentUser.uid) {
+                showLoginRequired();
+                return;
+            }
+
+            try {
+                const userId = currentUser.uid;
+                const storageKey = `user_documents_${userId}`;
+                const existingData = localStorage.getItem(storageKey);
+                
+                let documents = [];
+                if (existingData) {
+                    documents = JSON.parse(existingData);
+                    // Ordina per data (più recenti prima)
+                    documents.sort((a, b) => new Date(b.date) - new Date(a.date));
+                }
+
+                const documentsList = document.getElementById('documentsList');
+                
+                if (documents.length === 0) {
+                    documentsList.innerHTML = `
+                        <div class="empty-state" style="grid-column: 1 / -1;">
+                            <div class="empty-state-icon">📄</div>
+                            <h2>Nessun documento ancora</h2>
+                            <p>I documenti che generi appariranno qui</p>
+                            <a href="index.html" class="btn-primary">Crea il tuo primo documento</a>
+                        </div>
+                    `;
+                } else {
+                    documentsList.innerHTML = documents.map(doc => {
+                        const date = new Date(doc.date);
+                        const dateStr = date.toLocaleDateString('it-IT', { 
+                            year: 'numeric', 
+                            month: 'long', 
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        });
+                        
+                        const typeLabel = doc.type === 'business-plan' ? 'Business Plan' : 'Analisi di Mercato';
+                        const iconClass = doc.type === 'business-plan' ? 'business-plan' : 'market-analysis';
+                        const icon = doc.type === 'business-plan' ? '📊' : '📈';
+                        
+                        return `
+                            <div class="document-card" data-doc-id="${doc.id}">
+                                <div class="document-card-header">
+                                    <div class="document-icon ${iconClass}">${icon}</div>
+                                    <div>
+                                        <h3 class="document-title">${escapeHtml(doc.title)}</h3>
+                                        <div class="document-meta">${typeLabel} • ${dateStr}</div>
+                                    </div>
+                                </div>
+                                <div class="document-actions">
+                                    <button class="btn-primary btn-small" onclick="viewDocument('${doc.id}')">Visualizza</button>
+                                    <button class="btn-secondary btn-small" onclick="downloadDocument('${doc.id}')">Scarica PDF</button>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+            } catch (error) {
+                console.error('Errore nel caricamento documenti:', error);
+                document.getElementById('documentsList').innerHTML = `
+                    <div class="empty-state" style="grid-column: 1 / -1;">
+                        <div class="empty-state-icon">⚠️</div>
+                        <h2>Errore nel caricamento</h2>
+                        <p>Si è verificato un errore nel caricamento dei documenti</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Visualizza documento
+        function viewDocument(docId) {
+            if (!currentUser || !currentUser.uid) return;
+            
+            const userId = currentUser.uid;
+            const storageKey = `user_documents_${userId}`;
+            const existingData = localStorage.getItem(storageKey);
+            
+            if (existingData) {
+                const documents = JSON.parse(existingData);
+                const doc = documents.find(d => d.id === docId);
+                
+                if (doc) {
+                    // Salva il documento temporaneamente per la visualizzazione
+                    window.currentViewingDocument = doc;
+                    
+                    // Apri in una nuova finestra o modal
+                    const newWindow = window.open('', '_blank');
+                    newWindow.document.write(`
+                        <!DOCTYPE html>
+                        <html>
+                        <head>
+                            <title>${escapeHtml(doc.title)}</title>
+                            <style>
+                                body { 
+                                    font-family: 'Inter', Arial, sans-serif; 
+                                    max-width: 800px; 
+                                    margin: 0 auto; 
+                                    padding: 40px 20px; 
+                                    line-height: 1.8;
+                                    color: #1e293b;
+                                }
+                                h1 { color: #000000; font-size: 2.5rem; margin-bottom: 0.5rem; }
+                                h2 { color: #000000; font-size: 2rem; margin-top: 2rem; margin-bottom: 1rem; }
+                                h3 { color: #000000; font-size: 1.5rem; margin-top: 1.5rem; margin-bottom: 0.75rem; }
+                            </style>
+                        </head>
+                        <body>
+                            ${doc.html}
+                        </body>
+                        </html>
+                    `);
+                }
+            }
+        }
+
+        // Scarica documento come PDF
+        async function downloadDocument(docId) {
+            if (!currentUser || !currentUser.uid) return;
+            
+            const userId = currentUser.uid;
+            const storageKey = `user_documents_${userId}`;
+            const existingData = localStorage.getItem(storageKey);
+            
+            if (existingData) {
+                const documents = JSON.parse(existingData);
+                const doc = documents.find(d => d.id === docId);
+                
+                if (doc) {
+                    // Usa la funzione generatePDFFromContent se disponibile
+                    if (typeof generatePDFFromContent === 'function') {
+                        await generatePDFFromContent(doc, doc.title);
+                    } else {
+                        // Fallback: scarica come HTML
+                        const blob = new Blob([doc.html], { type: 'text/html' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `${doc.title}.html`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                    }
+                }
+            }
+        }
+
+        // Escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Inizializza quando il DOM è pronto
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeAuth);
+        } else {
+            initializeAuth();
+        }
+    </script>
+</body>
+</html>

@@ -20,26 +20,40 @@ from firebase_admin import credentials, auth
 load_dotenv()
 
 # Inizializza Firebase Admin SDK
+firebase_initialized = False
 try:
     # Prova a caricare le credenziali da variabile d'ambiente (JSON string)
     firebase_creds_json = os.getenv("FIREBASE_CREDENTIALS_JSON")
     if firebase_creds_json:
-        cred_dict = json.loads(firebase_creds_json)
-        cred = credentials.Certificate(cred_dict)
-        firebase_admin.initialize_app(cred)
-        print("✅ Firebase Admin inizializzato con credenziali da variabile d'ambiente")
+        try:
+            cred_dict = json.loads(firebase_creds_json)
+            cred = credentials.Certificate(cred_dict)
+            firebase_admin.initialize_app(cred)
+            firebase_initialized = True
+            print("✅ Firebase Admin inizializzato con credenziali da variabile d'ambiente")
+            print(f"   Project ID: {cred_dict.get('project_id', 'N/A')}")
+        except json.JSONDecodeError as e:
+            print(f"❌ ERRORE: FIREBASE_CREDENTIALS_JSON non è un JSON valido: {e}")
+        except Exception as e:
+            print(f"❌ ERRORE nell'inizializzazione Firebase Admin da JSON: {e}")
     else:
         # Prova a caricare da file (per sviluppo locale)
         cred_path = os.getenv("FIREBASE_CREDENTIALS_PATH", "firebase-credentials.json")
         if os.path.exists(cred_path):
-            cred = credentials.Certificate(cred_path)
-            firebase_admin.initialize_app(cred)
-            print(f"✅ Firebase Admin inizializzato con credenziali da {cred_path}")
+            try:
+                cred = credentials.Certificate(cred_path)
+                firebase_admin.initialize_app(cred)
+                firebase_initialized = True
+                print(f"✅ Firebase Admin inizializzato con credenziali da {cred_path}")
+            except Exception as e:
+                print(f"❌ ERRORE nell'inizializzazione Firebase Admin da file: {e}")
         else:
             print("⚠️ ATTENZIONE: Firebase Admin non configurato. L'autenticazione non funzionerà.")
             print("   Configura FIREBASE_CREDENTIALS_JSON o FIREBASE_CREDENTIALS_PATH")
 except Exception as e:
     print(f"⚠️ ERRORE nell'inizializzazione Firebase Admin: {e}")
+    import traceback
+    traceback.print_exc()
     print("   L'autenticazione potrebbe non funzionare correttamente")
 
 app = FastAPI(title="GetBusinessPlan API", version="1.0.0")
@@ -51,6 +65,7 @@ security = HTTPBearer(auto_error=False)
 async def verify_firebase_token(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)):
     """Verifica il token Firebase e restituisce l'utente autenticato"""
     if not credentials:
+        print("❌ verify_firebase_token: Nessun token fornito")
         raise HTTPException(
             status_code=401,
             detail="Token di autenticazione richiesto. Effettua il login per continuare."
@@ -58,12 +73,75 @@ async def verify_firebase_token(credentials: Optional[HTTPAuthorizationCredentia
     
     token = credentials.credentials
     
+    # Verifica che Firebase Admin sia inizializzato
+    try:
+        firebase_admin.get_app()
+    except ValueError:
+        print("❌ ERRORE CRITICO: Firebase Admin non inizializzato!")
+        raise HTTPException(
+            status_code=500,
+            detail="Errore di configurazione del server. Contatta il supporto."
+        )
+    
+    if not token or len(token) < 10:
+        print(f"❌ verify_firebase_token: Token non valido (lunghezza: {len(token) if token else 0})")
+        raise HTTPException(
+            status_code=401,
+            detail="Token non valido. Effettua nuovamente il login."
+        )
+    
+    print(f"🔍 Verifica token Firebase (lunghezza: {len(token)}, preview: {token[:20]}...)")
+    
+    # Verifica che Firebase Admin sia inizializzato
+    try:
+        app = firebase_admin.get_app()
+        print(f"✅ Firebase Admin app trovata: {app.name}")
+    except ValueError as e:
+        print(f"❌ ERRORE: Firebase Admin app non trovata: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Errore di configurazione del server. Firebase Admin non inizializzato."
+        )
+    
     try:
         # Verifica il token con Firebase Admin
-        decoded_token = auth.verify_id_token(token)
+        print("🔄 Chiamata auth.verify_id_token...")
+        decoded_token = auth.verify_id_token(token, check_revoked=False)
+        print(f"✅ Token verificato con successo!")
+        print(f"   Email: {decoded_token.get('email', 'N/A')}")
+        print(f"   UID: {decoded_token.get('uid', 'N/A')}")
+        print(f"   Project ID (aud): {decoded_token.get('aud', 'N/A')}")
+        print(f"   Issuer: {decoded_token.get('iss', 'N/A')}")
+        
+        # Verifica che il project ID corrisponda (opzionale, per debug)
+        try:
+            app = firebase_admin.get_app()
+            # Il project_id dovrebbe essere nelle credenziali
+            if hasattr(app.credential, 'project_id'):
+                expected_project_id = app.credential.project_id
+                token_project_id = decoded_token.get('aud')
+                if expected_project_id and token_project_id and expected_project_id != token_project_id:
+                    print(f"⚠️ ATTENZIONE: Project ID mismatch! Token: {token_project_id}, Config: {expected_project_id}")
+        except:
+            pass
+        
         return decoded_token
+    except ValueError as e:
+        print(f"❌ Errore verifica token Firebase (ValueError): {e}")
+        raise HTTPException(
+            status_code=401,
+            detail="Token non valido. Effettua nuovamente il login."
+        )
+    except firebase_admin.exceptions.InvalidArgumentError as e:
+        print(f"❌ Errore verifica token Firebase (InvalidArgumentError): {e}")
+        raise HTTPException(
+            status_code=401,
+            detail="Token non valido. Effettua nuovamente il login."
+        )
     except Exception as e:
-        print(f"Errore verifica token Firebase: {e}")
+        print(f"❌ Errore verifica token Firebase (generico): {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
             status_code=401,
             detail="Token non valido o scaduto. Effettua nuovamente il login."
@@ -160,6 +238,46 @@ async def test():
         "timestamp": datetime.datetime.now().isoformat(),
         "openai_configured": bool(OPENAI_API_KEY)
     }
+
+@app.get("/api/test-firebase")
+async def test_firebase():
+    """Endpoint di test per verificare che Firebase Admin sia configurato correttamente"""
+    try:
+        # Verifica che Firebase Admin sia inizializzato
+        app = firebase_admin.get_app()
+        print(f"✅ Firebase Admin app trovata: {app.name}")
+        
+        # Prova a ottenere informazioni sul progetto
+        project_id = None
+        try:
+            # Le credenziali contengono il project_id
+            cred = app.credential
+            if hasattr(cred, 'project_id'):
+                project_id = cred.project_id
+        except:
+            pass
+        
+        return {
+            "success": True,
+            "message": "Firebase Admin è configurato correttamente",
+            "firebase_initialized": firebase_initialized,
+            "project_id": project_id or "N/A",
+            "app_name": app.name
+        }
+    except ValueError:
+        return {
+            "success": False,
+            "message": "Firebase Admin non è inizializzato",
+            "firebase_initialized": firebase_initialized,
+            "error": "Firebase Admin app non trovata"
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"Errore nella verifica Firebase Admin: {str(e)}",
+            "firebase_initialized": firebase_initialized,
+            "error": str(e)
+        }
 
 @app.get("/api/test-openai")
 async def test_openai():
