@@ -856,14 +856,10 @@ async function generateBusinessPlanFromWizard() {
             console.error('ERRORE: planContent non disponibile!');
         }
         
-        // Nascondi loading e mostra risultato
+        // Nascondi loading
         if (loadingState) {
             loadingState.style.display = 'none';
             console.log('Loading nascosto');
-        }
-        if (resultState) {
-            resultState.style.display = 'block';
-            console.log('Result mostrato');
         }
         
         // Salva anche il JSON raw se disponibile (dalla chiamata GPT)
@@ -887,11 +883,18 @@ async function generateBusinessPlanFromWizard() {
             console.warn('⚠️ JSON non disponibile - potrebbe essere stato usato il template fallback');
         }
         
-        // Il PDF verrà generato tramite backend quando l'utente clicca "Scarica PDF"
-        if (jsonData) {
-            console.log('📄 JSON disponibile per generazione PDF tramite backend');
-            console.log('💡 Usa il pulsante "Scarica PDF" per generare il documento professionale');
-        }
+        // Mostra offerta upsell prima del risultato
+        showUpsellOffer('business-plan', jsonData).then(accepted => {
+            if (accepted) {
+                // L'utente ha accettato l'upsell, genereremo anche l'analisi di mercato
+                console.log('✅ Upsell accettato, procederemo con entrambi i servizi');
+            }
+            // Mostra il risultato dopo l'upsell (accettato o rifiutato)
+            if (resultState) {
+                resultState.style.display = 'block';
+                console.log('Result mostrato');
+            }
+        });
         
         console.log('=== GENERAZIONE COMPLETATA ===');
         
@@ -1072,6 +1075,79 @@ function initializeEventListeners() {
 // Wait for DOM to be fully loaded with retry mechanism
 function initializeAll() {
     console.log('DOM loaded, initializing...');
+    
+    // Verifica pagamento dopo redirect da Stripe
+    const urlParams = new URLSearchParams(window.location.search);
+    const paymentStatus = urlParams.get('payment');
+    const sessionId = urlParams.get('session_id');
+    
+    if (paymentStatus === 'success' && sessionId) {
+        // Verifica entrambi i tipi di documento (solo quello corretto passerà)
+        Promise.all([
+            verifyPaymentAfterRedirect('business-plan'),
+            verifyPaymentAfterRedirect('market-analysis')
+        ]).then(([bpVerified, maVerified]) => {
+            if (bpVerified) {
+                window.paymentVerified = true;
+                window.paymentSessionId = sessionId;
+                console.log('✅ Pagamento business plan verificato');
+                
+                // Se include upsell per analisi di mercato, verifica anche quello
+                if (window.upsellPaid && window.upsellType === 'market-analysis') {
+                    window.paymentVerified_analysis = true;
+                    window.paymentSessionId_analysis = sessionId;
+                    console.log('✅ Upsell analisi di mercato incluso nel pagamento');
+                }
+                
+                // Se c'è un business plan pronto, genera automaticamente il PDF
+                setTimeout(() => {
+                    if (window.lastBusinessPlanJSON && downloadPdfBtn) {
+                        console.log('📄 Generazione automatica PDF dopo pagamento verificato...');
+                        generatePDF();
+                    }
+                    
+                    // Se l'upsell è stato pagato e c'è un'analisi pronta, genera anche quello
+                    if (window.upsellPaid && window.upsellType === 'market-analysis' && 
+                        window.lastMarketAnalysisJSON && downloadAnalysisPdfBtn) {
+                        setTimeout(() => {
+                            console.log('📄 Generazione automatica PDF analisi (upsell) dopo pagamento verificato...');
+                            generatePDFAnalysis(window.lastMarketAnalysisJSON);
+                        }, 2000);
+                    }
+                }, 1000);
+            }
+            if (maVerified) {
+                window.paymentVerified_analysis = true;
+                window.paymentSessionId_analysis = sessionId;
+                console.log('✅ Pagamento analisi di mercato verificato');
+                
+                // Se include upsell per business plan, verifica anche quello
+                if (window.upsellPaid && window.upsellType === 'business-plan') {
+                    window.paymentVerified = true;
+                    window.paymentSessionId = sessionId;
+                    console.log('✅ Upsell business plan incluso nel pagamento');
+                }
+                
+                // Se c'è un'analisi pronta, genera automaticamente il PDF
+                setTimeout(() => {
+                    if (window.lastMarketAnalysisJSON && downloadAnalysisPdfBtn) {
+                        console.log('📄 Generazione automatica PDF analisi dopo pagamento verificato...');
+                        generatePDFAnalysis(window.lastMarketAnalysisJSON);
+                    }
+                    
+                    // Se l'upsell è stato pagato e c'è un business plan pronto, genera anche quello
+                    if (window.upsellPaid && window.upsellType === 'business-plan' && 
+                        window.lastBusinessPlanJSON && downloadPdfBtn) {
+                        setTimeout(() => {
+                            console.log('📄 Generazione automatica PDF business plan (upsell) dopo pagamento verificato...');
+                            generatePDF();
+                        }, 2000);
+                    }
+                }, 1000);
+            }
+        });
+    }
+    
     initializeEventListeners();
     initializeAnalysisListeners();
     console.log('All listeners initialized');
@@ -2286,6 +2362,30 @@ async function generatePDFAnalysis(marketAnalysisJSON) {
         return;
     }
     
+    if (!marketAnalysisJSON) {
+        alert('Nessuna analisi di mercato disponibile');
+        return;
+    }
+    
+    // Verifica se il pagamento è già stato completato (con chiave separata per analisi)
+    const paymentKey = 'paymentVerified_analysis';
+    const sessionKey = 'paymentSessionId_analysis';
+    
+    if (!window[paymentKey] || !window[sessionKey]) {
+        try {
+            // Richiedi il pagamento
+            await handlePayment('market-analysis');
+            // Se il pagamento è stato avviato, la funzione reindirizza a Stripe
+            // Il codice qui sotto verrà eseguito solo se l'utente annulla
+            return;
+        } catch (error) {
+            if (error.message !== 'Pagamento annullato') {
+                alert('Errore nel pagamento: ' + error.message);
+            }
+            return;
+        }
+    }
+    
     downloadAnalysisPdfBtn.disabled = true;
     downloadAnalysisPdfBtn.textContent = 'Generazione PDF...';
     
@@ -2293,17 +2393,31 @@ async function generatePDFAnalysis(marketAnalysisJSON) {
         console.log('=== INIZIO GENERAZIONE PDF ANALISI DI MERCATO ===');
         console.log('Chiamata API backend Python...');
         
+        // Aggiungi il sessionId al JSON per la verifica
+        const jsonWithPayment = {
+            ...marketAnalysisJSON,
+            _payment_session_id: window[sessionKey]
+        };
+        
         const response = await fetch(`${API_BASE_URL}/api/generate-pdf-analysis`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                marketAnalysisJson: marketAnalysisJSON
+                marketAnalysisJson: jsonWithPayment
             })
         });
         
         if (!response.ok) {
+            if (response.status === 402) {
+                // Pagamento non completato, richiedi di nuovo
+                window[paymentKey] = false;
+                window[sessionKey] = null;
+                alert('Pagamento non completato. Completa il pagamento per scaricare il PDF.');
+                await handlePayment('market-analysis');
+                return;
+            }
             const errorData = await response.json().catch(() => ({ detail: 'Errore sconosciuto' }));
             throw new Error(`Errore API: ${response.status} - ${errorData.detail || 'Errore sconosciuto'}`);
         }
@@ -2320,6 +2434,11 @@ async function generatePDFAnalysis(marketAnalysisJSON) {
         document.body.removeChild(a);
         
         console.log('✅ PDF analisi di mercato generato e scaricato con successo');
+        
+        // Reset pagamento dopo il download
+        window[paymentKey] = false;
+        window[sessionKey] = null;
+        
         downloadAnalysisPdfBtn.disabled = false;
         downloadAnalysisPdfBtn.textContent = 'Scarica PDF';
     } catch (error) {
@@ -2331,6 +2450,255 @@ async function generatePDFAnalysis(marketAnalysisJSON) {
 }
 
 // PDF Generation using window.print() (qualità professionale - come lo script da console)
+
+// Funzione per mostrare l'offerta upsell
+async function showUpsellOffer(currentDocumentType, currentJsonData) {
+    return new Promise((resolve) => {
+        const upsellModal = document.getElementById('upsellModal');
+        const closeUpsellModal = document.getElementById('closeUpsellModal');
+        const acceptUpsellBtn = document.getElementById('acceptUpsellBtn');
+        const declineUpsellBtn = document.getElementById('declineUpsellBtn');
+        
+        if (!upsellModal) {
+            console.warn('Modal upsell non trovato, procedo senza offerta');
+            resolve(false);
+            return;
+        }
+        
+        // Determina l'offerta in base al tipo di documento corrente
+        let otherServiceName, otherServiceType, originalPrice, discountedPrice, discountPercent, description;
+        
+        if (currentDocumentType === 'business-plan') {
+            otherServiceName = 'Analisi di Mercato';
+            otherServiceType = 'market-analysis';
+            originalPrice = 14.99; // Prezzo originale analisi
+            discountPercent = 30;
+            discountedPrice = (originalPrice * (1 - discountPercent / 100)).toFixed(2);
+            description = 'Ottieni un\'analisi completa del mercato con competitor, tendenze e opportunità';
+        } else {
+            otherServiceName = 'Business Plan Professionale';
+            otherServiceType = 'business-plan';
+            originalPrice = 19.99; // Prezzo originale business plan
+            discountPercent = 30;
+            discountedPrice = (originalPrice * (1 - discountPercent / 100)).toFixed(2);
+            description = 'Ottieni un business plan completo con proiezioni finanziarie e strategia';
+        }
+        
+        // Popola il modal con i dati dell'offerta
+        const serviceNameEl = document.getElementById('upsellServiceName');
+        const originalPriceEl = document.getElementById('upsellOriginalPrice');
+        const discountedPriceEl = document.getElementById('upsellDiscountedPrice');
+        const discountBadgeEl = document.getElementById('upsellDiscountBadge');
+        const descriptionEl = document.getElementById('upsellDescription');
+        
+        if (serviceNameEl) serviceNameEl.textContent = otherServiceName;
+        if (originalPriceEl) originalPriceEl.textContent = `${originalPrice.toFixed(2)}€`;
+        if (discountedPriceEl) discountedPriceEl.textContent = `${discountedPrice}€`;
+        if (discountBadgeEl) discountBadgeEl.textContent = `-${discountPercent}%`;
+        if (descriptionEl) descriptionEl.textContent = description;
+        
+        // Mostra il modal
+        upsellModal.style.display = 'block';
+        
+        // Gestisci chiusura
+        if (closeUpsellModal) {
+            closeUpsellModal.onclick = () => {
+                upsellModal.style.display = 'none';
+                resolve(false);
+            };
+        }
+        
+        upsellModal.onclick = (e) => {
+            if (e.target === upsellModal) {
+                upsellModal.style.display = 'none';
+                resolve(false);
+            }
+        };
+        
+        // Gestisci accettazione
+        if (acceptUpsellBtn) {
+            acceptUpsellBtn.onclick = async () => {
+                upsellModal.style.display = 'none';
+                
+                // Salva che l'utente ha accettato l'upsell
+                window.upsellAccepted = true;
+                window.upsellOtherServiceType = otherServiceType;
+                window.upsellCurrentServiceType = currentDocumentType;
+                window.upsellCurrentJsonData = currentJsonData;
+                
+                // Se l'utente ha accettato, genereremo anche l'altro servizio
+                // ma prima procediamo con il pagamento combinato
+                resolve(true);
+            };
+        }
+        
+        // Gestisci rifiuto
+        if (declineUpsellBtn) {
+            declineUpsellBtn.onclick = () => {
+                upsellModal.style.display = 'none';
+                window.upsellAccepted = false;
+                resolve(false);
+            };
+        }
+    });
+}
+
+// Funzione per gestire il pagamento Stripe
+async function handlePayment(documentType) {
+    return new Promise(async (resolve, reject) => {
+        const paymentModal = document.getElementById('paymentModal');
+        const closePaymentModal = document.getElementById('closePaymentModal');
+        const paymentLoading = document.getElementById('paymentLoading');
+        const paymentError = document.getElementById('paymentError');
+        
+        if (!paymentModal) {
+            reject(new Error('Modal di pagamento non trovato'));
+            return;
+        }
+        
+        // Mostra il modal
+        paymentModal.style.display = 'block';
+        paymentLoading.style.display = 'block';
+        paymentError.style.display = 'none';
+        
+        // Chiudi il modal quando si clicca sulla X
+        if (closePaymentModal) {
+            closePaymentModal.onclick = () => {
+                paymentModal.style.display = 'none';
+                reject(new Error('Pagamento annullato'));
+            };
+        }
+        
+        // Chiudi quando si clicca fuori dal modal
+        paymentModal.onclick = (e) => {
+            if (e.target === paymentModal) {
+                paymentModal.style.display = 'none';
+                reject(new Error('Pagamento annullato'));
+            }
+        };
+        
+        try {
+            // Crea la sessione di checkout
+            const successUrl = window.location.href.split('?')[0] + '?payment=success';
+            const cancelUrl = window.location.href.split('?')[0] + '?payment=cancel';
+            
+            // Verifica se l'utente ha accettato l'upsell
+            const includeUpsell = window.upsellAccepted === true && 
+                                 window.upsellOtherServiceType && 
+                                 window.upsellOtherServiceType !== documentType;
+            
+            const response = await fetch(`${API_BASE_URL}/api/create-checkout-session`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    documentType: documentType,
+                    successUrl: successUrl,
+                    cancelUrl: cancelUrl,
+                    includeUpsell: includeUpsell
+                })
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ detail: 'Errore sconosciuto' }));
+                throw new Error(errorData.detail || 'Errore nella creazione della sessione di pagamento');
+            }
+            
+            const data = await response.json();
+            
+            if (!data.success || !data.url) {
+                throw new Error('Risposta API non valida');
+            }
+            
+            // Salva il sessionId per la verifica successiva in base al tipo di documento
+            if (documentType === 'business-plan') {
+                window.paymentSessionId = data.sessionId;
+            } else if (documentType === 'market-analysis') {
+                window.paymentSessionId_analysis = data.sessionId;
+            }
+            
+            // Reindirizza a Stripe Checkout
+            window.location.href = data.url;
+            
+        } catch (error) {
+            console.error('Errore nella creazione checkout session:', error);
+            paymentLoading.style.display = 'none';
+            paymentError.style.display = 'block';
+            paymentError.textContent = 'Errore: ' + error.message;
+            reject(error);
+        }
+    });
+}
+
+// Verifica il pagamento dopo il redirect da Stripe
+async function verifyPaymentAfterRedirect(documentType) {
+    const urlParams = new URLSearchParams(window.location.search);
+    const sessionId = urlParams.get('session_id');
+    const paymentStatus = urlParams.get('payment');
+    
+    if (paymentStatus === 'success' && sessionId) {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/verify-payment`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    sessionId: sessionId,
+                    documentType: documentType
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success && data.paid) {
+                // Salva il sessionId per usarlo nella generazione PDF
+                if (documentType === 'business-plan') {
+                    window.paymentSessionId = sessionId;
+                    window.paymentVerified = true;
+                } else if (documentType === 'market-analysis') {
+                    window.paymentSessionId_analysis = sessionId;
+                    window.paymentVerified_analysis = true;
+                }
+                
+                // Se include upsell, salva anche le informazioni
+                if (data.includeUpsell && data.upsellType) {
+                    window.upsellPaid = true;
+                    window.upsellType = data.upsellType;
+                    window.upsellSessionId = sessionId;
+                    
+                    if (data.upsellType === 'business-plan') {
+                        window.paymentSessionId = sessionId;
+                        window.paymentVerified = true;
+                    } else if (data.upsellType === 'market-analysis') {
+                        window.paymentSessionId_analysis = sessionId;
+                        window.paymentVerified_analysis = true;
+                    }
+                }
+                
+                // Rimuovi i parametri dalla URL solo se è l'ultima verifica
+                setTimeout(() => {
+                    const newParams = new URLSearchParams(window.location.search);
+                    if (newParams.get('payment') === 'success') {
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                    }
+                }, 1000);
+                
+                return true;
+            } else {
+                return false;
+            }
+        } catch (error) {
+            console.error('Errore nella verifica pagamento:', error);
+            alert('Errore nella verifica del pagamento. Riprova.');
+            return false;
+        }
+    }
+    
+    return false;
+}
+
 async function generatePDF() {
     if (!window.currentPlanData) {
         alert('Nessun business plan disponibile');
@@ -2344,23 +2712,43 @@ async function generatePDF() {
         return;
     }
 
-    // Show loading
-    downloadPdfBtn.disabled = true;
-    downloadPdfBtn.textContent = 'Generazione PDF...';
-
     // Verifica che ci sia JSON
     const hasJSON = window.currentPlanData.jsonData && typeof window.currentPlanData.jsonData === 'object';
     const jsonData = window.lastBusinessPlanJSON || window.currentPlanData.jsonData;
     
     if (!hasJSON && !jsonData) {
         alert('Nessun JSON disponibile per il PDF. Assicurati che il business plan sia stato generato correttamente.');
-        downloadPdfBtn.disabled = false;
-        downloadPdfBtn.textContent = 'Scarica PDF';
         return;
     }
 
+    // Verifica se il pagamento è già stato completato
+    if (!window.paymentVerified || !window.paymentSessionId) {
+        try {
+            // Richiedi il pagamento
+            await handlePayment('business-plan');
+            // Se il pagamento è stato avviato, la funzione reindirizza a Stripe
+            // Il codice qui sotto verrà eseguito solo se l'utente annulla
+            return;
+        } catch (error) {
+            if (error.message !== 'Pagamento annullato') {
+                alert('Errore nel pagamento: ' + error.message);
+            }
+            return;
+        }
+    }
+
+    // Show loading
+    downloadPdfBtn.disabled = true;
+    downloadPdfBtn.textContent = 'Generazione PDF...';
+
     try {
         console.log('📄 Generazione PDF tramite API backend...');
+        
+        // Aggiungi il sessionId al JSON per la verifica
+        const jsonWithPayment = {
+            ...jsonData,
+            _payment_session_id: window.paymentSessionId
+        };
         
         const response = await fetch(`${API_BASE_URL}/api/generate-pdf`, {
             method: 'POST',
@@ -2368,11 +2756,19 @@ async function generatePDF() {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                businessPlanJson: jsonData
+                businessPlanJson: jsonWithPayment
             })
         });
         
         if (!response.ok) {
+            if (response.status === 402) {
+                // Pagamento non completato, richiedi di nuovo
+                window.paymentVerified = false;
+                window.paymentSessionId = null;
+                alert('Pagamento non completato. Completa il pagamento per scaricare il PDF.');
+                await handlePayment('business-plan');
+                return;
+            }
             const errorData = await response.json().catch(() => ({ detail: 'Errore sconosciuto' }));
             throw new Error(`Errore API: ${response.status} - ${errorData.detail || 'Errore sconosciuto'}`);
         }
@@ -2393,6 +2789,10 @@ async function generatePDF() {
         document.body.removeChild(a);
         
         console.log('✅ PDF scaricato con successo!');
+        
+        // Reset pagamento dopo il download
+        window.paymentVerified = false;
+        window.paymentSessionId = null;
         
         downloadPdfBtn.disabled = false;
         downloadPdfBtn.textContent = 'Scarica PDF';
@@ -2933,12 +3333,23 @@ async function generateMarketAnalysis() {
         
         analysisContent.innerHTML = analysisHTML;
         analysisLoadingState.style.display = 'none';
-        analysisResultState.style.display = 'block';
-        
+        // Salva i dati
         window.currentAnalysisData = {
             ...analysisWizardData,
             content: analysisHTML
         };
+        
+        // Mostra offerta upsell prima del risultato
+        showUpsellOffer('market-analysis', marketAnalysisJSON).then(accepted => {
+            if (accepted) {
+                // L'utente ha accettato l'upsell, genereremo anche il business plan
+                console.log('✅ Upsell accettato, procederemo con entrambi i servizi');
+            }
+            // Mostra il risultato dopo l'upsell (accettato o rifiutato)
+            if (analysisResultState) {
+                analysisResultState.style.display = 'block';
+            }
+        });
     } catch (error) {
         console.error('Errore nell\'analisi:', error);
         alert('Si è verificato un errore durante l\'analisi. Riprova.');

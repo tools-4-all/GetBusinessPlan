@@ -308,6 +308,51 @@
         </div>
     </div>
 
+    <!-- Modal for Upsell Offer -->
+    <div class="modal" id="upsellModal" style="display: none;">
+        <div class="modal-content" style="max-width: 600px;">
+            <span class="close" id="closeUpsellModal">&times;</span>
+            <h2>🎯 Offerta Speciale</h2>
+            <div id="upsellContent" style="padding: 20px;">
+                <p style="font-size: 1.1em; margin-bottom: 20px;">
+                    Vuoi anche <strong id="upsellServiceName">l'altro servizio</strong>? 
+                    Approfitta di uno <strong style="color: #2563eb;">sconto speciale</strong>!
+                </p>
+                <div style="background: #f0f4ff; border: 2px solid #3b82f6; border-radius: 8px; padding: 20px; margin: 20px 0;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <div>
+                            <p style="margin: 0; font-size: 0.9em; color: #64748b; text-decoration: line-through;" id="upsellOriginalPrice"></p>
+                            <p style="margin: 5px 0 0 0; font-size: 1.5em; font-weight: bold; color: #2563eb;" id="upsellDiscountedPrice"></p>
+                        </div>
+                        <div style="background: #dc2626; color: white; padding: 8px 16px; border-radius: 6px; font-weight: bold;" id="upsellDiscountBadge">
+                            -30%
+                        </div>
+                    </div>
+                    <p style="margin: 0; font-size: 0.9em; color: #64748b;" id="upsellDescription"></p>
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: center; margin-top: 25px;">
+                    <button class="btn-primary" id="acceptUpsellBtn" style="flex: 1;">Sì, voglio entrambi!</button>
+                    <button class="btn-secondary" id="declineUpsellBtn" style="flex: 1;">No, solo questo</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Payment -->
+    <div class="modal" id="paymentModal" style="display: none;">
+        <div class="modal-content" style="max-width: 500px;">
+            <span class="close" id="closePaymentModal">&times;</span>
+            <h2>Completa il Pagamento</h2>
+            <div id="paymentContent">
+                <p>Per scaricare il PDF professionale, completa il pagamento.</p>
+                <div id="paymentLoading" style="text-align: center; padding: 20px;">
+                    <div class="spinner"></div>
+                    <p>Preparazione pagamento...</p>
+                </div>
+                <div id="paymentError" style="display: none; color: #dc2626; padding: 10px; background: #fee2e2; border-radius: 6px; margin: 10px 0;"></div>
+            </div>
+        </div>
+    </div>
 
     <!-- Modal for Market Analysis -->
     <div class="modal" id="analysisModal">

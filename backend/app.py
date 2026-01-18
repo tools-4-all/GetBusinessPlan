@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from openai import OpenAI
@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 import utils
 import pdf_generator
 import pdf_generator_analysis
+import stripe
 
 # Carica variabili d'ambiente
 load_dotenv()
@@ -37,6 +38,20 @@ if not OPENAI_API_KEY.startswith("sk-"):
 
 client = OpenAI(api_key=OPENAI_API_KEY)
 
+# Configurazione Stripe
+STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")
+STRIPE_PUBLISHABLE_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY")
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+
+if STRIPE_SECRET_KEY:
+    stripe.api_key = STRIPE_SECRET_KEY
+else:
+    print("⚠️ ATTENZIONE: STRIPE_SECRET_KEY non configurata. Il pagamento non funzionerà.")
+
+# Prezzi (in centesimi di euro)
+PRICE_BUSINESS_PLAN = int(os.getenv("PRICE_BUSINESS_PLAN_CENTS", "1999"))  # 19.99€ default
+PRICE_MARKET_ANALYSIS = int(os.getenv("PRICE_MARKET_ANALYSIS_CENTS", "1499"))  # 14.99€ default
+
 # Modelli per le richieste
 class BusinessPlanRequest(BaseModel):
     formData: dict
@@ -59,6 +74,16 @@ class SuggestionRequest(BaseModel):
     currentValue: Optional[str] = None
     formType: str = "business-plan"  # "business-plan" o "market-analysis"
     contextData: Optional[dict] = None  # Dati già compilati per contesto
+
+class CreateCheckoutRequest(BaseModel):
+    documentType: str  # "business-plan" o "market-analysis"
+    successUrl: str
+    cancelUrl: str
+    includeUpsell: bool = False  # Se True, include anche l'altro servizio con sconto
+
+class VerifyPaymentRequest(BaseModel):
+    sessionId: str
+    documentType: str  # "business-plan" o "market-analysis"
 
 @app.get("/")
 async def root():
@@ -457,11 +482,172 @@ async def generate_market_analysis(request: MarketAnalysisRequest):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Errore interno: {str(e)}")
 
+@app.post("/api/create-checkout-session")
+async def create_checkout_session(request: CreateCheckoutRequest):
+    """Crea una sessione di checkout Stripe"""
+    if not STRIPE_SECRET_KEY:
+        raise HTTPException(status_code=500, detail="Stripe non configurato")
+    
+    try:
+        # Determina il prezzo in base al tipo di documento
+        line_items = []
+        
+        if request.documentType == "business-plan":
+            price_amount = PRICE_BUSINESS_PLAN
+            product_name = "Business Plan Professionale"
+            line_items.append({
+                'price_data': {
+                    'currency': 'eur',
+                    'product_data': {
+                        'name': product_name,
+                    },
+                    'unit_amount': price_amount,
+                },
+                'quantity': 1,
+            })
+            
+            # Se include upsell, aggiungi anche l'analisi di mercato con sconto
+            if request.includeUpsell:
+                upsell_price = int(PRICE_MARKET_ANALYSIS * 0.7)  # 30% di sconto
+                line_items.append({
+                    'price_data': {
+                        'currency': 'eur',
+                        'product_data': {
+                            'name': 'Analisi di Mercato (Offerta Speciale)',
+                        },
+                        'unit_amount': upsell_price,
+                    },
+                    'quantity': 1,
+                })
+                
+        elif request.documentType == "market-analysis":
+            price_amount = PRICE_MARKET_ANALYSIS
+            product_name = "Analisi di Mercato"
+            line_items.append({
+                'price_data': {
+                    'currency': 'eur',
+                    'product_data': {
+                        'name': product_name,
+                    },
+                    'unit_amount': price_amount,
+                },
+                'quantity': 1,
+            })
+            
+            # Se include upsell, aggiungi anche il business plan con sconto
+            if request.includeUpsell:
+                upsell_price = int(PRICE_BUSINESS_PLAN * 0.7)  # 30% di sconto
+                line_items.append({
+                    'price_data': {
+                        'currency': 'eur',
+                        'product_data': {
+                            'name': 'Business Plan Professionale (Offerta Speciale)',
+                        },
+                        'unit_amount': upsell_price,
+                    },
+                    'quantity': 1,
+                })
+        else:
+            raise HTTPException(status_code=400, detail="Tipo documento non valido")
+        
+        # Crea la sessione di checkout
+        metadata = {
+            'document_type': request.documentType
+        }
+        if request.includeUpsell:
+            metadata['include_upsell'] = 'true'
+            if request.documentType == "business-plan":
+                metadata['upsell_type'] = 'market-analysis'
+            else:
+                metadata['upsell_type'] = 'business-plan'
+        
+        checkout_session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            line_items=line_items,
+            mode='payment',
+            success_url=request.successUrl + '?session_id={CHECKOUT_SESSION_ID}',
+            cancel_url=request.cancelUrl,
+            metadata=metadata
+        )
+        
+        return JSONResponse(content={
+            "success": True,
+            "sessionId": checkout_session.id,
+            "url": checkout_session.url
+        })
+    except Exception as e:
+        print(f"Errore creazione checkout session: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Errore creazione checkout: {str(e)}")
+
+@app.post("/api/verify-payment")
+async def verify_payment(request: VerifyPaymentRequest):
+    """Verifica che il pagamento sia stato completato"""
+    if not STRIPE_SECRET_KEY:
+        raise HTTPException(status_code=500, detail="Stripe non configurato")
+    
+    try:
+        # Recupera la sessione di checkout
+        session = stripe.checkout.Session.retrieve(request.sessionId)
+        
+        # Verifica che il pagamento sia completato
+        if session.payment_status != 'paid':
+            return JSONResponse(content={
+                "success": False,
+                "paid": False,
+                "message": "Pagamento non completato"
+            })
+        
+        # Verifica che il tipo di documento corrisponda
+        if session.metadata.get('document_type') != request.documentType:
+            return JSONResponse(content={
+                "success": False,
+                "paid": False,
+                "message": "Tipo documento non corrispondente"
+            })
+        
+        # Verifica se include upsell
+        include_upsell = session.metadata.get('include_upsell') == 'true'
+        upsell_type = session.metadata.get('upsell_type') if include_upsell else None
+        
+        return JSONResponse(content={
+            "success": True,
+            "paid": True,
+            "sessionId": request.sessionId,
+            "includeUpsell": include_upsell,
+            "upsellType": upsell_type
+        })
+    except stripe.error.StripeError as e:
+        print(f"Errore Stripe: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Errore verifica pagamento: {str(e)}")
+    except Exception as e:
+        print(f"Errore verifica pagamento: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Errore interno: {str(e)}")
+
 @app.post("/api/generate-pdf")
 async def generate_pdf(request: PDFRequest):
-    """Genera il PDF dal JSON del business plan"""
+    """Genera il PDF dal JSON del business plan (richiede pagamento verificato)"""
     try:
-        pdf_path = await pdf_generator.create_pdf_from_json(request.businessPlanJson)
+        # Verifica che ci sia sessionId nel request (opzionale per retrocompatibilità)
+        # In produzione, dovresti sempre richiedere la verifica del pagamento
+        session_id = request.businessPlanJson.get('_payment_session_id')
+        
+        if session_id and STRIPE_SECRET_KEY:
+            # Verifica il pagamento
+            try:
+                session = stripe.checkout.Session.retrieve(session_id)
+                if session.payment_status != 'paid':
+                    raise HTTPException(status_code=402, detail="Pagamento non completato")
+            except stripe.error.StripeError as e:
+                raise HTTPException(status_code=402, detail=f"Errore verifica pagamento: {str(e)}")
+        
+        # Rimuovi il campo temporaneo dal JSON prima di generare il PDF
+        pdf_json = {k: v for k, v in request.businessPlanJson.items() if k != '_payment_session_id'}
+        
+        pdf_path = await pdf_generator.create_pdf_from_json(pdf_json)
         
         if not os.path.exists(pdf_path):
             raise HTTPException(status_code=500, detail="PDF non generato correttamente")
@@ -472,6 +658,8 @@ async def generate_pdf(request: PDFRequest):
             filename="business-plan.pdf",
             headers={"Content-Disposition": "attachment; filename=business-plan.pdf"}
         )
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Errore generazione PDF: {str(e)}")
         import traceback
@@ -480,10 +668,25 @@ async def generate_pdf(request: PDFRequest):
 
 @app.post("/api/generate-pdf-analysis")
 async def generate_pdf_analysis(request: PDFAnalysisRequest):
-    """Genera PDF dall'analisi di mercato"""
+    """Genera PDF dall'analisi di mercato (richiede pagamento verificato)"""
     try:
+        # Verifica che ci sia sessionId nel request (opzionale per retrocompatibilità)
+        session_id = request.marketAnalysisJson.get('_payment_session_id')
+        
+        if session_id and STRIPE_SECRET_KEY:
+            # Verifica il pagamento
+            try:
+                session = stripe.checkout.Session.retrieve(session_id)
+                if session.payment_status != 'paid':
+                    raise HTTPException(status_code=402, detail="Pagamento non completato")
+            except stripe.error.StripeError as e:
+                raise HTTPException(status_code=402, detail=f"Errore verifica pagamento: {str(e)}")
+        
+        # Rimuovi il campo temporaneo dal JSON prima di generare il PDF
+        pdf_json = {k: v for k, v in request.marketAnalysisJson.items() if k != '_payment_session_id'}
+        
         print("=== INIZIO GENERAZIONE PDF ANALISI DI MERCATO ===")
-        output_path = await pdf_generator_analysis.create_pdf_from_market_analysis(request.marketAnalysisJson)
+        output_path = await pdf_generator_analysis.create_pdf_from_market_analysis(pdf_json)
         
         if not Path(output_path).exists():
             raise HTTPException(status_code=500, detail="File PDF non generato correttamente")
@@ -493,6 +696,8 @@ async def generate_pdf_analysis(request: PDFAnalysisRequest):
             media_type="application/pdf",
             filename="analisi-mercato.pdf"
         )
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Errore nella generazione PDF analisi: {str(e)}")
         import traceback
