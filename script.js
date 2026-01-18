@@ -326,7 +326,6 @@ function displaySuggestions(suggestions, container, input) {
     container.innerHTML = `
         <div class="suggestions-box">
             <div class="suggestions-header">
-                <span class="suggestions-icon">💡</span>
                 <span class="suggestions-title">Suggerimenti per migliorare la risposta</span>
             </div>
             <ul class="suggestions-list">
@@ -334,7 +333,9 @@ function displaySuggestions(suggestions, container, input) {
                     const escapedSuggestion = escape(suggestion);
                     return `
                     <li class="suggestion-item" data-index="${index}">
-                        <span class="suggestion-text">${escapedSuggestion}</span>
+                        <div class="suggestion-content">
+                            <span class="suggestion-text">${escapedSuggestion}</span>
+                        </div>
                         <button class="suggestion-apply-btn" onclick="applySuggestion('${escapedSuggestion.replace(/'/g, "\\'").replace(/\n/g, ' ')}', '${input.id}')">
                             Usa
                         </button>
@@ -437,6 +438,31 @@ function renderCurrentStep() {
     if (input && suggestionsContainer && (question.type === 'text' || question.type === 'textarea')) {
         let suggestionTimeout;
         let isLoadingSuggestions = false;
+        let lastLoadedValue = '';
+        let hasSuggestions = false;
+        
+        // Funzione per mostrare loading senza nascondere i suggerimenti esistenti
+        const showLoading = () => {
+            const existingBox = suggestionsContainer.querySelector('.suggestions-box');
+            if (existingBox) {
+                // Aggiungi indicatore di aggiornamento senza nascondere i suggerimenti
+                const loadingIndicator = document.createElement('div');
+                loadingIndicator.className = 'suggestions-loading';
+                loadingIndicator.style.cssText = 'padding: 8px; text-align: center; font-size: 13px; color: #64748b; border-top: 1px solid #e2e8f0; margin-top: 12px;';
+                loadingIndicator.textContent = 'Aggiornamento suggerimenti...';
+                existingBox.appendChild(loadingIndicator);
+            } else {
+                suggestionsContainer.innerHTML = '<div class="suggestions-loading">Caricamento suggerimenti...</div>';
+            }
+        };
+        
+        // Funzione per rimuovere l'indicatore di loading
+        const hideLoading = () => {
+            const loadingIndicator = suggestionsContainer.querySelector('.suggestions-loading');
+            if (loadingIndicator && loadingIndicator.parentElement) {
+                loadingIndicator.remove();
+            }
+        };
         
         // Funzione per caricare e mostrare suggerimenti
         const loadSuggestions = async () => {
@@ -447,15 +473,22 @@ function renderCurrentStep() {
                 const autoDetectCheckbox = document.getElementById(`${question.id}_auto_detect`);
                 if (autoDetectCheckbox && autoDetectCheckbox.checked) {
                     suggestionsContainer.innerHTML = '';
+                    hasSuggestions = false;
                     return;
                 }
             }
             
             const currentValue = input.value.trim();
+            
+            // Evita ricaricamenti se il valore non è cambiato significativamente
+            if (currentValue === lastLoadedValue && hasSuggestions) {
+                return;
+            }
+            
             const contextData = { ...wizardData }; // Dati già compilati
             
             isLoadingSuggestions = true;
-            suggestionsContainer.innerHTML = '<div class="suggestions-loading">💡 Caricamento suggerimenti...</div>';
+            showLoading();
             
             try {
                 const suggestions = await getSuggestions(
@@ -467,29 +500,44 @@ function renderCurrentStep() {
                     contextData
                 );
                 
+                hideLoading();
+                
                 if (suggestions && suggestions.length > 0) {
                     displaySuggestions(suggestions, suggestionsContainer, input);
+                    lastLoadedValue = currentValue;
+                    hasSuggestions = true;
                 } else {
-                    suggestionsContainer.innerHTML = '';
+                    // Nascondi solo se non ci sono suggerimenti e non c'erano prima
+                    if (!hasSuggestions) {
+                        suggestionsContainer.innerHTML = '';
+                    }
+                    hasSuggestions = false;
                 }
             } catch (error) {
                 console.error('Errore caricamento suggerimenti:', error);
-                suggestionsContainer.innerHTML = '';
+                hideLoading();
+                // Non nascondere i suggerimenti esistenti in caso di errore
+                if (!hasSuggestions) {
+                    suggestionsContainer.innerHTML = '';
+                }
             } finally {
                 isLoadingSuggestions = false;
             }
         };
         
-        // Carica suggerimenti al focus
+        // Carica suggerimenti al focus (solo se non ci sono già)
         input.addEventListener('focus', () => {
-            clearTimeout(suggestionTimeout);
-            suggestionTimeout = setTimeout(loadSuggestions, 500);
+            if (!hasSuggestions) {
+                clearTimeout(suggestionTimeout);
+                suggestionTimeout = setTimeout(loadSuggestions, 500);
+            }
         });
         
-        // Carica suggerimenti dopo che l'utente smette di digitare (debounce)
+        // Carica suggerimenti dopo che l'utente smette di digitare (debounce più lungo)
         input.addEventListener('input', () => {
             clearTimeout(suggestionTimeout);
-            suggestionTimeout = setTimeout(loadSuggestions, 1500);
+            // Aumenta il debounce a 2 secondi per evitare ricaricamenti troppo frequenti
+            suggestionTimeout = setTimeout(loadSuggestions, 2000);
         });
         
         // Carica suggerimenti iniziali dopo un breve delay
@@ -2745,16 +2793,47 @@ function renderAnalysisCurrentStep() {
         if (input && suggestionsContainer && (question.type === 'text' || question.type === 'textarea')) {
             let suggestionTimeout;
             let isLoadingSuggestions = false;
+            let lastLoadedValue = '';
+            let hasSuggestions = false;
+            
+            // Funzione per mostrare loading senza nascondere i suggerimenti esistenti
+            const showLoading = () => {
+                const existingBox = suggestionsContainer.querySelector('.suggestions-box');
+                if (existingBox) {
+                    // Aggiungi indicatore di aggiornamento senza nascondere i suggerimenti
+                    const loadingIndicator = document.createElement('div');
+                    loadingIndicator.className = 'suggestions-loading';
+                    loadingIndicator.style.cssText = 'padding: 8px; text-align: center; font-size: 13px; color: #64748b; border-top: 1px solid #e2e8f0; margin-top: 12px;';
+                    loadingIndicator.textContent = 'Aggiornamento suggerimenti...';
+                    existingBox.appendChild(loadingIndicator);
+                } else {
+                    suggestionsContainer.innerHTML = '<div class="suggestions-loading">Caricamento suggerimenti...</div>';
+                }
+            };
+            
+            // Funzione per rimuovere l'indicatore di loading
+            const hideLoading = () => {
+                const loadingIndicator = suggestionsContainer.querySelector('.suggestions-loading');
+                if (loadingIndicator && loadingIndicator.parentElement) {
+                    loadingIndicator.remove();
+                }
+            };
             
             // Funzione per caricare e mostrare suggerimenti
             const loadSuggestions = async () => {
                 if (isLoadingSuggestions) return;
                 
                 const currentValue = input.value.trim();
+                
+                // Evita ricaricamenti se il valore non è cambiato significativamente
+                if (currentValue === lastLoadedValue && hasSuggestions) {
+                    return;
+                }
+                
                 const contextData = { ...analysisWizardData }; // Dati già compilati
                 
                 isLoadingSuggestions = true;
-                suggestionsContainer.innerHTML = '<div class="suggestions-loading">💡 Caricamento suggerimenti...</div>';
+                showLoading();
                 
                 try {
                     const suggestions = await getSuggestions(
@@ -2766,29 +2845,44 @@ function renderAnalysisCurrentStep() {
                         contextData
                     );
                     
+                    hideLoading();
+                    
                     if (suggestions && suggestions.length > 0) {
                         displaySuggestions(suggestions, suggestionsContainer, input);
+                        lastLoadedValue = currentValue;
+                        hasSuggestions = true;
                     } else {
-                        suggestionsContainer.innerHTML = '';
+                        // Nascondi solo se non ci sono suggerimenti e non c'erano prima
+                        if (!hasSuggestions) {
+                            suggestionsContainer.innerHTML = '';
+                        }
+                        hasSuggestions = false;
                     }
                 } catch (error) {
                     console.error('Errore caricamento suggerimenti:', error);
-                    suggestionsContainer.innerHTML = '';
+                    hideLoading();
+                    // Non nascondere i suggerimenti esistenti in caso di errore
+                    if (!hasSuggestions) {
+                        suggestionsContainer.innerHTML = '';
+                    }
                 } finally {
                     isLoadingSuggestions = false;
                 }
             };
             
-            // Carica suggerimenti al focus
+            // Carica suggerimenti al focus (solo se non ci sono già)
             input.addEventListener('focus', () => {
-                clearTimeout(suggestionTimeout);
-                suggestionTimeout = setTimeout(loadSuggestions, 500);
+                if (!hasSuggestions) {
+                    clearTimeout(suggestionTimeout);
+                    suggestionTimeout = setTimeout(loadSuggestions, 500);
+                }
             });
             
-            // Carica suggerimenti dopo che l'utente smette di digitare (debounce)
+            // Carica suggerimenti dopo che l'utente smette di digitare (debounce più lungo)
             input.addEventListener('input', () => {
                 clearTimeout(suggestionTimeout);
-                suggestionTimeout = setTimeout(loadSuggestions, 1500);
+                // Aumenta il debounce a 2 secondi per evitare ricaricamenti troppo frequenti
+                suggestionTimeout = setTimeout(loadSuggestions, 2000);
             });
             
             // Carica suggerimenti iniziali dopo un breve delay

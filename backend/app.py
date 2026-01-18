@@ -554,7 +554,7 @@ Rispondi SOLO con un JSON array di stringhe, esempio:
 """
 
         response = client.chat.completions.create(
-            model="gpt-4o-mini",  # Modello veloce per suggerimenti
+            model="gpt-3.5-turbo",  # Modello veloce per suggerimenti
             messages=[
                 {"role": "system", "content": "Sei un assistente esperto che fornisce suggerimenti professionali per business plan. Rispondi sempre e solo con un JSON array valido."},
                 {"role": "user", "content": suggestion_prompt}
