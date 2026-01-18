@@ -837,8 +837,8 @@ async def verify_payment(request: VerifyPaymentRequest):
         raise HTTPException(status_code=500, detail=f"Errore interno: {str(e)}")
 
 @app.post("/api/generate-pdf")
-async def generate_pdf(request: PDFRequest):
-    """Genera il PDF dal JSON del business plan (richiede pagamento verificato)"""
+async def generate_pdf(request: PDFRequest, user: dict = Depends(verify_firebase_token)):
+    """Genera il PDF dal JSON del business plan (richiede autenticazione e pagamento verificato)"""
     try:
         # Verifica che ci sia sessionId nel request (opzionale per retrocompatibilità)
         # In produzione, dovresti sempre richiedere la verifica del pagamento
@@ -876,8 +876,8 @@ async def generate_pdf(request: PDFRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/generate-pdf-analysis")
-async def generate_pdf_analysis(request: PDFAnalysisRequest):
-    """Genera PDF dall'analisi di mercato (richiede pagamento verificato)"""
+async def generate_pdf_analysis(request: PDFAnalysisRequest, user: dict = Depends(verify_firebase_token)):
+    """Genera PDF dall'analisi di mercato (richiede autenticazione e pagamento verificato)"""
     try:
         # Verifica che ci sia sessionId nel request (opzionale per retrocompatibilità)
         session_id = request.marketAnalysisJson.get('_payment_session_id')

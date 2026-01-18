@@ -292,9 +292,10 @@
 
     <script src="script.js"></script>
     <script>
-        // Usa currentUser e authInitialized globali da script.js invece di dichiararne di nuovi
+        // Usa currentUser, authInitialized e API_BASE_URL globali da script.js invece di dichiararne di nuovi
         // let currentUser = null; // RIMOSSO - usa quello globale da script.js
         // let authInitialized = false; // RIMOSSO - usa quello globale da script.js
+        // const API_BASE_URL = ...; // RIMOSSO - usa window.API_BASE_URL da script.js
 
         // Funzioni Firebase Auth
         function getAuthFunctions() {
@@ -617,15 +618,20 @@
             }
         }
 
-        // Scarica documento come PDF
+        // Scarica documento come PDF tramite backend
         async function downloadDocument(docId) {
             // Usa currentUser globale da script.js
             const currentUser = window.currentUser || null;
             
-            if (!currentUser || !currentUser.uid) return;
+            if (!currentUser || !currentUser.uid) {
+                alert('Devi essere autenticato per scaricare il PDF');
+                return;
+            }
             
             const userId = currentUser.uid;
             let doc = null;
+            
+            console.log('📥 Caricamento documento per generazione PDF...');
             
             // Prova a caricare da Firestore
             if (window.firebaseDb) {
@@ -660,22 +666,93 @@
                 }
             }
             
-            if (doc) {
-                // Usa la funzione generatePDFFromContent se disponibile
-                if (typeof generatePDFFromContent === 'function') {
-                    await generatePDFFromContent(doc, doc.title);
-                } else {
-                    // Fallback: scarica come HTML
-                    const blob = new Blob([doc.html], { type: 'text/html' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `${doc.title}.html`;
-                    a.click();
-                    URL.revokeObjectURL(url);
-                }
-            } else {
+            if (!doc) {
                 alert('Documento non trovato');
+                return;
+            }
+            
+            // Verifica che il documento abbia il JSON necessario per generare il PDF
+            if (!doc.json) {
+                alert('Errore: il documento non contiene i dati necessari per generare il PDF. Il documento potrebbe essere stato creato prima dell\'implementazione del salvataggio JSON.');
+                return;
+            }
+            
+            try {
+                // Ottieni il token Firebase per l'autenticazione
+                let idToken = null;
+                try {
+                    idToken = await currentUser.getIdToken(true);
+                } catch (tokenError) {
+                    console.error('Errore nell\'ottenere il token:', tokenError);
+                    alert('Errore di autenticazione. Effettua nuovamente il login.');
+                    return;
+                }
+                
+                // Usa API_BASE_URL globale da script.js
+                const apiBaseUrl = window.API_BASE_URL || 'https://getbusinessplan.onrender.com';
+                let endpoint = '';
+                let requestBody = {};
+                
+                // Determina l'endpoint in base al tipo di documento
+                if (doc.type === 'business-plan') {
+                    endpoint = `${apiBaseUrl}/api/generate-pdf`;
+                    requestBody = {
+                        businessPlanJson: doc.json
+                    };
+                } else if (doc.type === 'market-analysis') {
+                    endpoint = `${apiBaseUrl}/api/generate-pdf-analysis`;
+                    requestBody = {
+                        marketAnalysisJson: doc.json
+                    };
+                } else {
+                    alert('Tipo di documento non supportato');
+                    return;
+                }
+                
+                console.log('🔄 Chiamata backend per generazione PDF...');
+                console.log('Endpoint:', endpoint);
+                console.log('Tipo documento:', doc.type);
+                
+                // Mostra un indicatore di caricamento
+                const loadingMessage = document.createElement('div');
+                loadingMessage.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 10001;';
+                loadingMessage.innerHTML = '<p>Generazione PDF in corso...</p>';
+                document.body.appendChild(loadingMessage);
+                
+                // Chiama il backend
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${idToken}`
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+                
+                // Rimuovi l'indicatore di caricamento
+                document.body.removeChild(loadingMessage);
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ detail: 'Errore sconosciuto' }));
+                    throw new Error(errorData.detail || `Errore HTTP ${response.status}`);
+                }
+                
+                // Scarica il PDF
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${doc.title.replace(/[^a-z0-9]/gi, '_')}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                console.log('✅ PDF scaricato con successo');
+                
+            } catch (error) {
+                console.error('❌ Errore nella generazione PDF:', error);
+                alert('Errore nella generazione del PDF: ' + error.message);
             }
         }
 

@@ -4,6 +4,7 @@
 // Backend su Render. Le credenziali API sono configurate sul server.
 // Nota: sul piano free Render il servizio può andare in sleep; la prima richiesta dopo un po' di inattività può richiedere 1-2 minuti (cold start).
 const API_BASE_URL = 'https://getbusinessplan.onrender.com';
+window.API_BASE_URL = API_BASE_URL; // Esposto globalmente per dashboard.html
 if (typeof console !== 'undefined') console.log('[SeedWise] API Backend:', API_BASE_URL, '(Render)');
 
 // ============================================
