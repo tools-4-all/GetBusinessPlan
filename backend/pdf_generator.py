@@ -882,44 +882,6 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
         """
         story.append(Paragraph(note_legali, styles['Normal']))
     
-    # Pagina di firma/approvazione
-    story.append(PageBreak())
-    story.append(Spacer(1, 2*cm))
-    story.append(Paragraph("APPROVAZIONE E FIRMA", styles['CustomHeading1']))
-    story.append(Spacer(1, 1*cm))
-    
-    firma_text = f"""
-    Il presente Business Plan è stato redatto in data {data_gen} e approvato da:
-    """
-    story.append(Paragraph(firma_text, styles['Normal']))
-    story.append(Spacer(1, 2*cm))
-    
-    # Tabella firme
-    if company_name:
-        firma_table = Table([
-            ['Preparato da:', ''],
-            ['', ''],
-            ['', ''],
-            ['Firma:', ''],
-            ['', ''],
-            ['', ''],
-            ['Approvato da:', ''],
-            ['', ''],
-            ['', ''],
-            ['Firma:', ''],
-        ], colWidths=[8*cm, 8*cm])
-        firma_table.setStyle(TableStyle([
-            ('FONTNAME', (0, 0), (-1, -1), 'Times-Roman'),
-            ('FONTSIZE', (0, 0), (-1, -1), 11),
-            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
-            ('VALIGN', (0, 0), (-1, -1), 'BOTTOM'),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
-            ('LINEBELOW', (0, 2), (1, 2), 1, colors.black),
-            ('LINEBELOW', (0, 5), (1, 5), 1, colors.black),
-            ('LINEBELOW', (0, 9), (1, 9), 1, colors.black),
-        ]))
-        story.append(firma_table)
-    
     # === PAGINA FINALE DI CHIUSURA ===
     story.append(PageBreak())
     

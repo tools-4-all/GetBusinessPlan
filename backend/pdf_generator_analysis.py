@@ -125,7 +125,11 @@ async def create_pdf_from_market_analysis(market_analysis_json: dict) -> str:
     titolo = f"Analisi di Mercato {meta.get('tipo_analisi', '').upper() if meta.get('tipo_analisi') == 'deep' else ''}"
     settore = meta.get('settore', '')
     area_geografica = meta.get('area_geografica', '')
-    data_gen = meta.get('data_generazione', datetime.now().strftime('%d/%m/%Y'))
+    # Data di generazione esatta con ora
+    if meta.get('data_generazione'):
+        data_gen = meta.get('data_generazione')
+    else:
+        data_gen = datetime.now().strftime('%d/%m/%Y alle %H:%M')
     
     # Colori professionali per la copertina (verde per analisi di mercato)
     primary_color = colors.HexColor('#065f46')  # Verde scuro professionale
@@ -538,7 +542,9 @@ async def create_pdf_from_market_analysis(market_analysis_json: dict) -> str:
     story.append(Paragraph("APPROVAZIONE E FIRMA", styles['CustomHeading1']))
     story.append(Spacer(1, 1*cm))
     
-    data_gen = meta.get('data_generazione', datetime.now().strftime('%d/%m/%Y'))
+    # Usa la stessa data della copertina (già formattata con ora se disponibile)
+    if not meta.get('data_generazione'):
+        data_gen = datetime.now().strftime('%d/%m/%Y alle %H:%M')
     firma_text = f"""
     Il presente documento di Analisi di Mercato è stato redatto in data {data_gen} e approvato da:
     """
@@ -602,7 +608,7 @@ async def create_pdf_from_market_analysis(market_analysis_json: dict) -> str:
     closing_message = """
     Questa Analisi di Mercato è stata redatta con cura e attenzione ai dettagli.<br/><br/>
     Per ulteriori informazioni o chiarimenti, non esitate a contattarci.<br/><br/>
-    <i>Documento generato con GetBusinessPlan</i>
+    <i>Documento generato con SeedWise</i>
     """
     closing_style = ParagraphStyle(
         name='ClosingMessage',
