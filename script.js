@@ -4,7 +4,7 @@
 // Backend su Render. Le credenziali API sono configurate sul server.
 // Nota: sul piano free Render il servizio può andare in sleep; la prima richiesta dopo un po' di inattività può richiedere 1-2 minuti (cold start).
 const API_BASE_URL = 'https://getbusinessplan.onrender.com';
-if (typeof console !== 'undefined') console.log('[GetBusinessPlan] API Backend:', API_BASE_URL, '(Render)');
+if (typeof console !== 'undefined') console.log('[SeedWise] API Backend:', API_BASE_URL, '(Render)');
 
 // DOM Elements - will be initialized when DOM is ready
 let planModal;
@@ -2270,38 +2270,7 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
     });
 });
 
-// Add animation on scroll with staggered delays
-const observerOptions = {
-    threshold: 0.1,
-    rootMargin: '0px 0px -80px 0px'
-};
-
-const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-        if (entry.isIntersecting) {
-            entry.target.style.opacity = '1';
-            entry.target.style.transform = 'translateY(0)';
-        }
-    });
-}, observerOptions);
-
-// Observe all sections with staggered animation
-document.querySelectorAll('section > .container > *').forEach((el, index) => {
-    el.style.opacity = '0';
-    el.style.transform = 'translateY(30px)';
-    const delay = Math.min(index * 0.1, 0.5); // Max 0.5s delay
-    el.style.transition = `opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1) ${delay}s, transform 0.8s cubic-bezier(0.4, 0, 0.2, 1) ${delay}s`;
-    observer.observe(el);
-});
-
-// Animate cards and steps individually
-document.querySelectorAll('.card, .step, .testimonial, .plan-example, .feature').forEach((el, index) => {
-    el.style.opacity = '0';
-    el.style.transform = 'translateY(20px)';
-    const delay = Math.min(index * 0.08, 0.4);
-    el.style.transition = `opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1) ${delay}s, transform 0.6s cubic-bezier(0.4, 0, 0.2, 1) ${delay}s`;
-    observer.observe(el);
-});
+// Animations on scroll removed - sections appear immediately
 
 
 // ============================================
