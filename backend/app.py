@@ -48,9 +48,15 @@ if STRIPE_SECRET_KEY:
 else:
     print("⚠️ ATTENZIONE: STRIPE_SECRET_KEY non configurata. Il pagamento non funzionerà.")
 
-# Prezzi (in centesimi di euro)
+# Prezzi (in centesimi di euro) - usati come fallback se Price ID non configurati
 PRICE_BUSINESS_PLAN = int(os.getenv("PRICE_BUSINESS_PLAN_CENTS", "1999"))  # 19.99€ default
 PRICE_MARKET_ANALYSIS = int(os.getenv("PRICE_MARKET_ANALYSIS_CENTS", "1499"))  # 14.99€ default
+
+# Price ID Stripe (raccomandato - crea i Price in Stripe Dashboard e inserisci gli ID qui)
+STRIPE_PRICE_BUSINESS_PLAN = os.getenv("STRIPE_PRICE_BUSINESS_PLAN", "")
+STRIPE_PRICE_MARKET_ANALYSIS = os.getenv("STRIPE_PRICE_MARKET_ANALYSIS", "")
+STRIPE_PRICE_BUSINESS_PLAN_UPSELL = os.getenv("STRIPE_PRICE_BUSINESS_PLAN_UPSELL", "")
+STRIPE_PRICE_MARKET_ANALYSIS_UPSELL = os.getenv("STRIPE_PRICE_MARKET_ANALYSIS_UPSELL", "")
 
 # Modelli per le richieste
 class BusinessPlanRequest(BaseModel):
@@ -493,60 +499,86 @@ async def create_checkout_session(request: CreateCheckoutRequest):
         line_items = []
         
         if request.documentType == "business-plan":
-            price_amount = PRICE_BUSINESS_PLAN
-            product_name = "Business Plan Professionale"
-            line_items.append({
-                'price_data': {
-                    'currency': 'eur',
-                    'product_data': {
-                        'name': product_name,
+            # Usa Price ID se configurato, altrimenti usa price_data
+            if STRIPE_PRICE_BUSINESS_PLAN:
+                line_items.append({
+                    'price': STRIPE_PRICE_BUSINESS_PLAN,
+                    'quantity': 1,
+                })
+            else:
+                # Fallback a price_data se Price ID non configurato
+                line_items.append({
+                    'price_data': {
+                        'currency': 'eur',
+                        'product_data': {
+                            'name': 'Business Plan Professionale',
+                        },
+                        'unit_amount': PRICE_BUSINESS_PLAN,
                     },
-                    'unit_amount': price_amount,
-                },
-                'quantity': 1,
-            })
+                    'quantity': 1,
+                })
             
             # Se include upsell, aggiungi anche l'analisi di mercato con sconto
             if request.includeUpsell:
-                upsell_price = int(PRICE_MARKET_ANALYSIS * 0.7)  # 30% di sconto
+                if STRIPE_PRICE_MARKET_ANALYSIS_UPSELL:
+                    line_items.append({
+                        'price': STRIPE_PRICE_MARKET_ANALYSIS_UPSELL,
+                        'quantity': 1,
+                    })
+                else:
+                    # Fallback a price_data con sconto del 30%
+                    upsell_price = int(PRICE_MARKET_ANALYSIS * 0.7)
+                    line_items.append({
+                        'price_data': {
+                            'currency': 'eur',
+                            'product_data': {
+                                'name': 'Analisi di Mercato (Offerta Speciale)',
+                            },
+                            'unit_amount': upsell_price,
+                        },
+                        'quantity': 1,
+                    })
+                
+        elif request.documentType == "market-analysis":
+            # Usa Price ID se configurato, altrimenti usa price_data
+            if STRIPE_PRICE_MARKET_ANALYSIS:
+                line_items.append({
+                    'price': STRIPE_PRICE_MARKET_ANALYSIS,
+                    'quantity': 1,
+                })
+            else:
+                # Fallback a price_data se Price ID non configurato
                 line_items.append({
                     'price_data': {
                         'currency': 'eur',
                         'product_data': {
-                            'name': 'Analisi di Mercato (Offerta Speciale)',
+                            'name': 'Analisi di Mercato',
                         },
-                        'unit_amount': upsell_price,
+                        'unit_amount': PRICE_MARKET_ANALYSIS,
                     },
                     'quantity': 1,
                 })
-                
-        elif request.documentType == "market-analysis":
-            price_amount = PRICE_MARKET_ANALYSIS
-            product_name = "Analisi di Mercato"
-            line_items.append({
-                'price_data': {
-                    'currency': 'eur',
-                    'product_data': {
-                        'name': product_name,
-                    },
-                    'unit_amount': price_amount,
-                },
-                'quantity': 1,
-            })
             
             # Se include upsell, aggiungi anche il business plan con sconto
             if request.includeUpsell:
-                upsell_price = int(PRICE_BUSINESS_PLAN * 0.7)  # 30% di sconto
-                line_items.append({
-                    'price_data': {
-                        'currency': 'eur',
-                        'product_data': {
-                            'name': 'Business Plan Professionale (Offerta Speciale)',
+                if STRIPE_PRICE_BUSINESS_PLAN_UPSELL:
+                    line_items.append({
+                        'price': STRIPE_PRICE_BUSINESS_PLAN_UPSELL,
+                        'quantity': 1,
+                    })
+                else:
+                    # Fallback a price_data con sconto del 30%
+                    upsell_price = int(PRICE_BUSINESS_PLAN * 0.7)
+                    line_items.append({
+                        'price_data': {
+                            'currency': 'eur',
+                            'product_data': {
+                                'name': 'Business Plan Professionale (Offerta Speciale)',
+                            },
+                            'unit_amount': upsell_price,
                         },
-                        'unit_amount': upsell_price,
-                    },
-                    'quantity': 1,
-                })
+                        'quantity': 1,
+                    })
         else:
             raise HTTPException(status_code=400, detail="Tipo documento non valido")
         
