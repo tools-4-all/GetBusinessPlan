@@ -11,3 +11,9 @@ output/
 *.pdf
 .env
 .DS_Store
+# Firebase credentials (never commit!)
+firebase-credentials.json
+*firebase*.json
+# Firebase credentials (never commit!)
+firebase-credentials.json
+*firebase*.json

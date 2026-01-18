@@ -1,6 +1,7 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.responses import JSONResponse, FileResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from openai import OpenAI
 import json
@@ -12,11 +13,61 @@ import utils
 import pdf_generator
 import pdf_generator_analysis
 import stripe
+import firebase_admin
+from firebase_admin import credentials, auth
 
 # Carica variabili d'ambiente
 load_dotenv()
 
+# Inizializza Firebase Admin SDK
+try:
+    # Prova a caricare le credenziali da variabile d'ambiente (JSON string)
+    firebase_creds_json = os.getenv("FIREBASE_CREDENTIALS_JSON")
+    if firebase_creds_json:
+        cred_dict = json.loads(firebase_creds_json)
+        cred = credentials.Certificate(cred_dict)
+        firebase_admin.initialize_app(cred)
+        print("✅ Firebase Admin inizializzato con credenziali da variabile d'ambiente")
+    else:
+        # Prova a caricare da file (per sviluppo locale)
+        cred_path = os.getenv("FIREBASE_CREDENTIALS_PATH", "firebase-credentials.json")
+        if os.path.exists(cred_path):
+            cred = credentials.Certificate(cred_path)
+            firebase_admin.initialize_app(cred)
+            print(f"✅ Firebase Admin inizializzato con credenziali da {cred_path}")
+        else:
+            print("⚠️ ATTENZIONE: Firebase Admin non configurato. L'autenticazione non funzionerà.")
+            print("   Configura FIREBASE_CREDENTIALS_JSON o FIREBASE_CREDENTIALS_PATH")
+except Exception as e:
+    print(f"⚠️ ERRORE nell'inizializzazione Firebase Admin: {e}")
+    print("   L'autenticazione potrebbe non funzionare correttamente")
+
 app = FastAPI(title="GetBusinessPlan API", version="1.0.0")
+
+# Security scheme per Bearer token
+security = HTTPBearer(auto_error=False)
+
+# Funzione per verificare il token Firebase
+async def verify_firebase_token(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)):
+    """Verifica il token Firebase e restituisce l'utente autenticato"""
+    if not credentials:
+        raise HTTPException(
+            status_code=401,
+            detail="Token di autenticazione richiesto. Effettua il login per continuare."
+        )
+    
+    token = credentials.credentials
+    
+    try:
+        # Verifica il token con Firebase Admin
+        decoded_token = auth.verify_id_token(token)
+        return decoded_token
+    except Exception as e:
+        print(f"Errore verifica token Firebase: {e}")
+        raise HTTPException(
+            status_code=401,
+            detail="Token non valido o scaduto. Effettua nuovamente il login."
+        )
 
 # CORS - in produzione, specifica i domini
 app.add_middleware(
@@ -489,10 +540,18 @@ async def generate_market_analysis(request: MarketAnalysisRequest):
         raise HTTPException(status_code=500, detail=f"Errore interno: {str(e)}")
 
 @app.post("/api/create-checkout-session")
-async def create_checkout_session(request: CreateCheckoutRequest):
-    """Crea una sessione di checkout Stripe"""
+async def create_checkout_session(
+    request: CreateCheckoutRequest,
+    user: dict = Depends(verify_firebase_token)
+):
+    """Crea una sessione di checkout Stripe - Richiede autenticazione"""
     if not STRIPE_SECRET_KEY:
         raise HTTPException(status_code=500, detail="Stripe non configurato")
+    
+    # L'utente è autenticato (verificato da verify_firebase_token)
+    user_email = user.get('email', 'unknown')
+    user_id = user.get('uid', 'unknown')
+    print(f"✅ Checkout session richiesta da utente autenticato: {user_email} (UID: {user_id})")
     
     try:
         # Determina il prezzo in base al tipo di documento

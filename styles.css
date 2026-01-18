@@ -2330,3 +2330,125 @@ html {
         font-size: 14px;
     }
 }
+
+/* Stili per autenticazione */
+#authButtons {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+#userInfo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#userEmail {
+    color: var(--text-secondary);
+    font-size: 0.9em;
+}
+
+#authModal input[type="email"],
+#authModal input[type="password"] {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    font-size: 1em;
+    transition: all 0.2s ease;
+    font-family: inherit;
+}
+
+#authModal input[type="email"]:focus,
+#authModal input[type="password"]:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+#authModal input[type="email"]:hover,
+#authModal input[type="password"]:hover {
+    border-color: #9ca3af;
+}
+
+#authError {
+    display: none;
+    color: #dc2626;
+    padding: 12px;
+    background: #fee2e2;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    font-size: 0.9em;
+    line-height: 1.5;
+}
+
+#authInfo {
+    display: none;
+    color: #059669;
+    padding: 12px;
+    background: #d1fae5;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    font-size: 0.9em;
+    line-height: 1.5;
+}
+
+#authModal label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: var(--text-primary);
+    font-size: 0.95em;
+}
+
+#submitAuth:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none !important;
+}
+
+#passwordHint {
+    display: none;
+    margin-top: 6px;
+    font-size: 0.85em;
+}
+
+#passwordHintText {
+    display: block;
+}
+
+#switchModeBtn {
+    transition: color 0.2s ease;
+}
+
+#switchModeBtn:hover {
+    color: var(--accent-hover);
+    text-decoration: none;
+}
+
+#switchModeContainer {
+    text-align: center;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+}
+
+#switchModeContainer p {
+    margin-bottom: 8px;
+}
+
+/* Animazione per il campo conferma password */
+#confirmPasswordContainer {
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

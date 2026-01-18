@@ -13,6 +13,38 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <!-- html2pdf for better HTML to PDF conversion (optional) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getAuth } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        
+        // Configurazione Firebase - DA SOSTITUIRE CON LE TUE CREDENZIALI
+        const firebaseConfig = {
+            apiKey: "AIzaSyABZKDDf1biPDKObo37zpaPOwd6TqLzoqw",
+            authDomain: "seedwise-d0457.firebaseapp.com",
+            projectId: "seedwise-d0457",
+            storageBucket: "seedwise-d0457.firebasestorage.app",
+            messagingSenderId: "761293808147",
+            appId: "1:761293808147:web:18ea8bd8a89ac8d529d5e6",
+            measurementId: "G-PFQ3ZGX3RM"
+            };
+        
+        // Inizializza Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        
+        // Esponi auth e funzioni globalmente
+        window.firebaseAuth = auth;
+        window.firebaseAuthFunctions = {
+            signInWithEmailAndPassword,
+            createUserWithEmailAndPassword,
+            signOut,
+            onAuthStateChanged
+        };
+        
+        console.log('✅ Firebase inizializzato');
+    </script>
 </head>
 <body>
     <!-- Header -->
@@ -21,6 +53,13 @@
             <div class="header-content">
                 <div class="logo">SeedWise</div>
                 <nav class="nav">
+                    <div id="authButtons" style="display: flex; gap: 10px; align-items: center;">
+                        <button class="btn-secondary" id="authBtn">Accedi</button>
+                        <div id="userInfo" style="display: none; align-items: center; gap: 10px;">
+                            <span id="userEmail" style="color: var(--text-secondary); font-size: 0.9em;"></span>
+                            <button class="btn-secondary" id="logoutBtn">Esci</button>
+                        </div>
+                    </div>
                     <button class="btn-primary" id="createPlanBtn">Inizia</button>
                     <a href="blog.html" class="btn-link">Blog</a>
                 </nav>
@@ -335,6 +374,97 @@
                     <button class="btn-secondary" id="declineUpsellBtn" style="flex: 1;">No, solo questo</button>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Modal for Authentication -->
+    <div class="modal" id="authModal" style="display: none;">
+        <div class="modal-content" style="max-width: 480px;">
+            <span class="close" id="closeAuthModal">&times;</span>
+            <div style="text-align: center; margin-bottom: 24px;">
+                <h2 style="margin-bottom: 8px; font-size: 1.75em;">Accedi al tuo account</h2>
+                <p style="color: #64748b; font-size: 0.95em;">Per procedere con il pagamento, è necessario accedere o creare un account.</p>
+            </div>
+            
+            <!-- Unified Auth Form -->
+            <form id="authForm" onsubmit="return false;">
+                <div style="margin-bottom: 18px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 500; color: var(--text-primary);">Email</label>
+                    <input 
+                        type="email" 
+                        id="authEmail" 
+                        placeholder="nome@esempio.com" 
+                        required 
+                        autocomplete="email"
+                        style="width: 100%; padding: 12px 16px; border: 2px solid var(--border); border-radius: 8px; font-size: 1em; transition: all 0.2s ease;"
+                        onfocus="this.style.borderColor='var(--accent)'; this.style.boxShadow='0 0 0 3px rgba(37, 99, 235, 0.1)';"
+                        onblur="this.style.borderColor='var(--border)'; this.style.boxShadow='none';"
+                    >
+                </div>
+                
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 500; color: var(--text-primary);">Password</label>
+                    <input 
+                        type="password" 
+                        id="authPassword" 
+                        placeholder="Inserisci la tua password" 
+                        required 
+                        minlength="6"
+                        autocomplete="current-password"
+                        style="width: 100%; padding: 12px 16px; border: 2px solid var(--border); border-radius: 8px; font-size: 1em; transition: all 0.2s ease;"
+                        onfocus="this.style.borderColor='var(--accent)'; this.style.boxShadow='0 0 0 3px rgba(37, 99, 235, 0.1)';"
+                        onblur="this.style.borderColor='var(--border)'; this.style.boxShadow='none';"
+                    >
+                    <div id="passwordHint" style="display: none; margin-top: 6px; font-size: 0.85em; color: #64748b;">
+                        <span id="passwordHintText"></span>
+                    </div>
+                </div>
+                
+                <!-- Confirm Password (solo per registrazione) -->
+                <div id="confirmPasswordContainer" style="margin-bottom: 20px; display: none;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 500; color: var(--text-primary);">Conferma Password</label>
+                    <input 
+                        type="password" 
+                        id="authPasswordConfirm" 
+                        placeholder="Ripeti la password" 
+                        minlength="6"
+                        autocomplete="new-password"
+                        style="width: 100%; padding: 12px 16px; border: 2px solid var(--border); border-radius: 8px; font-size: 1em; transition: all 0.2s ease;"
+                        onfocus="this.style.borderColor='var(--accent)'; this.style.boxShadow='0 0 0 3px rgba(37, 99, 235, 0.1)';"
+                        onblur="this.style.borderColor='var(--border)'; this.style.boxShadow='none';"
+                    >
+                </div>
+                
+                <!-- Error Message -->
+                <div id="authError" style="display: none; color: #dc2626; padding: 12px; background: #fee2e2; border-radius: 8px; margin-bottom: 16px; font-size: 0.9em; line-height: 1.5;"></div>
+                
+                <!-- Success/Info Message -->
+                <div id="authInfo" style="display: none; color: #059669; padding: 12px; background: #d1fae5; border-radius: 8px; margin-bottom: 16px; font-size: 0.9em; line-height: 1.5;"></div>
+                
+                <!-- Submit Button -->
+                <button 
+                    type="submit" 
+                    class="btn-primary" 
+                    id="submitAuth" 
+                    style="width: 100%; padding: 14px; font-size: 1em; font-weight: 600; margin-bottom: 16px;"
+                >
+                    Accedi
+                </button>
+                
+                <!-- Switch Mode Link -->
+                <div id="switchModeContainer" style="text-align: center; padding-top: 16px; border-top: 1px solid var(--border);">
+                    <p style="color: #64748b; font-size: 0.9em; margin-bottom: 8px;" id="switchModeText">
+                        Non hai un account?
+                    </p>
+                    <button 
+                        type="button" 
+                        id="switchModeBtn" 
+                        style="background: none; border: none; color: var(--accent); cursor: pointer; font-weight: 600; font-size: 0.95em; text-decoration: underline;"
+                    >
+                        Crea un account
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 

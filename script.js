@@ -7,6 +7,37 @@ const API_BASE_URL = 'https://getbusinessplan.onrender.com';
 if (typeof console !== 'undefined') console.log('[SeedWise] API Backend:', API_BASE_URL, '(Render)');
 
 // ============================================
+// FIREBASE AUTHENTICATION
+// ============================================
+// Stato autenticazione
+let currentUser = null;
+let authInitialized = false;
+
+// Funzioni Firebase Auth (caricate dall'HTML)
+function getAuthFunctions() {
+    return window.firebaseAuthFunctions || null;
+}
+
+// Controllo immediato per pagamento dopo redirect (eseguito prima di tutto)
+(function() {
+    'use strict';
+    const urlParams = new URLSearchParams(window.location.search);
+    const paymentStatus = urlParams.get('payment');
+    const sessionId = urlParams.get('session_id');
+    
+    if (paymentStatus === 'success' && sessionId) {
+        console.log('🚨🚨🚨 PAGAMENTO RILEVATO ALL\'AVVIO DELLA PAGINA 🚨🚨🚨');
+        console.log('Session ID:', sessionId);
+        console.log('URL:', window.location.href);
+        
+        // Salva in una variabile globale che verrà controllata da initializeAll
+        window.paymentRedirectDetected = true;
+        window.paymentSessionId = sessionId;
+        window.paymentStatus = paymentStatus;
+    }
+})();
+
+// ============================================
 // UTILITY FUNCTIONS
 // ============================================
 // Funzione per sanitizzare HTML (escape)
@@ -1083,15 +1114,20 @@ function initializeEventListeners() {
     }
 
 
-    // Login buttons (funzionalità in sviluppo)
-    const loginBtn = document.getElementById('loginBtn');
-    const ctaLoginBtn = document.getElementById('ctaLoginBtn');
-    if (loginBtn) {
-        loginBtn.addEventListener('click', () => {
-            console.log('Login button clicked');
-            alert('Funzionalità di login in sviluppo');
+    // Bottone Accedi - listener diretto per sicurezza
+    const authBtn = document.getElementById('authBtn');
+    if (authBtn) {
+        authBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('🔐 Bottone Accedi cliccato (listener diretto)');
+            showAuthModal().catch(err => {
+                console.error('Errore apertura modal:', err);
+                alert('Errore nell\'apertura del form di accesso. Ricarica la pagina e riprova.');
+            });
         });
     }
+    
     if (ctaLoginBtn) {
         ctaLoginBtn.addEventListener('click', (e) => {
             e.preventDefault();
@@ -1131,18 +1167,26 @@ function initializeAll() {
     initializeEventListeners();
     initializeAnalysisListeners();
     
+    // Inizializza autenticazione Firebase
+    initializeAuth();
+    
     // Verifica pagamento dopo redirect da Stripe
     const urlParams = new URLSearchParams(window.location.search);
     const paymentStatus = urlParams.get('payment');
     const sessionId = urlParams.get('session_id');
     
-    console.log('Parametri URL:', { paymentStatus, sessionId });
+    // Usa anche i valori salvati all'avvio se disponibili
+    const finalPaymentStatus = paymentStatus || window.paymentStatus;
+    const finalSessionId = sessionId || window.paymentSessionId;
     
-    if (paymentStatus === 'success' && sessionId) {
+    console.log('Parametri URL:', { paymentStatus, sessionId, finalPaymentStatus, finalSessionId });
+    
+    if (finalPaymentStatus === 'success' && finalSessionId) {
         console.log('🔍 ===== VERIFICA PAGAMENTO DOPO REDIRECT =====');
-        console.log('Session ID:', sessionId);
-        console.log('Payment Status:', paymentStatus);
+        console.log('Session ID:', finalSessionId);
+        console.log('Payment Status:', finalPaymentStatus);
         console.log('URL completa:', window.location.href);
+        console.log('Payment redirect rilevato all\'avvio:', window.paymentRedirectDetected);
         
         // Determina il tipo di documento dal localStorage
         const pendingDocType = localStorage.getItem('pendingDocumentType');
@@ -1165,13 +1209,13 @@ function initializeAll() {
             verifyPaymentAfterRedirect('business-plan').then(bpVerified => {
             if (bpVerified) {
                 window.paymentVerified = true;
-                window.paymentSessionId = sessionId;
+                window.paymentSessionId = finalSessionId;
                 console.log('✅ Pagamento business plan verificato');
                 
                 // Se include upsell per analisi di mercato, verifica anche quello
                 if (window.upsellPaid && window.upsellType === 'market-analysis') {
                     window.paymentVerified_analysis = true;
-                    window.paymentSessionId_analysis = sessionId;
+                    window.paymentSessionId_analysis = finalSessionId;
                     console.log('✅ Upsell analisi di mercato incluso nel pagamento');
                 }
                 
@@ -1212,15 +1256,21 @@ function initializeAll() {
                         document.body.style.overflow = 'hidden';
                         console.log('✅ Modal business plan aperto');
                         
-                        // Nascondi wizard
+                        // Nascondi wizard e mostra loading
                         if (wizardContainer) wizardContainer.style.display = 'none';
                         if (wizardNavigation) wizardNavigation.style.display = 'none';
                         if (resultState) resultState.style.display = 'none';
+                        if (loadingState) loadingState.style.display = 'block';
                         
-                        // Genera il business plan dopo un breve delay
+                        // Genera il business plan dopo un breve delay per assicurare che il DOM sia pronto
                         setTimeout(() => {
-                            generateBusinessPlanAfterPayment(wizardData);
-                        }, 300);
+                            console.log('🚀 Avvio generazione business plan...');
+                            generateBusinessPlanAfterPayment(wizardData).catch(error => {
+                                console.error('❌ Errore nella generazione:', error);
+                                alert('Errore nella generazione del business plan: ' + error.message);
+                                if (loadingState) loadingState.style.display = 'none';
+                            });
+                        }, 500);
                     } else {
                         console.error('❌ Modal business plan non trovato');
                         alert('Errore: modal non trovato. Ricarica la pagina.');
@@ -1239,13 +1289,13 @@ function initializeAll() {
                 console.log('📋 Risultato verifica market-analysis:', maVerified);
                 if (maVerified) {
                     window.paymentVerified_analysis = true;
-                    window.paymentSessionId_analysis = sessionId;
+                    window.paymentSessionId_analysis = finalSessionId;
                     console.log('✅ Pagamento analisi di mercato verificato');
                     
                     // Se include upsell per business plan, verifica anche quello
                     if (window.upsellPaid && window.upsellType === 'business-plan') {
                         window.paymentVerified = true;
-                        window.paymentSessionId = sessionId;
+                        window.paymentSessionId = finalSessionId;
                         console.log('✅ Upsell business plan incluso nel pagamento');
                     }
                     
@@ -1286,15 +1336,21 @@ function initializeAll() {
                             document.body.style.overflow = 'hidden';
                             console.log('✅ Modal analisi aperto');
                             
-                            // Nascondi wizard
+                            // Nascondi wizard e mostra loading
                             if (analysisWizardContainer) analysisWizardContainer.style.display = 'none';
                             if (analysisWizardNavigation) analysisWizardNavigation.style.display = 'none';
                             if (analysisResultState) analysisResultState.style.display = 'none';
+                            if (analysisLoadingState) analysisLoadingState.style.display = 'block';
                             
-                            // Genera l'analisi dopo un breve delay
+                            // Genera l'analisi dopo un breve delay per assicurare che il DOM sia pronto
                             setTimeout(() => {
-                                generateMarketAnalysisAfterPayment(analysisWizardData);
-                            }, 300);
+                                console.log('🚀 Avvio generazione analisi di mercato...');
+                                generateMarketAnalysisAfterPayment(analysisWizardData).catch(error => {
+                                    console.error('❌ Errore nella generazione:', error);
+                                    alert('Errore nella generazione dell\'analisi: ' + error.message);
+                                    if (analysisLoadingState) analysisLoadingState.style.display = 'none';
+                                });
+                            }, 500);
                         } else {
                             console.error('❌ Modal analisi non trovato');
                             alert('Errore: modal non trovato. Ricarica la pagina.');
@@ -1406,12 +1462,33 @@ function initializeAll() {
     }
 }
 
+// Controlla immediatamente se c'è un pagamento in corso (anche prima che il DOM sia completamente caricato)
+(function checkPaymentImmediately() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const paymentStatus = urlParams.get('payment');
+    const sessionId = urlParams.get('session_id');
+    
+    if (paymentStatus === 'success' && sessionId) {
+        console.log('🚨 PAGAMENTO RILEVATO - Esegui verifica immediata');
+        // Non fare nulla qui, lascia che initializeAll gestisca tutto
+        // Ma assicurati che initializeAll venga chiamato
+    }
+})();
+
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initializeAll);
 } else {
     // DOM already loaded, but wait a bit to ensure everything is ready
     if (document.body) {
-        initializeAll();
+        // Chiama immediatamente se c'è un pagamento
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('payment') === 'success') {
+            console.log('🚨 Pagamento rilevato, inizializzazione immediata...');
+            initializeAll();
+        } else {
+            // Altrimenti aspetta un po'
+            setTimeout(initializeAll, 100);
+        }
     } else {
         // Fallback: wait for body
         setTimeout(initializeAll, 10);
@@ -2777,9 +2854,372 @@ async function showUpsellOffer(currentDocumentType, currentJsonData) {
     });
 }
 
+// ============================================
+// FUNZIONI DI AUTENTICAZIONE FIREBASE
+// ============================================
+
+// Verifica se l'utente è autenticato
+async function requireAuth() {
+    return new Promise((resolve, reject) => {
+        const authFunctions = getAuthFunctions();
+        if (!window.firebaseAuth || !authFunctions) {
+            reject(new Error('Firebase non inizializzato'));
+            return;
+        }
+        
+        const { onAuthStateChanged } = authFunctions;
+        
+        // Verifica lo stato attuale
+        onAuthStateChanged(window.firebaseAuth, (user) => {
+            if (user) {
+                currentUser = user;
+                resolve(user);
+            } else {
+                // Mostra modal di autenticazione
+                showAuthModal().then((authenticatedUser) => {
+                    if (authenticatedUser) {
+                        currentUser = authenticatedUser;
+                        resolve(authenticatedUser);
+                    } else {
+                        reject(new Error('Autenticazione richiesta'));
+                    }
+                }).catch(reject);
+            }
+        });
+    });
+}
+
+// Mostra il modal di autenticazione con form unificato intelligente
+function showAuthModal() {
+    return new Promise((resolve, reject) => {
+        const authModal = document.getElementById('authModal');
+        const closeAuthModal = document.getElementById('closeAuthModal');
+        const authForm = document.getElementById('authForm');
+        const authEmail = document.getElementById('authEmail');
+        const authPassword = document.getElementById('authPassword');
+        const authPasswordConfirm = document.getElementById('authPasswordConfirm');
+        const confirmPasswordContainer = document.getElementById('confirmPasswordContainer');
+        const submitAuth = document.getElementById('submitAuth');
+        const authError = document.getElementById('authError');
+        const authInfo = document.getElementById('authInfo');
+        const switchModeBtn = document.getElementById('switchModeBtn');
+        const switchModeText = document.getElementById('switchModeText');
+        const passwordHint = document.getElementById('passwordHint');
+        
+        if (!authModal) {
+            reject(new Error('Modal di autenticazione non trovato'));
+            return;
+        }
+        
+        // Stato del form (login o registrazione)
+        let isRegisterMode = false;
+        
+        // Reset form
+        const resetForm = () => {
+            if (authEmail) authEmail.value = '';
+            if (authPassword) authPassword.value = '';
+            if (authPasswordConfirm) authPasswordConfirm.value = '';
+            if (authError) authError.style.display = 'none';
+            if (authInfo) authInfo.style.display = 'none';
+            if (passwordHint) passwordHint.style.display = 'none';
+            isRegisterMode = false;
+            updateFormMode();
+        };
+        
+        // Aggiorna UI in base alla modalità
+        const updateFormMode = () => {
+            if (confirmPasswordContainer) {
+                confirmPasswordContainer.style.display = isRegisterMode ? 'block' : 'none';
+            }
+            if (authPasswordConfirm) {
+                authPasswordConfirm.required = isRegisterMode;
+            }
+            if (submitAuth) {
+                submitAuth.textContent = isRegisterMode ? 'Crea account' : 'Accedi';
+            }
+            if (switchModeText) {
+                switchModeText.textContent = isRegisterMode 
+                    ? 'Hai già un account?' 
+                    : 'Non hai un account?';
+            }
+            if (switchModeBtn) {
+                switchModeBtn.textContent = isRegisterMode 
+                    ? 'Accedi invece' 
+                    : 'Crea un account';
+            }
+            if (authError) authError.style.display = 'none';
+            if (authInfo) authInfo.style.display = 'none';
+        };
+        
+        // Mostra hint password
+        const showPasswordHint = (text, isError = false) => {
+            if (passwordHint) {
+                passwordHint.style.display = 'block';
+                passwordHint.style.color = isError ? '#dc2626' : '#64748b';
+                const hintText = document.getElementById('passwordHintText');
+                if (hintText) hintText.textContent = text;
+            }
+        };
+        
+        // Nascondi hint password
+        const hidePasswordHint = () => {
+            if (passwordHint) passwordHint.style.display = 'none';
+        };
+        
+        // Gestione chiusura
+        const closeHandler = () => {
+            resetForm();
+            authModal.style.display = 'none';
+            reject(new Error('Autenticazione annullata'));
+        };
+        
+        if (closeAuthModal) {
+            closeAuthModal.onclick = closeHandler;
+        }
+        authModal.onclick = (e) => {
+            if (e.target === authModal) closeHandler();
+        };
+        
+        // Switch tra login e registrazione
+        if (switchModeBtn) {
+            switchModeBtn.onclick = () => {
+                isRegisterMode = !isRegisterMode;
+                updateFormMode();
+                if (authError) authError.style.display = 'none';
+                if (authInfo) authInfo.style.display = 'none';
+            };
+        }
+        
+        // Validazione password in tempo reale
+        if (authPassword) {
+            authPassword.addEventListener('input', () => {
+                const password = authPassword.value;
+                if (password.length > 0 && password.length < 6) {
+                    showPasswordHint('La password deve essere di almeno 6 caratteri', true);
+                } else if (password.length >= 6) {
+                    showPasswordHint('Password valida', false);
+                } else {
+                    hidePasswordHint();
+                }
+            });
+        }
+        
+        // Gestione submit form
+        if (authForm) {
+            authForm.onsubmit = async (e) => {
+                e.preventDefault();
+                
+                const email = authEmail ? authEmail.value.trim() : '';
+                const password = authPassword ? authPassword.value : '';
+                const passwordConfirm = authPasswordConfirm ? authPasswordConfirm.value : '';
+                
+                // Validazione base
+                if (!email || !password) {
+                    if (authError) {
+                        authError.textContent = 'Inserisci email e password';
+                        authError.style.display = 'block';
+                    }
+                    return;
+                }
+                
+                if (isRegisterMode) {
+                    if (!passwordConfirm) {
+                        if (authError) {
+                            authError.textContent = 'Conferma la password';
+                            authError.style.display = 'block';
+                        }
+                        return;
+                    }
+                    
+                    if (password.length < 6) {
+                        if (authError) {
+                            authError.textContent = 'La password deve essere di almeno 6 caratteri';
+                            authError.style.display = 'block';
+                        }
+                        return;
+                    }
+                    
+                    if (password !== passwordConfirm) {
+                        if (authError) {
+                            authError.textContent = 'Le password non corrispondono';
+                            authError.style.display = 'block';
+                        }
+                        return;
+                    }
+                }
+                
+                // Nascondi errori precedenti
+                if (authError) authError.style.display = 'none';
+                if (authInfo) authInfo.style.display = 'none';
+                
+                // Disabilita pulsante
+                if (submitAuth) {
+                    submitAuth.disabled = true;
+                    submitAuth.textContent = isRegisterMode ? 'Creazione account...' : 'Accesso in corso...';
+                }
+                
+                try {
+                    const authFunctions = getAuthFunctions();
+                    if (!authFunctions || !window.firebaseAuth) {
+                        throw new Error('Firebase Auth non disponibile');
+                    }
+                    
+                    let userCredential;
+                    
+                    if (isRegisterMode) {
+                        // Registrazione
+                        const { createUserWithEmailAndPassword } = authFunctions;
+                        userCredential = await createUserWithEmailAndPassword(window.firebaseAuth, email, password);
+                    } else {
+                        // Login - prova prima il login
+                        try {
+                            const { signInWithEmailAndPassword } = authFunctions;
+                            userCredential = await signInWithEmailAndPassword(window.firebaseAuth, email, password);
+                        } catch (loginError) {
+                            // Se l'utente non esiste, suggerisci registrazione
+                            if (loginError.code === 'auth/user-not-found') {
+                                if (authError) {
+                                    authError.innerHTML = 'Account non trovato. <strong>Clicca su "Crea un account"</strong> per registrarti.';
+                                    authError.style.display = 'block';
+                                }
+                                if (submitAuth) {
+                                    submitAuth.disabled = false;
+                                    submitAuth.textContent = 'Accedi';
+                                }
+                                return;
+                            }
+                            throw loginError;
+                        }
+                    }
+                    
+                    // Successo!
+                    currentUser = userCredential.user;
+                    authModal.style.display = 'none';
+                    resetForm();
+                    updateAuthUI();
+                    resolve(userCredential.user);
+                    
+                } catch (error) {
+                    console.error('Errore autenticazione:', error);
+                    
+                    let errorMsg = isRegisterMode 
+                        ? 'Errore durante la registrazione.' 
+                        : 'Errore durante l\'accesso.';
+                    
+                    if (error.code === 'auth/email-already-in-use') {
+                        errorMsg = 'Questa email è già registrata. Prova ad accedere.';
+                        // Passa automaticamente in modalità login
+                        isRegisterMode = false;
+                        updateFormMode();
+                    } else if (error.code === 'auth/user-not-found') {
+                        errorMsg = 'Account non trovato. Clicca su "Crea un account" per registrarti.';
+                    } else if (error.code === 'auth/wrong-password') {
+                        errorMsg = 'Password errata. Verifica la password e riprova.';
+                    } else if (error.code === 'auth/invalid-email') {
+                        errorMsg = 'Email non valida. Verifica il formato dell\'email.';
+                    } else if (error.code === 'auth/weak-password') {
+                        errorMsg = 'Password troppo debole. Usa almeno 6 caratteri.';
+                    } else if (error.message) {
+                        errorMsg = error.message;
+                    }
+                    
+                    if (authError) {
+                        authError.textContent = errorMsg;
+                        authError.style.display = 'block';
+                    }
+                    
+                    if (submitAuth) {
+                        submitAuth.disabled = false;
+                        submitAuth.textContent = isRegisterMode ? 'Crea account' : 'Accedi';
+                    }
+                }
+            };
+        }
+        
+        // Reset e mostra modal
+        resetForm();
+        authModal.style.display = 'block';
+        
+        // Focus sul campo email
+        if (authEmail) {
+            setTimeout(() => authEmail.focus(), 100);
+        }
+    });
+}
+
+// Aggiorna UI in base allo stato di autenticazione
+function updateAuthUI() {
+    const authBtn = document.getElementById('authBtn');
+    const userInfo = document.getElementById('userInfo');
+    const userEmail = document.getElementById('userEmail');
+    const logoutBtn = document.getElementById('logoutBtn');
+    
+    if (currentUser) {
+        // Utente autenticato
+        if (authBtn) authBtn.style.display = 'none';
+        if (userInfo) userInfo.style.display = 'flex';
+        if (userEmail) userEmail.textContent = currentUser.email || 'Utente';
+        
+        if (logoutBtn) {
+            logoutBtn.onclick = async () => {
+                try {
+                    const authFunctions = getAuthFunctions();
+                    if (authFunctions && window.firebaseAuth) {
+                        const { signOut } = authFunctions;
+                        await signOut(window.firebaseAuth);
+                        currentUser = null;
+                        updateAuthUI();
+                        console.log('✅ Logout effettuato');
+                    }
+                } catch (error) {
+                    console.error('Errore logout:', error);
+                }
+            };
+        }
+    } else {
+        // Utente non autenticato
+        if (authBtn) {
+            authBtn.style.display = 'block';
+            // Il listener è già collegato in initializeEventListeners()
+            // Non serve aggiungerlo qui per evitare duplicati
+        }
+        if (userInfo) userInfo.style.display = 'none';
+    }
+}
+
+// Inizializza listener per stato autenticazione
+function initializeAuth() {
+    // Mostra il bottone di default (se Firebase non è ancora pronto)
+    updateAuthUI();
+    
+    const authFunctions = getAuthFunctions();
+    if (!window.firebaseAuth || !authFunctions) {
+        // Riprova dopo un po'
+        setTimeout(initializeAuth, 500);
+        return;
+    }
+    
+    const { onAuthStateChanged } = authFunctions;
+    onAuthStateChanged(window.firebaseAuth, (user) => {
+        currentUser = user;
+        updateAuthUI();
+        authInitialized = true;
+        console.log('✅ Auth state initialized:', user ? user.email : 'Non autenticato');
+    });
+}
+
 // Funzione per gestire il pagamento Stripe
 async function handlePayment(documentType) {
     return new Promise(async (resolve, reject) => {
+        // PRIMA: Verifica autenticazione
+        try {
+            await requireAuth();
+        } catch (error) {
+            console.log('Autenticazione richiesta:', error.message);
+            reject(error);
+            return;
+        }
+        
         const paymentModal = document.getElementById('paymentModal');
         const closePaymentModal = document.getElementById('closePaymentModal');
         const paymentLoading = document.getElementById('paymentLoading');
@@ -2812,6 +3252,12 @@ async function handlePayment(documentType) {
         };
         
         try {
+            // Ottieni il token ID per inviarlo al backend
+            let idToken = null;
+            if (currentUser) {
+                idToken = await currentUser.getIdToken();
+            }
+            
             // Crea la sessione di checkout
             const successUrl = window.location.href.split('?')[0] + '?payment=success';
             const cancelUrl = window.location.href.split('?')[0] + '?payment=cancel';
@@ -2825,6 +3271,7 @@ async function handlePayment(documentType) {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Authorization': idToken ? `Bearer ${idToken}` : '',
                 },
                 body: JSON.stringify({
                     documentType: documentType,
@@ -2868,8 +3315,16 @@ async function handlePayment(documentType) {
 // Verifica il pagamento dopo il redirect da Stripe
 async function verifyPaymentAfterRedirect(documentType) {
     const urlParams = new URLSearchParams(window.location.search);
-    const sessionId = urlParams.get('session_id');
-    const paymentStatus = urlParams.get('payment');
+    let sessionId = urlParams.get('session_id');
+    let paymentStatus = urlParams.get('payment');
+    
+    // Usa anche i valori salvati all'avvio se disponibili
+    if (!sessionId && window.paymentSessionId) {
+        sessionId = window.paymentSessionId;
+    }
+    if (!paymentStatus && window.paymentStatus) {
+        paymentStatus = window.paymentStatus;
+    }
     
     console.log(`🔍 Verifica pagamento per ${documentType}:`, { sessionId, paymentStatus });
     
