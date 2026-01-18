@@ -1,7 +1,7 @@
 // ============================================
 // CONFIGURAZIONE API BACKEND
 // ============================================
-// Backend su Render. La chiave OPENAI_API_KEY è configurata su Render.
+// Backend su Render. Le credenziali API sono configurate sul server.
 // Nota: sul piano free Render il servizio può andare in sleep; la prima richiesta dopo un po' di inattività può richiedere 1-2 minuti (cold start).
 const API_BASE_URL = 'https://getbusinessplan.onrender.com';
 if (typeof console !== 'undefined') console.log('[GetBusinessPlan] API Backend:', API_BASE_URL, '(Render)');
@@ -1427,70 +1427,8 @@ function convertBusinessPlanJSONToHTML(bpData) {
     return html;
 }
 
-// Alternative: Real OpenAI API Integration
-// NOTE: This requires an API key. For production, use a backend API to keep keys secure.
-async function generateWithOpenAI(formData) {
-    const apiKey = prompt('Inserisci la tua OpenAI API Key (per demo):');
-    if (!apiKey) {
-        throw new Error('API Key richiesta');
-    }
-
-    const prompt = `Crea un business plan professionale e completo in italiano per:
-- Nome Azienda: ${formData.companyName}
-- Settore: ${formData.industry}
-- Località: ${formData.location}
-- Numero Dipendenti: ${formData.employees}
-- Descrizione: ${formData.description}
-${formData.targetMarket ? `- Mercato Target: ${formData.targetMarket}` : ''}
-${formData.revenue ? `- Fatturato Previsto: €${formData.revenue}` : ''}
-
-Il business plan deve includere:
-1. Sintesi Esecutiva
-2. Descrizione del Business
-3. Analisi di Mercato
-4. Organizzazione e Management
-5. Prodotti e Servizi
-6. Strategia di Marketing
-7. Proiezioni Finanziarie
-8. Richiesta di Finanziamento
-
-Formatta la risposta in HTML con tag <h4> per i titoli delle sezioni e <p> per i paragrafi.`;
-
-    try {
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
-            },
-            body: JSON.stringify({
-                model: 'gpt-4',
-                messages: [
-                    {
-                        role: 'system',
-                        content: 'Sei un esperto consulente aziendale specializzato nella creazione di business plan professionali.'
-                    },
-                    {
-                        role: 'user',
-                        content: prompt
-                    }
-                ],
-                temperature: 0.7,
-                max_tokens: 3000
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error('Errore nella chiamata API');
-        }
-
-        const data = await response.json();
-        return data.choices[0].message.content;
-    } catch (error) {
-        console.error('Errore OpenAI:', error);
-        throw error;
-    }
-}
+// Funzione rimossa per motivi di sicurezza: le chiavi API non devono essere esposte nel frontend.
+// Tutte le chiamate API vengono gestite dal backend che mantiene le credenziali in modo sicuro.
 
 // Form data is now collected through wizard
 

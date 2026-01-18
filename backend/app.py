@@ -29,7 +29,7 @@ app.add_middleware(
 # Configurazione OpenAI
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 if not OPENAI_API_KEY:
-    raise ValueError("OPENAI_API_KEY non configurata nelle variabili d'ambiente. Vedi CONFIGURARE_API_KEY.md")
+    raise ValueError("OPENAI_API_KEY non configurata nelle variabili d'ambiente.")
 
 # Verifica formato base della chiave (deve iniziare con sk-)
 if not OPENAI_API_KEY.startswith("sk-"):
@@ -82,7 +82,7 @@ async def test_openai():
                 "status": "error",
                 "openai_working": False,
                 "error": "OPENAI_API_KEY non configurata",
-                "help": "Configura OPENAI_API_KEY su Render. Vedi CONFIGURARE_API_KEY.md",
+                "help": "Configura OPENAI_API_KEY su Render come variabile d'ambiente.",
                 "timestamp": datetime.datetime.now().isoformat()
             }
         
@@ -108,7 +108,7 @@ async def test_openai():
             "openai_working": False,
             "error": error_msg,
             "is_auth_error": is_auth_error,
-            "help": "Configura OPENAI_API_KEY su Render. Vedi CONFIGURARE_API_KEY.md" if is_auth_error else None,
+            "help": "Configura OPENAI_API_KEY su Render come variabile d'ambiente." if is_auth_error else None,
             "timestamp": datetime.datetime.now().isoformat()
         }
 
