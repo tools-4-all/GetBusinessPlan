@@ -485,7 +485,7 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
     story.append(PageBreak())
     
     # === INDICE ===
-    story.append(Paragraph("INDICE", styles['TOCHeading']))
+    story.append(Paragraph("INDICE", styles['CustomTitle']))
     story.append(Spacer(1, 0.5*cm))
     
     # Costruisci l'indice dai capitoli
