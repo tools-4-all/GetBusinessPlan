@@ -310,10 +310,14 @@ def create_chart_image(chart_data, width=15*cm, height=10*cm):
         for idx, serie in enumerate(series):
             name = serie.get('name', f'Serie {idx+1}')
             points = serie.get('points', [])
-            x_values = [str(p.get('x', '')) for p in points if p.get('x')]
-            y_values = [float(p.get('y', 0)) for p in points if p.get('x') and p.get('y') is not None]
+            # Filtra punti validi (con x non vuoto e y valido)
+            valid_points = [(p.get('x', ''), p.get('y')) for p in points 
+                           if p.get('x') and str(p.get('x', '')).strip() != '' 
+                           and p.get('y') is not None]
+            x_values = [str(x) for x, y in valid_points]
+            y_values = [float(y) for x, y in valid_points]
             
-            if x_values and y_values:
+            if x_values and y_values and len(x_values) == len(y_values):
                 color = professional_colors[idx % len(professional_colors)]
                 ax.plot(x_values, y_values, 
                        marker='o', 
@@ -339,9 +343,10 @@ def create_chart_image(chart_data, width=15*cm, height=10*cm):
             name = serie.get('name', f'Serie {idx+1}')
             points = serie.get('points', [])
             for p in points:
-                x_val = str(p.get('x', ''))
+                x_val = str(p.get('x', '')).strip()
                 y_val = float(p.get('y', 0)) if p.get('y') is not None else 0
-                if x_val:
+                # Ignora punti con x vuoto o solo spazi
+                if x_val and x_val != '':
                     if x_val not in x_values:
                         x_values.append(x_val)
                     if name not in y_data:
@@ -379,10 +384,14 @@ def create_chart_image(chart_data, width=15*cm, height=10*cm):
         if series:
             serie = series[0]
             points = serie.get('points', [])
-            labels = [str(p.get('x', '')) for p in points if p.get('x')]
-            values = [float(p.get('y', 0)) for p in points if p.get('x') and p.get('y') is not None]
+            # Filtra punti validi
+            valid_points = [(p.get('x', ''), p.get('y')) for p in points 
+                           if p.get('x') and str(p.get('x', '')).strip() != '' 
+                           and p.get('y') is not None and float(p.get('y', 0)) > 0]
+            labels = [str(x) for x, y in valid_points]
+            values = [float(y) for x, y in valid_points]
             
-            if labels and values:
+            if labels and values and len(labels) == len(values):
                 colors_pie = professional_colors[:len(labels)]
                 wedges, texts, autotexts = ax.pie(
                     values, 
@@ -398,6 +407,20 @@ def create_chart_image(chart_data, width=15*cm, height=10*cm):
                     autotext.set_color('white')
                     autotext.set_fontweight('bold')
     
+    # Verifica che ci siano dati da visualizzare
+    has_data = False
+    if tipo == 'line':
+        has_data = any(len(serie.get('points', [])) > 0 for serie in series)
+    elif tipo == 'bar':
+        has_data = len(x_values) > 0 and len(y_data) > 0
+    elif tipo == 'pie':
+        has_data = len(labels) > 0 and len(values) > 0
+    
+    if not has_data:
+        plt.close(fig)
+        print(f"⚠️  Grafico '{titolo}' non ha dati validi da visualizzare")
+        return None
+    
     # Titolo e labels
     if titolo:
         ax.set_title(titolo, fontsize=14, fontweight='bold', 
@@ -410,13 +433,17 @@ def create_chart_image(chart_data, width=15*cm, height=10*cm):
     plt.tight_layout(pad=1.5)
     
     # Salva con alta qualità
-    buf = io.BytesIO()
-    plt.savefig(buf, format='png', dpi=300, bbox_inches='tight', 
-               facecolor='white', edgecolor='none', pad_inches=0.1)
-    buf.seek(0)
-    plt.close(fig)
-    
-    return buf
+    try:
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png', dpi=300, bbox_inches='tight', 
+                   facecolor='white', edgecolor='none', pad_inches=0.1)
+        buf.seek(0)
+        plt.close(fig)
+        return buf
+    except Exception as e:
+        plt.close(fig)
+        print(f"⚠️  Errore nel salvare il grafico '{titolo}': {str(e)}")
+        return None
 
 def create_numbered_canvas(header_left, header_right, footer_left, footer_center, footer_right, confidenzialita):
     """Crea funzioni callback per header/footer e numerazione pagine"""
@@ -1049,25 +1076,42 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
             story.extend(elements)
         
         # Aggiungi i grafici referenziati
-        if chart_ids:
+        # IMPORTANTE: I grafici devono essere mostrati SOLO nel capitolo CH7_CHARTS
+        if chart_ids and chapter_id == "CH7_CHARTS":
+            print(f"📊 Processando {len(chart_ids)} grafici per il capitolo {chapter_id}")
             story.append(Spacer(1, 0.5*cm))
             for chart_id in chart_ids:
                 if chart_id in charts_dict:
                     chart = charts_dict[chart_id]
+                    print(f"📈 Generando grafico: {chart_id} - {chart.get('titolo', 'N/A')}")
                     try:
                         chart_img = create_chart_image(chart, width=15*cm, height=10*cm)
-                        img = Image(chart_img, width=15*cm, height=10*cm)
-                        story.append(img)
-                        story.append(Spacer(1, 0.3*cm))
-                        
-                        # Aggiungi caption se presente
-                        caption = chart.get('caption', '')
-                        if caption:
-                            caption_clean = caption.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-                            story.append(Paragraph(f"<i>{caption_clean}</i>", styles['Normal']))
+                        if chart_img:
+                            img = Image(chart_img, width=15*cm, height=10*cm)
+                            story.append(img)
                             story.append(Spacer(1, 0.3*cm))
+                            print(f"✅ Grafico {chart_id} aggiunto con successo")
+                            
+                            # Aggiungi caption se presente
+                            caption = chart.get('caption', '')
+                            if caption:
+                                caption_clean = caption.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                                story.append(Paragraph(f"<i>{caption_clean}</i>", styles['Normal']))
+                                story.append(Spacer(1, 0.3*cm))
+                        else:
+                            print(f"⚠️  Grafico {chart_id} non generato (chart_img è None)")
                     except Exception as e:
-                        print(f"⚠️  Errore nel generare il grafico {chart_id}: {str(e)}")
+                        import traceback
+                        error_details = traceback.format_exc()
+                        print(f"❌ Errore nel generare il grafico {chart_id}: {str(e)}")
+                        print(f"   Dettagli: {error_details}")
+                        # Aggiungi un messaggio di errore nel PDF invece di fallire silenziosamente
+                        story.append(Paragraph(f"<i>Errore nella generazione del grafico: {chart_id}</i>", styles['Normal']))
+                else:
+                    print(f"⚠️  Grafico {chart_id} non trovato in charts_dict")
+        elif chart_ids and chapter_id != "CH7_CHARTS":
+            # I grafici non dovrebbero essere in altri capitoli, ma li ignoriamo silenziosamente
+            print(f"⚠️  Capitolo {chapter_id} ha {len(chart_ids)} grafici referenziati, ma i grafici devono essere solo in CH7_CHARTS. Ignorati.")
         
         story.append(Spacer(1, 0.5*cm))
         story.append(PageBreak())
