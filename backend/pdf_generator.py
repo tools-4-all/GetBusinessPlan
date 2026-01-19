@@ -920,7 +920,12 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
     # (chapters già ordinati sopra)
     
     # Crea un dizionario dei grafici per accesso rapido
-    charts_dict = {chart['id']: chart for chart in business_plan_json.get('charts', [])}
+    charts_list = business_plan_json.get('charts', [])
+    charts_dict = {chart['id']: chart for chart in charts_list}
+    print(f"📊 Totale grafici nel JSON: {len(charts_list)}")
+    print(f"📊 Grafici nel dizionario: {list(charts_dict.keys())}")
+    for chart in charts_list:
+        print(f"   - {chart.get('id', 'N/A')} (chapter_id: {chart.get('chapter_id', 'N/A')}, tipo: {chart.get('tipo', 'N/A')})")
     
     # Dati per tabelle riassuntive
     data = business_plan_json.get('data', {})
@@ -930,6 +935,7 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
         titolo_ch = chapter.get('titolo', '')
         contenuto = chapter.get('contenuto_markdown', '')
         chart_ids = chapter.get('chart_ids', [])
+        print(f"📖 Capitolo: {chapter_id} - chart_ids: {chart_ids}")
         
         if titolo_ch:
             story.append(Paragraph(titolo_ch, styles['CustomHeading1']))
@@ -1095,10 +1101,13 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
         
         # Aggiungi i grafici referenziati
         # IMPORTANTE: I grafici devono essere mostrati SOLO nel capitolo CH7_CHARTS
+        print(f"🔍 Verifica grafici per capitolo {chapter_id}: chart_ids={chart_ids}, chapter_id=='CH7_CHARTS'={chapter_id == 'CH7_CHARTS'}")
+        
         if chart_ids and chapter_id == "CH7_CHARTS":
             print(f"📊 Processando {len(chart_ids)} grafici per il capitolo {chapter_id}")
             story.append(Spacer(1, 0.5*cm))
             for chart_id in chart_ids:
+                print(f"🔍 Cercando grafico {chart_id} in charts_dict...")
                 if chart_id in charts_dict:
                     chart = charts_dict[chart_id]
                     print(f"📈 Generando grafico: {chart_id} - {chart.get('titolo', 'N/A')}")
@@ -1108,7 +1117,7 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
                             img = Image(chart_img, width=15*cm, height=10*cm)
                             story.append(img)
                             story.append(Spacer(1, 0.3*cm))
-                            print(f"✅ Grafico {chart_id} aggiunto con successo")
+                            print(f"✅ Grafico {chart_id} aggiunto con successo al PDF")
                             
                             # Aggiungi caption se presente
                             caption = chart.get('caption', '')
@@ -1129,10 +1138,34 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
                         # Aggiungi un messaggio di errore nel PDF invece di fallire silenziosamente
                         story.append(Paragraph(f"<i>Errore nella generazione del grafico: {chart_id} - {str(e)}</i>", styles['Normal']))
                 else:
-                    print(f"⚠️  Grafico {chart_id} non trovato in charts_dict")
+                    print(f"⚠️  Grafico {chart_id} non trovato in charts_dict. Grafici disponibili: {list(charts_dict.keys())}")
         elif chart_ids and chapter_id != "CH7_CHARTS":
             # I grafici non dovrebbero essere in altri capitoli, ma li ignoriamo silenziosamente
             print(f"⚠️  Capitolo {chapter_id} ha {len(chart_ids)} grafici referenziati, ma i grafici devono essere solo in CH7_CHARTS. Ignorati.")
+        elif chapter_id == "CH7_CHARTS" and not chart_ids:
+            # Se siamo nel capitolo CH7_CHARTS ma non ci sono chart_ids, proviamo a prendere tutti i grafici
+            print(f"⚠️  Capitolo CH7_CHARTS non ha chart_ids, ma ci sono {len(charts_dict)} grafici disponibili. Tentativo di aggiungere tutti i grafici con chapter_id='CH7_CHARTS'")
+            story.append(Spacer(1, 0.5*cm))
+            for chart_id, chart in charts_dict.items():
+                if chart.get('chapter_id') == 'CH7_CHARTS':
+                    print(f"📈 Aggiungendo grafico {chart_id} (trovato per chapter_id)")
+                    try:
+                        chart_img = create_chart_image(chart, width=15*cm, height=10*cm)
+                        if chart_img:
+                            img = Image(chart_img, width=15*cm, height=10*cm)
+                            story.append(img)
+                            story.append(Spacer(1, 0.3*cm))
+                            print(f"✅ Grafico {chart_id} aggiunto con successo al PDF")
+                            
+                            caption = chart.get('caption', '')
+                            if caption:
+                                caption_clean = caption.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                                story.append(Paragraph(f"<i>{caption_clean}</i>", styles['Normal']))
+                                story.append(Spacer(1, 0.3*cm))
+                    except Exception as e:
+                        import traceback
+                        print(f"❌ Errore nel generare il grafico {chart_id}: {str(e)}")
+                        print(traceback.format_exc())
         
         story.append(Spacer(1, 0.5*cm))
         story.append(PageBreak())
