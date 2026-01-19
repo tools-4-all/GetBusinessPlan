@@ -247,41 +247,53 @@ def markdown_to_paragraphs(text, styles):
 
 def create_chart_image(chart_data, width=15*cm, height=10*cm):
     """Crea un grafico professionale con stile aziendale e alta qualità"""
-    tipo = chart_data.get('tipo', 'line')
-    titolo = chart_data.get('titolo', '')
-    x_label = chart_data.get('x_label', '')
-    y_label = chart_data.get('y_label', '')
-    series = chart_data.get('series', [])
-    
-    # Configurazione stile professionale
-    plt.rcParams.update({
-        'figure.facecolor': 'white',
-        'axes.facecolor': 'white',
-        'axes.edgecolor': '#333333',
-        'axes.linewidth': 1.2,
-        'axes.grid': True,
-        'axes.grid.alpha': 0.3,
-        'axes.grid.color': '#E0E0E0',
-        'axes.labelcolor': '#333333',
-        'axes.labelsize': 11,
-        'axes.titlesize': 13,
-        'axes.titleweight': 'bold',
-        'xtick.color': '#333333',
-        'ytick.color': '#333333',
-        'text.color': '#333333',
-        'font.family': 'sans-serif',
-        'font.sans-serif': ['Arial', 'DejaVu Sans', 'Liberation Sans'],
-        'font.size': 10,
-        'legend.frameon': True,
-        'legend.framealpha': 0.9,
-        'legend.facecolor': 'white',
-        'legend.edgecolor': '#CCCCCC',
-        'legend.fontsize': 9,
-        'figure.dpi': 300,
-        'savefig.dpi': 300,
-        'savefig.bbox': 'tight',
-        'savefig.pad_inches': 0.1
-    })
+    try:
+        tipo = chart_data.get('tipo', 'line')
+        titolo = chart_data.get('titolo', '')
+        x_label = chart_data.get('x_label', '')
+        y_label = chart_data.get('y_label', '')
+        series = chart_data.get('series', [])
+        
+        # Validazione dati in ingresso
+        if not series:
+            print(f"⚠️  Grafico '{titolo}' non ha serie di dati")
+            return None
+        
+        if tipo not in ['line', 'bar', 'pie']:
+            print(f"⚠️  Tipo grafico non valido: {tipo} (atteso: line, bar, pie)")
+            return None
+        
+        print(f"   📊 Creando grafico tipo '{tipo}' con {len(series)} serie")
+        
+        # Configurazione stile professionale
+        plt.rcParams.update({
+            'figure.facecolor': 'white',
+            'axes.facecolor': 'white',
+            'axes.edgecolor': '#333333',
+            'axes.linewidth': 1.2,
+            'axes.grid': True,
+            'axes.grid.alpha': 0.3,
+            'axes.grid.color': '#E0E0E0',
+            'axes.labelcolor': '#333333',
+            'axes.labelsize': 11,
+            'axes.titlesize': 13,
+            'axes.titleweight': 'bold',
+            'xtick.color': '#333333',
+            'ytick.color': '#333333',
+            'text.color': '#333333',
+            'font.family': 'sans-serif',
+            'font.sans-serif': ['Arial', 'DejaVu Sans', 'Liberation Sans'],
+            'font.size': 10,
+            'legend.frameon': True,
+            'legend.framealpha': 0.9,
+            'legend.facecolor': 'white',
+            'legend.edgecolor': '#CCCCCC',
+            'legend.fontsize': 9,
+            'figure.dpi': 300,
+            'savefig.dpi': 300,
+            'savefig.bbox': 'tight',
+            'savefig.pad_inches': 0.1
+        })
     
     # Palette colori professionale (blu/grigio aziendale)
     professional_colors = [
@@ -407,19 +419,19 @@ def create_chart_image(chart_data, width=15*cm, height=10*cm):
                     autotext.set_color('white')
                     autotext.set_fontweight('bold')
     
-    # Verifica che ci siano dati da visualizzare
-    has_data = False
-    if tipo == 'line':
-        has_data = any(len(serie.get('points', [])) > 0 for serie in series)
-    elif tipo == 'bar':
-        has_data = len(x_values) > 0 and len(y_data) > 0
-    elif tipo == 'pie':
-        has_data = len(labels) > 0 and len(values) > 0
-    
-    if not has_data:
-        plt.close(fig)
-        print(f"⚠️  Grafico '{titolo}' non ha dati validi da visualizzare")
-        return None
+        # Verifica che ci siano dati da visualizzare
+        has_data = False
+        if tipo == 'line':
+            has_data = any(len(serie.get('points', [])) > 0 for serie in series)
+        elif tipo == 'bar':
+            has_data = 'x_values' in locals() and 'y_data' in locals() and len(x_values) > 0 and len(y_data) > 0
+        elif tipo == 'pie':
+            has_data = 'labels' in locals() and 'values' in locals() and len(labels) > 0 and len(values) > 0
+        
+        if not has_data:
+            plt.close(fig)
+            print(f"⚠️  Grafico '{titolo}' non ha dati validi da visualizzare")
+            return None
     
     # Titolo e labels
     if titolo:
@@ -432,8 +444,7 @@ def create_chart_image(chart_data, width=15*cm, height=10*cm):
     
     plt.tight_layout(pad=1.5)
     
-    # Salva con alta qualità
-    try:
+        # Salva con alta qualità
         buf = io.BytesIO()
         plt.savefig(buf, format='png', dpi=300, bbox_inches='tight', 
                    facecolor='white', edgecolor='none', pad_inches=0.1)
@@ -441,8 +452,15 @@ def create_chart_image(chart_data, width=15*cm, height=10*cm):
         plt.close(fig)
         return buf
     except Exception as e:
-        plt.close(fig)
-        print(f"⚠️  Errore nel salvare il grafico '{titolo}': {str(e)}")
+        # Cattura qualsiasi errore durante la creazione del grafico
+        print(f"⚠️  Errore nella creazione del grafico '{titolo}': {str(e)}")
+        import traceback
+        print(traceback.format_exc())
+        try:
+            if 'fig' in locals():
+                plt.close(fig)
+        except:
+            pass
         return None
 
 def create_numbered_canvas(header_left, header_right, footer_left, footer_center, footer_right, confidenzialita):
@@ -1104,9 +1122,12 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
                         import traceback
                         error_details = traceback.format_exc()
                         print(f"❌ Errore nel generare il grafico {chart_id}: {str(e)}")
-                        print(f"   Dettagli: {error_details}")
+                        print(f"   Tipo grafico: {chart.get('tipo', 'N/A')}")
+                        print(f"   Serie: {len(chart.get('series', []))}")
+                        print(f"   Dettagli completi:")
+                        print(error_details)
                         # Aggiungi un messaggio di errore nel PDF invece di fallire silenziosamente
-                        story.append(Paragraph(f"<i>Errore nella generazione del grafico: {chart_id}</i>", styles['Normal']))
+                        story.append(Paragraph(f"<i>Errore nella generazione del grafico: {chart_id} - {str(e)}</i>", styles['Normal']))
                 else:
                     print(f"⚠️  Grafico {chart_id} non trovato in charts_dict")
         elif chart_ids and chapter_id != "CH7_CHARTS":
