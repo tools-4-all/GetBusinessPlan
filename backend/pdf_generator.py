@@ -30,7 +30,8 @@ def preprocess_content_for_pdf(content):
     content = content.replace('\r\n', '\n').replace('\r', '\n')
     
     # Rimuovi spazi eccessivi ma mantieni struttura markdown
-    content = re.sub(r'[ \t]+', ' ', content)  # Spazi multipli -> singolo spazio
+    # NON sostituire spazi multipli in una riga, solo normalizza
+    content = re.sub(r'[ \t]{2,}', ' ', content)  # Spazi multipli -> singolo spazio
     
     # Normalizza newline multiple (mantieni max 2 consecutive)
     content = re.sub(r'\n{3,}', '\n\n', content)
@@ -38,8 +39,12 @@ def preprocess_content_for_pdf(content):
     # Assicurati che i titoli inizino con # (rimuovi spazi prima)
     content = re.sub(r'^[ \t]+(#+)', r'\1', content, flags=re.MULTILINE)
     
-    # Normalizza spazi dopo # (deve esserci almeno uno spazio)
-    content = re.sub(r'^(#+)[ \t]*([^#\s])', r'\1 \2', content, flags=re.MULTILINE)
+    # Normalizza spazi dopo # - gestisce vari casi:
+    # ##Titolo -> ## Titolo
+    # ## Titolo -> ## Titolo (già corretto)
+    # ##  Titolo -> ## Titolo (rimuovi spazi multipli)
+    content = re.sub(r'^(#+)[ \t]+([^#\s])', r'\1 \2', content, flags=re.MULTILINE)
+    content = re.sub(r'^(#+)([^#\s])', r'\1 \2', content, flags=re.MULTILINE)
     
     # Rimuovi spazi alla fine delle righe
     content = re.sub(r'[ \t]+\n', '\n', content)
@@ -63,14 +68,16 @@ def markdown_to_paragraphs(text, styles):
         if not line_text:
             return ""
         
-        # Escape caratteri HTML speciali
+        # Escape caratteri HTML speciali PRIMA di processare markdown
         line_text = line_text.replace('&', '&amp;')
         line_text = line_text.replace('<', '&lt;').replace('>', '&gt;')
         
-        # Converti **grassetto** (gestisce anche spazi)
+        # Converti **grassetto** (gestisce anche spazi e caratteri speciali)
+        # Usa non-greedy match e gestisce casi con spazi
         line_text = re.sub(r'\*\*([^*]+?)\*\*', r'<b>\1</b>', line_text)
         
         # Converti *corsivo* (ma non **)
+        # Match solo se non è preceduto o seguito da *
         line_text = re.sub(r'(?<!\*)\*([^*\n]+?)\*(?!\*)', r'<i>\1</i>', line_text)
         
         # Converti `codice` in monospace
@@ -78,113 +85,155 @@ def markdown_to_paragraphs(text, styles):
         
         return line_text
     
-    # Dividi in blocchi (separati da righe vuote)
-    blocks = re.split(r'\n\s*\n', text)
+    # Processa riga per riga invece di dividere in blocchi
+    # Questo è più robusto per gestire casi edge
+    lines = text.split('\n')
+    i = 0
     
-    for block in blocks:
-        block = block.strip()
-        if not block:
+    while i < len(lines):
+        # NON fare strip() qui, lo facciamo dopo per preservare informazioni
+        original_line = lines[i]
+        line = original_line.strip()
+        
+        if not line:
+            i += 1
             continue
         
-        lines = block.split('\n')
-        i = 0
+        # Controlla i titoli - pattern molto flessibile
+        # Accetta: ## Titolo, ##Titolo, ##  Titolo, ##Titolo con caratteri speciali
+        # Prima prova pattern standard con spazio
+        heading_match = re.match(r'^(#{1,6})\s+(.+)$', line)
+        if not heading_match:
+            # Fallback: prova senza spazio (es: ##Titolo)
+            heading_match = re.match(r'^(#{1,6})([^#\s].*)$', line)
         
-        while i < len(lines):
-            line = lines[i].strip()
+        if heading_match:
+            level = len(heading_match.group(1))
+            title_text = heading_match.group(2).strip()
             
-            if not line:
+            # Se il titolo è vuoto dopo lo strip, salta
+            if not title_text:
                 i += 1
                 continue
             
-            # Controlla i titoli (deve iniziare con #, non spazi)
-            # Usa regex per matchare correttamente i livelli
-            heading_match = re.match(r'^(#{1,6})\s+(.+)$', line)
-            if heading_match:
-                level = len(heading_match.group(1))
-                title_text = heading_match.group(2).strip()
-                title_text = convert_inline_markdown(title_text)
-                
-                # Chiudi paragrafo corrente se presente
-                if i > 0 and lines[i-1].strip():
-                    # Non chiudere se la riga precedente era già un titolo o lista
-                    prev_line = lines[i-1].strip()
-                    if not (re.match(r'^#{1,6}\s+', prev_line) or 
-                           re.match(r'^[-*+]\s+', prev_line) or 
-                           re.match(r'^\d+[.)]\s+', prev_line)):
-                        elements.append(Spacer(1, 0.2*cm))
-                
-                # Usa lo stile appropriato
-                if level == 1:
-                    elements.append(Paragraph(title_text, styles['CustomHeading1']))
-                    elements.append(Spacer(1, 0.4*cm))
-                elif level == 2:
-                    elements.append(Paragraph(title_text, styles['CustomHeading2']))
-                    elements.append(Spacer(1, 0.3*cm))
-                elif level >= 3:
-                    elements.append(Paragraph(title_text, styles['Heading3']))
-                    elements.append(Spacer(1, 0.2*cm))
-                
-                i += 1
-                continue
+            title_text = convert_inline_markdown(title_text)
             
-            # Liste (bullet) - supporta -, *, +
-            list_match = re.match(r'^[-*+]\s+(.+)$', line)
-            if list_match:
-                items = []
-                # Raccogli tutti gli elementi della lista consecutivi
-                while i < len(lines) and re.match(r'^[-*+]\s+', lines[i].strip()):
-                    item_text = re.sub(r'^[-*+]\s+', '', lines[i].strip())
+            # Usa lo stile appropriato
+            if level == 1:
+                elements.append(Paragraph(title_text, styles['CustomHeading1']))
+                elements.append(Spacer(1, 0.4*cm))
+            elif level == 2:
+                elements.append(Paragraph(title_text, styles['CustomHeading2']))
+                elements.append(Spacer(1, 0.3*cm))
+            elif level >= 3:
+                elements.append(Paragraph(title_text, styles['Heading3']))
+                elements.append(Spacer(1, 0.2*cm))
+            
+            i += 1
+            continue
+        
+        # Liste (bullet) - supporta -, *, +
+        # Pattern più flessibile: accetta anche spazi multipli dopo il marker
+        list_match = re.match(r'^[-*+]\s+(.+)$', line)
+        if list_match:
+            items = []
+            # Raccogli tutti gli elementi della lista consecutivi
+            while i < len(lines):
+                current_line = lines[i].strip()
+                if not current_line:
+                    break
+                if re.match(r'^[-*+]\s+', current_line):
+                    item_text = re.sub(r'^[-*+]\s+', '', current_line)
                     item_text = convert_inline_markdown(item_text)
                     items.append(item_text)
                     i += 1
-                
-                for item in items:
-                    elements.append(Paragraph(f"• {item}", styles['Normal']))
-                    elements.append(Spacer(1, 0.15*cm))
-                continue
+                else:
+                    break
             
-            # Liste numerate - supporta 1. e 1)
-            numbered_match = re.match(r'^\d+[.)]\s+(.+)$', line)
-            if numbered_match:
-                items = []
-                item_numbers = []
-                # Raccogli tutti gli elementi numerati consecutivi
-                while i < len(lines) and re.match(r'^\d+[.)]\s+', lines[i].strip()):
-                    match = re.match(r'^(\d+)[.)]\s+(.+)$', lines[i].strip())
-                    if match:
-                        item_numbers.append(int(match.group(1)))
-                        item_text = match.group(2)
-                        item_text = convert_inline_markdown(item_text)
-                        items.append(item_text)
-                    i += 1
-                
-                # Usa i numeri originali se sono sequenziali, altrimenti enumera
-                start_num = item_numbers[0] if item_numbers else 1
-                for idx, item in enumerate(items):
-                    num = start_num + idx
-                    elements.append(Paragraph(f"{num}. {item}", styles['Normal']))
-                    elements.append(Spacer(1, 0.15*cm))
-                continue
-            
-            # Paragrafo normale - raccogli righe consecutive
-            para_lines = []
+            for item in items:
+                elements.append(Paragraph(f"• {item}", styles['Normal']))
+                elements.append(Spacer(1, 0.15*cm))
+            continue
+        
+        # Liste numerate - supporta 1. e 1)
+        numbered_match = re.match(r'^\d+[.)]\s+(.+)$', line)
+        if numbered_match:
+            items = []
+            item_numbers = []
+            # Raccogli tutti gli elementi numerati consecutivi
             while i < len(lines):
-                line = lines[i].strip()
-                if not line:
+                current_line = lines[i].strip()
+                if not current_line:
                     break
-                # Se inizia un nuovo blocco, fermati
-                if (re.match(r'^#{1,6}\s+', line) or 
-                    re.match(r'^[-*+]\s+', line) or 
-                    re.match(r'^\d+[.)]\s+', line)):
+                match = re.match(r'^(\d+)[.)]\s+(.+)$', current_line)
+                if match:
+                    item_numbers.append(int(match.group(1)))
+                    item_text = match.group(2)
+                    item_text = convert_inline_markdown(item_text)
+                    items.append(item_text)
+                    i += 1
+                else:
                     break
-                para_lines.append(line)
-                i += 1
             
-            if para_lines:
-                para_text = ' '.join(para_lines)
-                para_text = convert_inline_markdown(para_text)
-                elements.append(Paragraph(para_text, styles['Normal']))
-                elements.append(Spacer(1, 0.3*cm))
+            # Usa i numeri originali se sono sequenziali, altrimenti enumera
+            start_num = item_numbers[0] if item_numbers else 1
+            for idx, item in enumerate(items):
+                num = start_num + idx
+                elements.append(Paragraph(f"{num}. {item}", styles['Normal']))
+                elements.append(Spacer(1, 0.15*cm))
+            continue
+        
+        # Fallback per titoli malformati (senza spazio dopo #)
+        # Controlla se inizia con # ma non è stato riconosciuto dal pattern principale
+        if line.startswith('#') and not re.match(r'^#{1,6}\s', line):
+            # Potrebbe essere un titolo malformato (es: ##Titolo invece di ## Titolo)
+            # Conta i # e estrai il testo
+            hash_count = len(re.match(r'^(#+)', line).group(1))
+            title_text = line[hash_count:].strip()
+            if title_text:
+                title_text = convert_inline_markdown(title_text)
+                if hash_count == 1:
+                    elements.append(Paragraph(title_text, styles['CustomHeading1']))
+                    elements.append(Spacer(1, 0.4*cm))
+                elif hash_count == 2:
+                    elements.append(Paragraph(title_text, styles['CustomHeading2']))
+                    elements.append(Spacer(1, 0.3*cm))
+                else:
+                    elements.append(Paragraph(title_text, styles['Heading3']))
+                    elements.append(Spacer(1, 0.2*cm))
+                i += 1
+                continue
+        
+        # Paragrafo normale - raccogli righe consecutive fino a un blocco speciale
+        para_lines = []
+        while i < len(lines):
+            current_line = lines[i].strip()
+            if not current_line:
+                # Se troviamo una riga vuota, fermiamoci (fine paragrafo)
+                i += 1
+                break
+            
+            # Se inizia un nuovo blocco speciale, fermati
+            if (re.match(r'^#{1,6}\s', current_line) or 
+                re.match(r'^[-*+]\s+', current_line) or 
+                re.match(r'^\d+[.)]\s+', current_line)):
+                break
+            
+            para_lines.append(current_line)
+            i += 1
+        
+        if para_lines:
+            para_text = ' '.join(para_lines)
+            para_text = convert_inline_markdown(para_text)
+            elements.append(Paragraph(para_text, styles['Normal']))
+            elements.append(Spacer(1, 0.3*cm))
+        elif line:
+            # Ultimo fallback: se non abbiamo riconosciuto nulla e la riga non è vuota
+            # tratta come paragrafo normale
+            para_text = convert_inline_markdown(line)
+            elements.append(Paragraph(para_text, styles['Normal']))
+            elements.append(Spacer(1, 0.3*cm))
+            i += 1
     
     return elements
 
