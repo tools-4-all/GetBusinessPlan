@@ -294,9 +294,9 @@ def create_chart_image(chart_data, width=15*cm, height=10*cm):
             'savefig.bbox': 'tight',
             'savefig.pad_inches': 0.1
         })
-    
-    # Palette colori professionale (blu/grigio aziendale)
-    professional_colors = [
+        
+        # Palette colori professionale (blu/grigio aziendale)
+        professional_colors = [
         '#1e3a8a',  # Blu scuro
         '#3b82f6',  # Blu medio
         '#10b981',  # Verde
@@ -304,21 +304,21 @@ def create_chart_image(chart_data, width=15*cm, height=10*cm):
         '#8b5cf6',  # Viola
         '#ef4444',  # Rosso
         '#64748b',  # Grigio
-        '#06b6d4',  # Ciano
-    ]
-    
-    # Crea figura con dimensioni precise
-    fig, ax = plt.subplots(figsize=(width/cm, height/cm), 
-                          facecolor='white',
-                          edgecolor='none')
-    
-    # Rimuovi bordi superflui per aspetto più pulito
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['left'].set_color('#CCCCCC')
-    ax.spines['bottom'].set_color('#CCCCCC')
-    
-    if tipo == 'line':
+            '#06b6d4',  # Ciano
+        ]
+        
+        # Crea figura con dimensioni precise
+        fig, ax = plt.subplots(figsize=(width/cm, height/cm), 
+                              facecolor='white',
+                              edgecolor='none')
+        
+        # Rimuovi bordi superflui per aspetto più pulito
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['left'].set_color('#CCCCCC')
+        ax.spines['bottom'].set_color('#CCCCCC')
+        
+        if tipo == 'line':
         for idx, serie in enumerate(series):
             name = serie.get('name', f'Serie {idx+1}')
             points = serie.get('points', [])
@@ -342,83 +342,83 @@ def create_chart_image(chart_data, width=15*cm, height=10*cm):
                        markeredgewidth=1.5,
                        alpha=0.9)
         
-        ax.legend(loc='best', frameon=True, fancybox=True, shadow=False)
-        ax.grid(True, alpha=0.3, linestyle='--', linewidth=0.8)
-        ax.set_axisbelow(True)
-        
-    elif tipo == 'bar':
-        # Raccogli dati da tutte le serie per grafico a barre raggruppate
-        x_values = []
-        y_data = {}
-        
-        for idx, serie in enumerate(series):
-            name = serie.get('name', f'Serie {idx+1}')
-            points = serie.get('points', [])
-            for p in points:
-                x_val = str(p.get('x', '')).strip()
-                y_val = float(p.get('y', 0)) if p.get('y') is not None else 0
-                # Ignora punti con x vuoto o solo spazi
-                if x_val and x_val != '':
-                    if x_val not in x_values:
-                        x_values.append(x_val)
-                    if name not in y_data:
-                        y_data[name] = {}
-                    y_data[name][x_val] = y_val
-        
-        # Crea grafico a barre raggruppate
-        if x_values and y_data:
-            x_pos = range(len(x_values))
-            bar_width = 0.35
-            offset = 0
-            
-            for idx, (name, values) in enumerate(y_data.items()):
-                positions = [x + offset for x in x_pos]
-                heights = [values.get(x_val, 0) for x_val in x_values]
-                
-                color = professional_colors[idx % len(professional_colors)]
-                ax.bar(positions, heights, 
-                      width=bar_width,
-                      label=name,
-                      color=color,
-                      alpha=0.85,
-                      edgecolor='white',
-                      linewidth=1.5)
-                offset += bar_width
-            
-            ax.set_xticks([x + bar_width * (len(y_data) - 1) / 2 for x in x_pos])
-            ax.set_xticklabels(x_values, rotation=45, ha='right')
-            ax.legend(loc='best', frameon=True)
-            ax.grid(True, alpha=0.3, axis='y', linestyle='--')
+            ax.legend(loc='best', frameon=True, fancybox=True, shadow=False)
+            ax.grid(True, alpha=0.3, linestyle='--', linewidth=0.8)
             ax.set_axisbelow(True)
-        
-    elif tipo == 'pie':
-        # Prendi la prima serie per il pie chart
-        if series:
-            serie = series[0]
-            points = serie.get('points', [])
-            # Filtra punti validi
-            valid_points = [(p.get('x', ''), p.get('y')) for p in points 
-                           if p.get('x') and str(p.get('x', '')).strip() != '' 
-                           and p.get('y') is not None and float(p.get('y', 0)) > 0]
-            labels = [str(x) for x, y in valid_points]
-            values = [float(y) for x, y in valid_points]
             
-            if labels and values and len(labels) == len(values):
-                colors_pie = professional_colors[:len(labels)]
-                wedges, texts, autotexts = ax.pie(
-                    values, 
-                    labels=labels,
-                    autopct='%1.1f%%',
-                    colors=colors_pie,
-                    startangle=90,
-                    textprops={'fontsize': 10, 'fontweight': 'bold'},
-                    wedgeprops={'edgecolor': 'white', 'linewidth': 2}
-                )
-                # Migliora leggibilità percentuali
-                for autotext in autotexts:
-                    autotext.set_color('white')
-                    autotext.set_fontweight('bold')
-    
+        elif tipo == 'bar':
+            # Raccogli dati da tutte le serie per grafico a barre raggruppate
+            x_values = []
+            y_data = {}
+            
+            for idx, serie in enumerate(series):
+                name = serie.get('name', f'Serie {idx+1}')
+                points = serie.get('points', [])
+                for p in points:
+                    x_val = str(p.get('x', '')).strip()
+                    y_val = float(p.get('y', 0)) if p.get('y') is not None else 0
+                    # Ignora punti con x vuoto o solo spazi
+                    if x_val and x_val != '':
+                        if x_val not in x_values:
+                            x_values.append(x_val)
+                        if name not in y_data:
+                            y_data[name] = {}
+                        y_data[name][x_val] = y_val
+            
+            # Crea grafico a barre raggruppate
+            if x_values and y_data:
+                x_pos = range(len(x_values))
+                bar_width = 0.35
+                offset = 0
+                
+                for idx, (name, values) in enumerate(y_data.items()):
+                    positions = [x + offset for x in x_pos]
+                    heights = [values.get(x_val, 0) for x_val in x_values]
+                    
+                    color = professional_colors[idx % len(professional_colors)]
+                    ax.bar(positions, heights, 
+                          width=bar_width,
+                          label=name,
+                          color=color,
+                          alpha=0.85,
+                          edgecolor='white',
+                          linewidth=1.5)
+                    offset += bar_width
+                
+                ax.set_xticks([x + bar_width * (len(y_data) - 1) / 2 for x in x_pos])
+                ax.set_xticklabels(x_values, rotation=45, ha='right')
+                ax.legend(loc='best', frameon=True)
+                ax.grid(True, alpha=0.3, axis='y', linestyle='--')
+                ax.set_axisbelow(True)
+            
+        elif tipo == 'pie':
+            # Prendi la prima serie per il pie chart
+            if series:
+                serie = series[0]
+                points = serie.get('points', [])
+                # Filtra punti validi
+                valid_points = [(p.get('x', ''), p.get('y')) for p in points 
+                               if p.get('x') and str(p.get('x', '')).strip() != '' 
+                               and p.get('y') is not None and float(p.get('y', 0)) > 0]
+                labels = [str(x) for x, y in valid_points]
+                values = [float(y) for x, y in valid_points]
+                
+                if labels and values and len(labels) == len(values):
+                    colors_pie = professional_colors[:len(labels)]
+                    wedges, texts, autotexts = ax.pie(
+                        values, 
+                        labels=labels,
+                        autopct='%1.1f%%',
+                        colors=colors_pie,
+                        startangle=90,
+                        textprops={'fontsize': 10, 'fontweight': 'bold'},
+                        wedgeprops={'edgecolor': 'white', 'linewidth': 2}
+                    )
+                    # Migliora leggibilità percentuali
+                    for autotext in autotexts:
+                        autotext.set_color('white')
+                        autotext.set_fontweight('bold')
+        
         # Verifica che ci siano dati da visualizzare
         has_data = False
         if tipo == 'line':
@@ -432,18 +432,18 @@ def create_chart_image(chart_data, width=15*cm, height=10*cm):
             plt.close(fig)
             print(f"⚠️  Grafico '{titolo}' non ha dati validi da visualizzare")
             return None
-    
-    # Titolo e labels
-    if titolo:
-        ax.set_title(titolo, fontsize=14, fontweight='bold', 
-                   pad=15, color='#1a1a1a')
-    if x_label:
-        ax.set_xlabel(x_label, fontsize=11, fontweight='medium', color='#333333')
-    if y_label:
-        ax.set_ylabel(y_label, fontsize=11, fontweight='medium', color='#333333')
-    
-    plt.tight_layout(pad=1.5)
-    
+        
+        # Titolo e labels
+        if titolo:
+            ax.set_title(titolo, fontsize=14, fontweight='bold', 
+                       pad=15, color='#1a1a1a')
+        if x_label:
+            ax.set_xlabel(x_label, fontsize=11, fontweight='medium', color='#333333')
+        if y_label:
+            ax.set_ylabel(y_label, fontsize=11, fontweight='medium', color='#333333')
+        
+        plt.tight_layout(pad=1.5)
+        
         # Salva con alta qualità
         buf = io.BytesIO()
         plt.savefig(buf, format='png', dpi=300, bbox_inches='tight', 
