@@ -1,0 +1,176 @@
+{
+  "model": "gpt-5-nano-2025-08-07",
+  "temperature": 0.7,
+  "input": [
+    {
+      "role": "system",
+      "content": [
+        {
+          "type": "text",
+          "text": "Sei un consulente esperto e amichevole per startup e imprenditori italiani. Il tuo compito è validare idee di business in modo discorsivo, costruttivo e pratico. Scrivi in italiano, con un tono professionale ma accessibile, come se stessi dando consigli a un amico imprenditore. Sii onesto ma incoraggiante, evidenziando sia i punti di forza che le aree di miglioramento. Il tuo obiettivo è aiutare l'imprenditore a capire se la sua idea ha potenziale e come può migliorarla."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "Analizza e valida la seguente idea di business in modo DISCORSIVO e DETTAGLIATO. Scrivi come se stessi dando consigli a un imprenditore che ti chiede un parere onesto sulla sua idea.\n\nDATI DELL'IDEA:\n{{USER_DATA_JSON}}\n\nIl tuo compito è fornire un report di validazione completo che aiuti l'imprenditore a:\n1. Capire se l'idea ha potenziale\n2. Identificare i punti di forza\n3. Riconoscere le criticità\n4. Ricevere suggerimenti concreti per migliorare\n\nREQUISITI IMPORTANTI:\n- Scrivi in modo DISCORSIVO: usa paragrafi completi, spiega il ragionamento, fornisci contesto\n- Sii COSTRUTTIVO: anche se l'idea ha problemi, suggerisci come migliorarla\n- Sii SPECIFICO: evita generalizzazioni, fai esempi concreti quando possibile\n- ORIENTATO AL MERCATO ITALIANO: considera le specificità del mercato italiano quando rilevante\n- PROFESSIONALE MA ACCESSIBILE: usa un linguaggio chiaro, evita gergo eccessivo\n\nPer ogni sezione, fornisci:\n\n1. **Executive Summary** (minimo 300 parole):\n   - Un riepilogo discorsivo dell'idea\n   - La tua prima impressione generale\n   - I punti chiave che emergono dall'analisi\n   - Il verdetto iniziale (VALIDATA / DA MIGLIORARE / NON VALIDATA)\n\n2. **Analisi del Problema** (minimo 200 parole per la valutazione):\n   - Valuta se il problema è reale e significativo\n   - Quante persone hanno questo problema?\n   - Quanto sono disposte a pagare per risolverlo?\n   - Score da 0 a 10 con giustificazione dettagliata\n\n3. **Analisi della Soluzione** (minimo 200 parole per la valutazione):\n   - La soluzione proposta è efficace?\n   - È fattibile da realizzare?\n   - Si differenzia dai competitor?\n   - Score da 0 a 10 con giustificazione dettagliata\n\n4. **Analisi del Mercato** (minimo 200 parole per la valutazione):\n   - Qual è la dimensione del mercato?\n   - Il mercato è in crescita?\n   - È accessibile per una startup?\n   - Score da 0 a 10 con giustificazione dettagliata\n\n5. **Analisi della Competitività** (minimo 200 parole per la valutazione):\n   - Chi sono i competitor principali?\n   - Quali sono i vantaggi competitivi?\n   - Ci sono barriere all'ingresso?\n   - Score da 0 a 10 con giustificazione dettagliata\n\n6. **Analisi del Modello di Business** (minimo 200 parole per la valutazione):\n   - Il modello di ricavi è sostenibile?\n   - L'idea è scalabile?\n   - I costi sono gestibili?\n   - Score da 0 a 10 con giustificazione dettagliata\n\n7. **Punti di Forza** (minimo 3 punti, ognuno con 50+ parole di spiegazione):\n   - Elenca i principali punti di forza dell'idea\n   - Per ognuno, spiega perché è un punto di forza\n   - Fornisci esempi concreti quando possibile\n\n8. **Punti di Debolezza** (minimo 3 punti, ognuno con 50+ parole di spiegazione):\n   - Elenca le principali criticità e rischi\n   - Per ognuno, spiega perché è un problema\n   - Sii onesto ma costruttivo\n\n9. **Raccomandazioni** (minimo 5 raccomandazioni, ognuna con 80+ parole):\n   - Suggerimenti concreti per migliorare l'idea\n   - Azioni specifiche che l'imprenditore può intraprendere\n   - Priorità: cosa fare prima e cosa dopo\n   - Sii pratico e specifico\n\n10. **Score Complessivo** (0-100):\n    - Calcola uno score finale considerando tutti i fattori\n    - Giustifica il punteggio in modo dettagliato (minimo 150 parole)\n    - Spiega come sei arrivato a questo punteggio\n\n11. **Verdetto Finale**:\n    - \"VALIDATA\": L'idea ha un buon potenziale, procedi con fiducia\n    - \"DA MIGLIORARE\": L'idea ha potenziale ma serve lavoro, ecco cosa fare\n    - \"NON VALIDATA\": L'idea ha problemi significativi, considera alternative\n    - Spiegazione dettagliata del verdetto (minimo 200 parole)\n\nIMPORTANTE: Ogni campo di testo deve essere DISCORSIVO e DETTAGLIATO. Non accettare risposte brevi o superficiali. Espandi ogni punto con spiegazioni, esempi e contesto. Il report deve essere utile e pratico per l'imprenditore.\n\nRispondi ESCLUSIVAMENTE con un JSON valido seguendo lo schema fornito."
+        }
+      ]
+    }
+  ],
+  "text": {
+    "format": {
+      "type": "json_schema",
+      "name": "idea_validation_report_it",
+      "strict": true,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "executiveSummary",
+          "analisiProblema",
+          "analisiSoluzione",
+          "analisiMercato",
+          "analisiCompetitivita",
+          "analisiModelloBusiness",
+          "puntiForza",
+          "puntiDebolezza",
+          "raccomandazioni",
+          "scoreComplessivo",
+          "verdetto",
+          "spiegazioneVerdetto"
+        ],
+        "properties": {
+          "executiveSummary": {
+            "type": "string",
+            "description": "Riepilogo discorsivo dell'idea e della valutazione complessiva (minimo 300 parole)"
+          },
+          "analisiProblema": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["score", "valutazione"],
+            "properties": {
+              "score": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10
+              },
+              "valutazione": {
+                "type": "string",
+                "description": "Valutazione dettagliata e discorsiva del problema (minimo 200 parole)"
+              }
+            }
+          },
+          "analisiSoluzione": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["score", "valutazione"],
+            "properties": {
+              "score": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10
+              },
+              "valutazione": {
+                "type": "string",
+                "description": "Valutazione dettagliata e discorsiva della soluzione (minimo 200 parole)"
+              }
+            }
+          },
+          "analisiMercato": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["score", "valutazione"],
+            "properties": {
+              "score": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10
+              },
+              "valutazione": {
+                "type": "string",
+                "description": "Valutazione dettagliata e discorsiva del mercato (minimo 200 parole)"
+              }
+            }
+          },
+          "analisiCompetitivita": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["score", "valutazione"],
+            "properties": {
+              "score": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10
+              },
+              "valutazione": {
+                "type": "string",
+                "description": "Valutazione dettagliata e discorsiva della competitività (minimo 200 parole)"
+              }
+            }
+          },
+          "analisiModelloBusiness": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["score", "valutazione"],
+            "properties": {
+              "score": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10
+              },
+              "valutazione": {
+                "type": "string",
+                "description": "Valutazione dettagliata e discorsiva del modello di business (minimo 200 parole)"
+              }
+            }
+          },
+          "puntiForza": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 3,
+            "maxItems": 8,
+            "description": "Elenco dei punti di forza, ognuno con almeno 50 parole di spiegazione"
+          },
+          "puntiDebolezza": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 3,
+            "maxItems": 8,
+            "description": "Elenco dei punti di debolezza, ognuno con almeno 50 parole di spiegazione"
+          },
+          "raccomandazioni": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 5,
+            "maxItems": 10,
+            "description": "Raccomandazioni concrete, ognuna con almeno 80 parole"
+          },
+          "scoreComplessivo": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Score complessivo da 0 a 100"
+          },
+          "verdetto": {
+            "type": "string",
+            "enum": ["VALIDATA", "DA MIGLIORARE", "NON VALIDATA"]
+          },
+          "spiegazioneVerdetto": {
+            "type": "string",
+            "description": "Spiegazione dettagliata del verdetto (minimo 200 parole)"
+          }
+        }
+      }
+    }
+  }
+}

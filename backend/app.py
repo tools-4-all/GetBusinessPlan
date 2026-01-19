@@ -1089,7 +1089,20 @@ async def validate_idea(request: ValidateIdeaRequest, user: dict = Depends(verif
         
         # Rimuovi il campo temporaneo dal formData prima di processare
         form_data_clean = {k: v for k, v in request.formData.items() if k != '_payment_session_id'}
-        # Prepara i dati utente
+        
+        # Carica il prompt template per validazione idea
+        prompt_path = Path(__file__).parent / "prompt_validation.json"
+        if not prompt_path.exists():
+            raise HTTPException(status_code=500, detail="File prompt_validation.json non trovato")
+        
+        print(f"Caricamento prompt da: {prompt_path}")
+        with open(prompt_path, "r", encoding="utf-8") as f:
+            prompt_config = json.load(f)
+        
+        model_name = prompt_config.get('model', 'gpt-4o-mini')
+        print(f"Modello configurato: {model_name}")
+        
+        # Prepara i dati utente per la validazione
         idea_data = {
             "idea": form_data_clean.get('idea', ''),
             "problema": form_data_clean.get('problem', ''),
@@ -1102,62 +1115,56 @@ async def validate_idea(request: ValidateIdeaRequest, user: dict = Depends(verif
             "team": form_data_clean.get('team', ''),
             "risorse_necessarie": form_data_clean.get('resources', '')
         }
-        
         idea_data_json = json.dumps(idea_data, ensure_ascii=False, indent=2)
         
-        # Prompt per la validazione dell'idea
-        validation_prompt = f"""Sei un esperto consulente per startup e imprenditori italiani. 
-Il tuo compito è validare un'idea di business e fornire un report completo e professionale.
-
-Dati dell'idea di business:
-{idea_data_json}
-
-Analizza l'idea e fornisci un report di validazione strutturato in formato JSON con le seguenti sezioni:
-
-1. **Executive Summary**: Un riepilogo breve (2-3 paragrafi) dell'idea e della valutazione complessiva
-2. **Analisi del Problema**: Valuta se il problema identificato è reale, significativo e se le persone sono disposte a pagare per risolverlo (score 0-10)
-3. **Analisi della Soluzione**: Valuta se la soluzione proposta è efficace, fattibile e differenziata (score 0-10)
-4. **Analisi del Mercato**: Valuta la dimensione del mercato, la crescita e l'accessibilità (score 0-10)
-5. **Analisi della Competitività**: Valuta la posizione competitiva, i vantaggi e le barriere all'ingresso (score 0-10)
-6. **Analisi del Modello di Business**: Valuta la sostenibilità economica e la scalabilità (score 0-10)
-7. **Punti di Forza**: Elenco dei principali punti di forza dell'idea (minimo 3)
-8. **Punti di Debolezza**: Elenco delle principali criticità e rischi (minimo 3)
-9. **Raccomandazioni**: Suggerimenti concreti per migliorare l'idea e aumentare le probabilità di successo (minimo 5)
-10. **Score Complessivo**: Score finale da 0 a 100 con giustificazione
-11. **Verdetto**: "VALIDATA", "DA MIGLIORARE" o "NON VALIDATA" con spiegazione
-
-Il report deve essere:
-- Professionale e dettagliato
-- Orientato al mercato italiano quando rilevante
-- Costruttivo e pratico
-- Basato su criteri oggettivi di validazione
-
-Rispondi SOLO con un JSON valido con questa struttura:
-{{
-    "executiveSummary": "...",
-    "analisiProblema": {{"score": 8, "valutazione": "..."}},
-    "analisiSoluzione": {{"score": 7, "valutazione": "..."}},
-    "analisiMercato": {{"score": 6, "valutazione": "..."}},
-    "analisiCompetitivita": {{"score": 7, "valutazione": "..."}},
-    "analisiModelloBusiness": {{"score": 8, "valutazione": "..."}},
-    "puntiForza": ["...", "..."],
-    "puntiDebolezza": ["...", "..."],
-    "raccomandazioni": ["...", "..."],
-    "scoreComplessivo": 72,
-    "verdetto": "DA MIGLIORARE",
-    "spiegazioneVerdetto": "..."
-}}
-"""
-
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {"role": "system", "content": "Sei un esperto consulente per startup e imprenditori. Fornisci sempre risposte in formato JSON valido, strutturate e professionali."},
-                {"role": "user", "content": validation_prompt}
-            ],
-            temperature=0.7,
-            max_tokens=4000
-        )
+        # Costruisci i messaggi per OpenAI usando il prompt config
+        messages = []
+        for msg in prompt_config["input"]:
+            content_parts = []
+            for content_item in msg["content"]:
+                if content_item["type"] == "text":
+                    text = content_item["text"]
+                    # Sostituisci i placeholder
+                    text = text.replace("{{USER_DATA_JSON}}", idea_data_json)
+                    content_parts.append(text)
+            
+            messages.append({
+                "role": msg["role"],
+                "content": "".join(content_parts)
+            })
+        
+        # Prepara il request body
+        request_body = {
+            "model": model_name,
+            "messages": messages,
+            "temperature": prompt_config.get("temperature", 0.7)
+        }
+        
+        # Aggiungi max_tokens se specificato
+        if "max_tokens" in prompt_config:
+            request_body["max_tokens"] = prompt_config["max_tokens"]
+        
+        # Aggiungi response_format se presente (per JSON schema)
+        if "text" in prompt_config and "format" in prompt_config["text"]:
+            request_body["response_format"] = prompt_config["text"]["format"]
+        
+        # Chiamata a OpenAI
+        openai_start = datetime.datetime.now()
+        print(f"Timestamp inizio OpenAI: {openai_start.isoformat()}")
+        
+        try:
+            response = client.chat.completions.create(**request_body)
+        except Exception as e:
+            print(f"Errore chiamata OpenAI: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Errore nella chiamata a OpenAI: {str(e)}")
+        
+        openai_end = datetime.datetime.now()
+        openai_elapsed = (openai_end - openai_start).total_seconds()
+        print(f"Timestamp fine OpenAI: {openai_end.isoformat()}")
+        print(f"Tempo chiamata OpenAI: {openai_elapsed:.2f} secondi ({openai_elapsed/60:.2f} minuti)")
+        
+        if not response.choices or len(response.choices) == 0:
+            raise HTTPException(status_code=500, detail="Nessuna risposta da OpenAI")
         
         content = response.choices[0].message.content.strip()
         
@@ -1174,8 +1181,8 @@ Rispondi SOLO con un JSON valido con questa struttura:
             validation_report = json.loads(content)
         except json.JSONDecodeError as e:
             print(f"Errore parsing JSON: {e}")
-            print(f"Contenuto ricevuto: {content[:500]}")
-            raise HTTPException(status_code=500, detail="Errore nella generazione del report di validazione")
+            print(f"Contenuto ricevuto (primi 500 caratteri): {content[:500]}")
+            raise HTTPException(status_code=500, detail="Errore nella generazione del report di validazione: formato JSON non valido")
         
         # Aggiungi metadata
         validation_report["_metadata"] = {
