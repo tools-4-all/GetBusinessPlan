@@ -1,6 +1,7 @@
 import json
 import re
 import io
+import os
 from datetime import datetime
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -404,7 +405,13 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
     output_dir = Path(__file__).parent / "output"
     output_dir.mkdir(exist_ok=True)
     
-    output_path = output_dir / "business-plan.pdf"
+    # Genera nome file univoco con timestamp per evitare cache
+    import hashlib
+    import time
+    timestamp = int(time.time() * 1000)  # millisecondi
+    # Aggiungi hash del contenuto per garantire unicità
+    content_hash = hashlib.md5(json.dumps(business_plan_json, sort_keys=True).encode()).hexdigest()[:8]
+    output_path = output_dir / f"business-plan-{timestamp}-{content_hash}.pdf"
     
     # Estrai informazioni per header/footer
     pdf_layout = business_plan_json.get('pdf_layout', {})
@@ -1111,5 +1118,17 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
     # Genera il PDF
     doc.build(story)
     print(f"✓ PDF generato con successo: {output_path}")
+    
+    # Pulisci file PDF vecchi (mantieni solo gli ultimi 10)
+    try:
+        pdf_files = sorted(output_dir.glob("business-plan-*.pdf"), key=os.path.getmtime, reverse=True)
+        for old_pdf in pdf_files[10:]:  # Mantieni solo gli ultimi 10
+            try:
+                old_pdf.unlink()
+                print(f"🗑️  Rimosso PDF vecchio: {old_pdf.name}")
+            except Exception as e:
+                print(f"⚠️  Errore rimozione PDF vecchio {old_pdf.name}: {e}")
+    except Exception as e:
+        print(f"⚠️  Errore pulizia PDF vecchi: {e}")
     
     return str(output_path)

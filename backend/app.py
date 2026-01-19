@@ -898,12 +898,28 @@ async def generate_pdf(request: PDFRequest, user: dict = Depends(verify_firebase
         if not os.path.exists(pdf_path):
             raise HTTPException(status_code=500, detail="PDF non generato correttamente")
         
-        return FileResponse(
+        # Estrai nome file dal path
+        pdf_filename = os.path.basename(pdf_path)
+        
+        # Aggiungi header per evitare cache
+        headers = {
+            "Content-Disposition": f'attachment; filename="{pdf_filename}"',
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0"
+        }
+        
+        response = FileResponse(
             pdf_path,
             media_type="application/pdf",
-            filename="business-plan.pdf",
-            headers={"Content-Disposition": "attachment; filename=business-plan.pdf"}
+            filename=pdf_filename,
+            headers=headers
         )
+        
+        # Pulisci file temporaneo dopo l'invio (opzionale, in background)
+        # Nota: FileResponse gestisce la cancellazione automaticamente dopo l'invio
+        
+        return response
     except HTTPException:
         raise
     except Exception as e:
