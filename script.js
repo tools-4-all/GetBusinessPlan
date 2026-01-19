@@ -4240,6 +4240,22 @@ async function generatePDF() {
     try {
         console.log('📄 Generazione PDF tramite API backend...');
         
+        // Ottieni il token di autenticazione Firebase
+        let idToken = null;
+        try {
+            if (!currentUser || !window.firebaseAuth) {
+                throw new Error('Utente non autenticato');
+            }
+            idToken = await currentUser.getIdToken(true);
+            console.log('✅ Token Firebase ottenuto');
+        } catch (tokenError) {
+            console.error('❌ Errore nell\'ottenere il token:', tokenError);
+            alert('Errore di autenticazione. Effettua nuovamente il login.');
+            downloadPdfBtn.disabled = false;
+            downloadPdfBtn.textContent = 'Scarica PDF';
+            return;
+        }
+        
         // Aggiungi il sessionId al JSON per la verifica
         const jsonWithPayment = {
             ...jsonData,
@@ -4250,6 +4266,7 @@ async function generatePDF() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${idToken}`
             },
             body: JSON.stringify({
                 businessPlanJson: jsonWithPayment
