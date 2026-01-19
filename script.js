@@ -3185,6 +3185,22 @@ async function generateValidationPDF() {
         console.log('=== INIZIO GENERAZIONE PDF VALIDAZIONE IDEA ===');
         console.log('Chiamata API backend Python...');
         
+        // Ottieni il token di autenticazione
+        let idToken = null;
+        try {
+            if (!currentUser || !window.firebaseAuth) {
+                throw new Error('Utente non autenticato');
+            }
+            idToken = await currentUser.getIdToken(true);
+            console.log('✅ Token Firebase ottenuto');
+        } catch (tokenError) {
+            console.error('❌ Errore nell\'ottenere il token:', tokenError);
+            alert('Errore di autenticazione. Effettua nuovamente il login.');
+            downloadValidationPdfBtn.disabled = false;
+            downloadValidationPdfBtn.textContent = 'Scarica PDF';
+            return;
+        }
+        
         // Aggiungi il sessionId al JSON per la verifica
         const jsonWithPayment = {
             ...window.currentValidationData,
@@ -3195,6 +3211,7 @@ async function generateValidationPDF() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${idToken}`
             },
             body: JSON.stringify({
                 validationJson: jsonWithPayment
@@ -3270,6 +3287,22 @@ async function generatePDFAnalysis(marketAnalysisJSON) {
         console.log('=== INIZIO GENERAZIONE PDF ANALISI DI MERCATO ===');
         console.log('Chiamata API backend Python...');
         
+        // Ottieni il token di autenticazione
+        let idToken = null;
+        try {
+            if (!currentUser || !window.firebaseAuth) {
+                throw new Error('Utente non autenticato');
+            }
+            idToken = await currentUser.getIdToken(true);
+            console.log('✅ Token Firebase ottenuto');
+        } catch (tokenError) {
+            console.error('❌ Errore nell\'ottenere il token:', tokenError);
+            alert('Errore di autenticazione. Effettua nuovamente il login.');
+            downloadAnalysisPdfBtn.disabled = false;
+            downloadAnalysisPdfBtn.textContent = 'Scarica PDF';
+            return;
+        }
+        
         // Aggiungi il sessionId al JSON per la verifica
         const jsonWithPayment = {
             ...marketAnalysisJSON,
@@ -3280,6 +3313,7 @@ async function generatePDFAnalysis(marketAnalysisJSON) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${idToken}`
             },
             body: JSON.stringify({
                 marketAnalysisJson: jsonWithPayment
@@ -6166,6 +6200,18 @@ async function generateValidationAfterPayment(validationWizardData) {
         window.paymentInProgress = false;
         console.log('✅ Flag paymentInProgress disattivato - validazione completata');
         
+        // Salva nella dashboard
+        const validationTitle = validationWizardData.idea || 'Validazione Idea';
+        console.log('💾 Chiamata saveDocumentToDashboard per validazione idea...');
+        saveDocumentToDashboard({
+            type: 'validate-idea',
+            title: validationTitle,
+            html: generateValidationHTML(data.json),
+            json: data.json,
+            wizardData: validationWizardData,
+            date: new Date().toISOString()
+        });
+        
         // Mostra i risultati
         displayValidationResults(data.json);
         
@@ -6179,6 +6225,61 @@ async function generateValidationAfterPayment(validationWizardData) {
         if (validationWizardNavigation) validationWizardNavigation.style.display = 'flex';
         validationLoadingState.style.display = 'none';
     }
+}
+
+function generateValidationHTML(validationData) {
+    const score = validationData.scoreComplessivo || 0;
+    const verdict = validationData.verdetto || 'DA MIGLIORARE';
+    const scoreColor = score >= 70 ? '#10b981' : score >= 50 ? '#f59e0b' : '#ef4444';
+    
+    let html = `
+        <div style="margin-bottom: 30px; text-align: center;">
+            <div style="font-size: 48px; font-weight: 700; color: ${scoreColor}; margin-bottom: 10px;">${score}/100</div>
+            <div style="font-size: 20px; font-weight: 600; color: var(--text-primary); margin-bottom: 5px;">${escape(verdict)}</div>
+            <p style="color: var(--text-secondary); margin-top: 10px;">${escape(validationData.spiegazioneVerdetto || '')}</p>
+        </div>
+        
+        <div style="margin-bottom: 30px;">
+            <h4 style="font-size: 18px; font-weight: 600; margin-bottom: 15px;">Executive Summary</h4>
+            <p style="color: var(--text-secondary); line-height: 1.7;">${escape(validationData.executiveSummary || '').replace(/\n/g, '<br>')}</p>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px;">
+            <div style="padding: 20px; background: var(--bg-secondary); border-radius: 8px;">
+                <div style="font-size: 14px; color: var(--text-secondary); margin-bottom: 5px;">Problema</div>
+                <div style="font-size: 24px; font-weight: 700; color: var(--accent); margin-bottom: 10px;">${validationData.analisiProblema?.score || 0}/10</div>
+                <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.6;">${escape((validationData.analisiProblema?.valutazione || '').substring(0, 150))}...</p>
+            </div>
+            <div style="padding: 20px; background: var(--bg-secondary); border-radius: 8px;">
+                <div style="font-size: 14px; color: var(--text-secondary); margin-bottom: 5px;">Soluzione</div>
+                <div style="font-size: 24px; font-weight: 700; color: var(--accent); margin-bottom: 10px;">${validationData.analisiSoluzione?.score || 0}/10</div>
+                <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.6;">${escape((validationData.analisiSoluzione?.valutazione || '').substring(0, 150))}...</p>
+            </div>
+            <div style="padding: 20px; background: var(--bg-secondary); border-radius: 8px;">
+                <div style="font-size: 14px; color: var(--text-secondary); margin-bottom: 5px;">Mercato</div>
+                <div style="font-size: 24px; font-weight: 700; color: var(--accent); margin-bottom: 10px;">${validationData.analisiMercato?.score || 0}/10</div>
+                <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.6;">${escape((validationData.analisiMercato?.valutazione || '').substring(0, 150))}...</p>
+            </div>
+        </div>
+    `;
+    
+    if (validationData.puntiForza && validationData.puntiForza.length > 0) {
+        html += `<div style="margin-bottom: 30px;"><h4 style="font-size: 18px; font-weight: 600; margin-bottom: 15px;">Punti di Forza</h4><ul style="list-style: none; padding: 0;">`;
+        validationData.puntiForza.forEach(punto => {
+            html += `<li style="padding: 10px 0; border-bottom: 1px solid var(--border);">${escape(punto).replace(/\n/g, '<br>')}</li>`;
+        });
+        html += `</ul></div>`;
+    }
+    
+    if (validationData.raccomandazioni && validationData.raccomandazioni.length > 0) {
+        html += `<div style="margin-bottom: 30px;"><h4 style="font-size: 18px; font-weight: 600; margin-bottom: 15px;">Raccomandazioni</h4><ul style="list-style: none; padding: 0;">`;
+        validationData.raccomandazioni.forEach(racc => {
+            html += `<li style="padding: 10px 0; border-bottom: 1px solid var(--border);">${escape(racc).replace(/\n/g, '<br>')}</li>`;
+        });
+        html += `</ul></div>`;
+    }
+    
+    return html;
 }
 
 function displayValidationResults(validationData) {

@@ -972,7 +972,6 @@ async def generate_pdf_validation(request: PDFValidationRequest, user: dict = De
         # Per ora usiamo lo stesso generatore PDF dell'analisi, ma potresti creare un generatore specifico
         # output_path = await pdf_generator_validation.create_pdf_from_validation(pdf_json)
         # Per semplicità, usiamo il generatore dell'analisi (dovrai creare un generatore specifico se necessario)
-        from backend import pdf_generator_analysis
         output_path = await pdf_generator_analysis.create_pdf_from_market_analysis(pdf_json)  # TODO: creare generatore specifico
         
         if not Path(output_path).exists():

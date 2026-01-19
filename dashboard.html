@@ -510,9 +510,24 @@
                             minute: '2-digit'
                         });
                         
-                        const typeLabel = doc.type === 'business-plan' ? 'Business Plan' : 'Analisi di Mercato';
-                        const iconClass = doc.type === 'business-plan' ? 'business-plan' : 'market-analysis';
-                        const icon = doc.type === 'business-plan' ? '📊' : '📈';
+                        let typeLabel, iconClass, icon;
+                        if (doc.type === 'business-plan') {
+                            typeLabel = 'Business Plan';
+                            iconClass = 'business-plan';
+                            icon = '📊';
+                        } else if (doc.type === 'market-analysis') {
+                            typeLabel = 'Analisi di Mercato';
+                            iconClass = 'market-analysis';
+                            icon = '📈';
+                        } else if (doc.type === 'validate-idea') {
+                            typeLabel = 'Validazione Idea';
+                            iconClass = 'validate-idea';
+                            icon = '✅';
+                        } else {
+                            typeLabel = 'Documento';
+                            iconClass = 'document';
+                            icon = '📄';
+                        }
                         
                         return `
                             <div class="document-card" data-doc-id="${doc.id}">
@@ -725,6 +740,11 @@
                     endpoint = `${apiBaseUrl}/api/generate-pdf-analysis`;
                     requestBody = {
                         marketAnalysisJson: doc.json
+                    };
+                } else if (doc.type === 'validate-idea') {
+                    endpoint = `${apiBaseUrl}/api/generate-pdf-validation`;
+                    requestBody = {
+                        validationJson: doc.json
                     };
                 } else {
                     alert('Tipo di documento non supportato');
