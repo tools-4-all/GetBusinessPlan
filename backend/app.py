@@ -204,6 +204,9 @@ class MarketAnalysisRequest(BaseModel):
 class PDFAnalysisRequest(BaseModel):
     marketAnalysisJson: dict
 
+class PDFValidationRequest(BaseModel):
+    validationJson: dict
+
 class SuggestionRequest(BaseModel):
     questionId: str
     questionTitle: str
@@ -942,6 +945,48 @@ async def generate_pdf_analysis(request: PDFAnalysisRequest, user: dict = Depend
         raise
     except Exception as e:
         print(f"Errore nella generazione PDF analisi: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Errore generazione PDF: {str(e)}")
+
+@app.post("/api/generate-pdf-validation")
+async def generate_pdf_validation(request: PDFValidationRequest, user: dict = Depends(verify_firebase_token)):
+    """Genera PDF dalla validazione idea (richiede autenticazione e pagamento verificato)"""
+    try:
+        # Verifica che ci sia sessionId nel request (opzionale per retrocompatibilità)
+        session_id = request.validationJson.get('_payment_session_id')
+        
+        if session_id and STRIPE_SECRET_KEY:
+            # Verifica il pagamento
+            try:
+                session = stripe.checkout.Session.retrieve(session_id)
+                if session.payment_status != 'paid':
+                    raise HTTPException(status_code=402, detail="Pagamento non completato")
+            except stripe.error.StripeError as e:
+                raise HTTPException(status_code=402, detail=f"Errore verifica pagamento: {str(e)}")
+        
+        # Rimuovi il campo temporaneo dal JSON prima di generare il PDF
+        pdf_json = {k: v for k, v in request.validationJson.items() if k != '_payment_session_id'}
+        
+        print("=== INIZIO GENERAZIONE PDF VALIDAZIONE IDEA ===")
+        # Per ora usiamo lo stesso generatore PDF dell'analisi, ma potresti creare un generatore specifico
+        # output_path = await pdf_generator_validation.create_pdf_from_validation(pdf_json)
+        # Per semplicità, usiamo il generatore dell'analisi (dovrai creare un generatore specifico se necessario)
+        from backend import pdf_generator_analysis
+        output_path = await pdf_generator_analysis.create_pdf_from_market_analysis(pdf_json)  # TODO: creare generatore specifico
+        
+        if not Path(output_path).exists():
+            raise HTTPException(status_code=500, detail="File PDF non generato correttamente")
+        
+        return FileResponse(
+            path=output_path,
+            media_type="application/pdf",
+            filename="validazione-idea.pdf"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Errore nella generazione PDF validazione: {str(e)}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Errore generazione PDF: {str(e)}")

@@ -3156,6 +3156,91 @@ async function generatePDFStandaloneFromJSON(jsonData) {
     return await generatePDF();
 }
 
+async function generateValidationPDF() {
+    if (!downloadValidationPdfBtn) downloadValidationPdfBtn = document.getElementById('downloadValidationPdfBtn');
+    if (!downloadValidationPdfBtn) {
+        console.error('downloadValidationPdfBtn not found');
+        return;
+    }
+    
+    if (!window.currentValidationData) {
+        alert('Nessuna validazione disponibile');
+        return;
+    }
+    
+    // Verifica se il pagamento è già stato completato
+    const paymentKey = 'paymentVerified_validation';
+    const sessionKey = 'paymentSessionId_validation';
+    
+    // Il pagamento è già stato verificato prima della generazione del documento
+    if (!window[paymentKey] || !window[sessionKey]) {
+        alert('Pagamento non verificato. Genera prima la validazione.');
+        return;
+    }
+    
+    downloadValidationPdfBtn.disabled = true;
+    downloadValidationPdfBtn.textContent = 'Generazione PDF...';
+    
+    try {
+        console.log('=== INIZIO GENERAZIONE PDF VALIDAZIONE IDEA ===');
+        console.log('Chiamata API backend Python...');
+        
+        // Aggiungi il sessionId al JSON per la verifica
+        const jsonWithPayment = {
+            ...window.currentValidationData,
+            _payment_session_id: window[sessionKey]
+        };
+        
+        const response = await fetch(`${API_BASE_URL}/api/generate-pdf-validation`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                validationJson: jsonWithPayment
+            })
+        });
+        
+        if (!response.ok) {
+            if (response.status === 402) {
+                // Pagamento non completato, richiedi di nuovo
+                window[paymentKey] = false;
+                window[sessionKey] = null;
+                alert('Pagamento non completato. Completa il pagamento per scaricare il PDF.');
+                await handlePayment('validate-idea');
+                return;
+            }
+            const errorData = await response.json().catch(() => ({ detail: 'Errore sconosciuto' }));
+            throw new Error(`Errore API: ${response.status} - ${errorData.detail || 'Errore sconosciuto'}`);
+        }
+        
+        // Scarica il PDF
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'validazione-idea.pdf';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        console.log('✅ PDF validazione generato e scaricato con successo');
+        
+        // Reset pagamento dopo il download
+        window[paymentKey] = false;
+        window[sessionKey] = null;
+        
+        downloadValidationPdfBtn.disabled = false;
+        downloadValidationPdfBtn.textContent = 'Scarica PDF';
+    } catch (error) {
+        console.error('Errore nella generazione PDF validazione:', error);
+        alert('Errore nella generazione del PDF: ' + error.message);
+        downloadValidationPdfBtn.disabled = false;
+        downloadValidationPdfBtn.textContent = 'Scarica PDF';
+    }
+}
+
 async function generatePDFAnalysis(marketAnalysisJSON) {
     if (!downloadAnalysisPdfBtn) downloadAnalysisPdfBtn = document.getElementById('downloadAnalysisPdfBtn');
     if (!downloadAnalysisPdfBtn) {
@@ -6077,11 +6162,18 @@ async function generateValidationAfterPayment(validationWizardData) {
         console.log('📊 Score complessivo:', data.json.scoreComplessivo || 'N/A');
         console.log('🎯 Verdetto:', data.json.verdetto || 'N/A');
         
+        // Resetta il flag di pagamento in corso
+        window.paymentInProgress = false;
+        console.log('✅ Flag paymentInProgress disattivato - validazione completata');
+        
         // Mostra i risultati
         displayValidationResults(data.json);
         
     } catch (parseError) {
         console.error('❌ Errore nel parsing della risposta:', parseError);
+        // Resetta il flag di pagamento in corso anche in caso di errore
+        window.paymentInProgress = false;
+        console.log('✅ Flag paymentInProgress disattivato - errore nella validazione');
         alert('Errore durante la validazione: ' + parseError.message);
         validationWizardContainer.style.display = 'block';
         if (validationWizardNavigation) validationWizardNavigation.style.display = 'flex';
@@ -6188,6 +6280,13 @@ function initializeValidationListeners() {
     }
     if (validationNextBtn) {
         validationNextBtn.addEventListener('click', validationNextStep);
+    }
+    
+    if (!downloadValidationPdfBtn) {
+        downloadValidationPdfBtn = document.getElementById('downloadValidationPdfBtn');
+    }
+    if (downloadValidationPdfBtn) {
+        downloadValidationPdfBtn.addEventListener('click', generateValidationPDF);
     }
     
     if (!downloadValidationJsonBtn) {
