@@ -319,29 +319,29 @@ def create_chart_image(chart_data, width=15*cm, height=10*cm):
         ax.spines['bottom'].set_color('#CCCCCC')
         
         if tipo == 'line':
-        for idx, serie in enumerate(series):
-            name = serie.get('name', f'Serie {idx+1}')
-            points = serie.get('points', [])
-            # Filtra punti validi (con x non vuoto e y valido)
-            valid_points = [(p.get('x', ''), p.get('y')) for p in points 
-                           if p.get('x') and str(p.get('x', '')).strip() != '' 
-                           and p.get('y') is not None]
-            x_values = [str(x) for x, y in valid_points]
-            y_values = [float(y) for x, y in valid_points]
+            for idx, serie in enumerate(series):
+                name = serie.get('name', f'Serie {idx+1}')
+                points = serie.get('points', [])
+                # Filtra punti validi (con x non vuoto e y valido)
+                valid_points = [(p.get('x', ''), p.get('y')) for p in points 
+                               if p.get('x') and str(p.get('x', '')).strip() != '' 
+                               and p.get('y') is not None]
+                x_values = [str(x) for x, y in valid_points]
+                y_values = [float(y) for x, y in valid_points]
+                
+                if x_values and y_values and len(x_values) == len(y_values):
+                    color = professional_colors[idx % len(professional_colors)]
+                    ax.plot(x_values, y_values, 
+                           marker='o', 
+                           label=name,
+                           color=color,
+                           linewidth=2.5,
+                           markersize=7,
+                           markerfacecolor=color,
+                           markeredgecolor='white',
+                           markeredgewidth=1.5,
+                           alpha=0.9)
             
-            if x_values and y_values and len(x_values) == len(y_values):
-                color = professional_colors[idx % len(professional_colors)]
-                ax.plot(x_values, y_values, 
-                       marker='o', 
-                       label=name,
-                       color=color,
-                       linewidth=2.5,
-                       markersize=7,
-                       markerfacecolor=color,
-                       markeredgecolor='white',
-                       markeredgewidth=1.5,
-                       alpha=0.9)
-        
             ax.legend(loc='best', frameon=True, fancybox=True, shadow=False)
             ax.grid(True, alpha=0.3, linestyle='--', linewidth=0.8)
             ax.set_axisbelow(True)
