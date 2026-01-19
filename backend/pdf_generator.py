@@ -65,6 +65,57 @@ def markdown_to_paragraphs(text, styles):
     # Normalizza il testo prima del parsing
     text = preprocess_content_for_pdf(text)
     
+    # PRIMA: Identifica righe completamente in maiuscolo come titoli
+    # Processa riga per riga per identificare titoli in maiuscolo
+    lines = text.split('\n')
+    processed_lines = []
+    i = 0
+    
+    while i < len(lines):
+        line = lines[i].strip()
+        
+        if not line:
+            processed_lines.append('')
+            i += 1
+            continue
+        
+        # Controlla se la riga è completamente in maiuscolo (titolo)
+        # Pattern: righe come "PUNTO CHIAVE 1", "ANALISI DEL MERCATO", "SEZIONE 2", etc.
+        # Deve avere almeno 3 caratteri e essere principalmente maiuscolo
+        # Esclude righe che iniziano con # (già markdown), sono troppo corte, o sono solo numeri/punteggiatura
+        if len(line) >= 3 and not line.startswith('#'):
+            # Rimuovi spazi e punteggiatura per analisi
+            text_only = ''.join([c for c in line if c.isalnum() or c.isspace()])
+            
+            if len(text_only) >= 3:
+                # Conta caratteri alfabetici maiuscoli vs totali alfabetici
+                alpha_chars = [c for c in line if c.isalpha()]
+                upper_chars = [c for c in line if c.isupper() and c.isalpha()]
+                
+                # Se ci sono caratteri alfabetici
+                if len(alpha_chars) >= 3:
+                    upper_ratio = len(upper_chars) / len(alpha_chars) if alpha_chars else 0
+                    
+                    # Se almeno l'80% dei caratteri alfabetici è maiuscolo
+                    # E la riga non è solo numeri/punteggiatura
+                    if upper_ratio >= 0.8:
+                        # Pattern comuni per titoli in maiuscolo:
+                        # - "PUNTO CHIAVE 1", "PUNTO CHIAVE 2"
+                        # - "ANALISI DEL MERCATO"
+                        # - "SEZIONE 1", "SEZIONE 2"
+                        # - "CONCLUSIONI"
+                        # Tratta come titolo: aggiungi markdown H2
+                        processed_lines.append(f'## {line}')
+                        i += 1
+                        continue
+        
+        # Altrimenti mantieni la riga originale
+        processed_lines.append(lines[i])
+        i += 1
+    
+    # Ricostruisci il testo con i titoli in maiuscolo convertiti
+    text = '\n'.join(processed_lines)
+    
     # Configura markdown con estensioni utili
     md = markdown.Markdown(extensions=['fenced_code', 'tables', 'nl2br'])
     
