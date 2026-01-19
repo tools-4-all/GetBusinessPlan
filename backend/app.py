@@ -1145,8 +1145,16 @@ async def validate_idea(request: ValidateIdeaRequest, user: dict = Depends(verif
             request_body["max_tokens"] = prompt_config["max_tokens"]
         
         # Aggiungi response_format se presente (per JSON schema)
-        if "text" in prompt_config and "format" in prompt_config["text"]:
-            request_body["response_format"] = prompt_config["text"]["format"]
+        if prompt_config.get("text", {}).get("format"):
+            fmt = prompt_config["text"]["format"]
+            request_body["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": fmt["name"],
+                    "strict": fmt["strict"],
+                    "schema": fmt["schema"]
+                }
+            }
         
         # Chiamata a OpenAI
         openai_start = datetime.datetime.now()
