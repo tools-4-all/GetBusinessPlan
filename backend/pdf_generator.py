@@ -12,6 +12,8 @@ from pathlib import Path
 import matplotlib
 matplotlib.use('Agg')  # Backend non interattivo per server
 import matplotlib.pyplot as plt
+import markdown
+from markdown.extensions import fenced_code, tables, nl2br
 
 
 def escape_for_pdf(s):
@@ -53,7 +55,7 @@ def preprocess_content_for_pdf(content):
 
 
 def markdown_to_paragraphs(text, styles):
-    """Parser markdown migliorato e più deterministico per ReportLab"""
+    """Converte markdown in paragrafi ReportLab usando libreria markdown standard"""
     elements = []
     
     if not text:
@@ -62,178 +64,109 @@ def markdown_to_paragraphs(text, styles):
     # Normalizza il testo prima del parsing
     text = preprocess_content_for_pdf(text)
     
-    # Funzione helper per convertire markdown inline a HTML per ReportLab
-    def convert_inline_markdown(line_text):
-        """Converte markdown inline a HTML per ReportLab"""
-        if not line_text:
+    # Configura markdown con estensioni utili
+    md = markdown.Markdown(extensions=['fenced_code', 'tables', 'nl2br'])
+    
+    # Converti markdown in HTML
+    html = md.convert(text)
+    
+    # Funzione per convertire tag HTML in formato ReportLab
+    def clean_html_for_reportlab(html_text):
+        """Converte HTML in formato compatibile con ReportLab Paragraph"""
+        if not html_text:
             return ""
-        
-        # Escape caratteri HTML speciali PRIMA di processare markdown
-        line_text = line_text.replace('&', '&amp;')
-        line_text = line_text.replace('<', '&lt;').replace('>', '&gt;')
-        
-        # Converti **grassetto** (gestisce anche spazi e caratteri speciali)
-        # Usa non-greedy match e gestisce casi con spazi
-        line_text = re.sub(r'\*\*([^*]+?)\*\*', r'<b>\1</b>', line_text)
-        
-        # Converti *corsivo* (ma non **)
-        # Match solo se non è preceduto o seguito da *
-        line_text = re.sub(r'(?<!\*)\*([^*\n]+?)\*(?!\*)', r'<i>\1</i>', line_text)
-        
-        # Converti `codice` in monospace
-        line_text = re.sub(r'`([^`]+?)`', r'<font name="Courier">\1</font>', line_text)
-        
-        return line_text
+        # ReportLab supporta: <b>, <i>, <u>, <font>, <br/>, <a>, <sup>, <sub>
+        html_text = re.sub(r'<strong>(.+?)</strong>', r'<b>\1</b>', html_text, flags=re.DOTALL)
+        html_text = re.sub(r'<em>(.+?)</em>', r'<i>\1</i>', html_text, flags=re.DOTALL)
+        html_text = re.sub(r'<code>(.+?)</code>', r'<font name="Courier">\1</font>', html_text, flags=re.DOTALL)
+        html_text = re.sub(r'<pre>(.+?)</pre>', r'<font name="Courier">\1</font>', html_text, flags=re.DOTALL)
+        # Rimuovi tag non supportati
+        html_text = re.sub(r'</?div[^>]*>', '', html_text)
+        html_text = re.sub(r'</?span[^>]*>', '', html_text)
+        return html_text.strip()
     
-    # Processa riga per riga invece di dividere in blocchi
-    # Questo è più robusto per gestire casi edge
-    lines = text.split('\n')
-    i = 0
+    # Processa l'HTML sequenzialmente mantenendo l'ordine
+    # Dividi per blocchi HTML principali
+    parts = []
+    current_pos = 0
     
-    while i < len(lines):
-        # NON fare strip() qui, lo facciamo dopo per preservare informazioni
-        original_line = lines[i]
-        line = original_line.strip()
+    # Trova tutti i tag principali nell'ordine
+    for match in re.finditer(r'<(h[1-6]|p|ul|ol|li)>(.+?)</\1>', html, re.DOTALL):
+        # Aggiungi testo prima del match come paragrafo se presente
+        before = html[current_pos:match.start()].strip()
+        if before:
+            parts.append(('text', before))
         
-        if not line:
-            i += 1
-            continue
+        tag_type = match.group(1)
+        content = match.group(2)
         
-        # Controlla i titoli - pattern molto flessibile
-        # Accetta: ## Titolo, ##Titolo, ##  Titolo, ##Titolo con caratteri speciali
-        # Prima prova pattern standard con spazio
-        heading_match = re.match(r'^(#{1,6})\s+(.+)$', line)
-        if not heading_match:
-            # Fallback: prova senza spazio (es: ##Titolo)
-            heading_match = re.match(r'^(#{1,6})([^#\s].*)$', line)
+        if tag_type.startswith('h'):
+            level = int(tag_type[1])
+            parts.append(('heading', level, content))
+        elif tag_type in ('ul', 'ol'):
+            # Processa lista
+            items = re.findall(r'<li>(.+?)</li>', content, re.DOTALL)
+            for idx, item in enumerate(items, 1):
+                parts.append(('list_item', tag_type == 'ol', item))
+        elif tag_type == 'li':
+            parts.append(('list_item', False, content))
+        elif tag_type == 'p':
+            parts.append(('paragraph', content))
         
-        if heading_match:
-            level = len(heading_match.group(1))
-            title_text = heading_match.group(2).strip()
-            
-            # Se il titolo è vuoto dopo lo strip, salta
-            if not title_text:
-                i += 1
-                continue
-            
-            title_text = convert_inline_markdown(title_text)
-            
-            # Usa lo stile appropriato
+        current_pos = match.end()
+    
+    # Aggiungi testo rimanente
+    remaining = html[current_pos:].strip()
+    if remaining:
+        parts.append(('text', remaining))
+    
+    # Se non abbiamo trovato tag, processa tutto come testo
+    if not parts:
+        parts = [('text', html)]
+    
+    # Converti in elementi ReportLab
+    for part in parts:
+        part_type = part[0]
+        
+        if part_type == 'heading':
+            level, content = part[1], part[2]
+            content_html = clean_html_for_reportlab(content)
             if level == 1:
-                elements.append(Paragraph(title_text, styles['CustomHeading1']))
+                elements.append(Paragraph(content_html, styles['CustomHeading1']))
                 elements.append(Spacer(1, 0.4*cm))
             elif level == 2:
-                elements.append(Paragraph(title_text, styles['CustomHeading2']))
+                elements.append(Paragraph(content_html, styles['CustomHeading2']))
                 elements.append(Spacer(1, 0.3*cm))
-            elif level >= 3:
-                elements.append(Paragraph(title_text, styles['Heading3']))
+            else:
+                elements.append(Paragraph(content_html, styles['Heading3']))
                 elements.append(Spacer(1, 0.2*cm))
-            
-            i += 1
-            continue
         
-        # Liste (bullet) - supporta -, *, +
-        # Pattern più flessibile: accetta anche spazi multipli dopo il marker
-        list_match = re.match(r'^[-*+]\s+(.+)$', line)
-        if list_match:
-            items = []
-            # Raccogli tutti gli elementi della lista consecutivi
-            while i < len(lines):
-                current_line = lines[i].strip()
-                if not current_line:
-                    break
-                if re.match(r'^[-*+]\s+', current_line):
-                    item_text = re.sub(r'^[-*+]\s+', '', current_line)
-                    item_text = convert_inline_markdown(item_text)
-                    items.append(item_text)
-                    i += 1
-                else:
-                    break
-            
-            for item in items:
-                elements.append(Paragraph(f"• {item}", styles['Normal']))
-                elements.append(Spacer(1, 0.15*cm))
-            continue
+        elif part_type == 'list_item':
+            is_ordered, content = part[1], part[2]
+            content_html = clean_html_for_reportlab(content)
+            # Per liste ordinate, usa un contatore (semplificato)
+            if is_ordered:
+                # Non possiamo sapere il numero esatto senza contesto, usiamo bullet
+                elements.append(Paragraph(f"• {content_html}", styles['Normal']))
+            else:
+                elements.append(Paragraph(f"• {content_html}", styles['Normal']))
+            elements.append(Spacer(1, 0.15*cm))
         
-        # Liste numerate - supporta 1. e 1)
-        numbered_match = re.match(r'^\d+[.)]\s+(.+)$', line)
-        if numbered_match:
-            items = []
-            item_numbers = []
-            # Raccogli tutti gli elementi numerati consecutivi
-            while i < len(lines):
-                current_line = lines[i].strip()
-                if not current_line:
-                    break
-                match = re.match(r'^(\d+)[.)]\s+(.+)$', current_line)
-                if match:
-                    item_numbers.append(int(match.group(1)))
-                    item_text = match.group(2)
-                    item_text = convert_inline_markdown(item_text)
-                    items.append(item_text)
-                    i += 1
-                else:
-                    break
-            
-            # Usa i numeri originali se sono sequenziali, altrimenti enumera
-            start_num = item_numbers[0] if item_numbers else 1
-            for idx, item in enumerate(items):
-                num = start_num + idx
-                elements.append(Paragraph(f"{num}. {item}", styles['Normal']))
-                elements.append(Spacer(1, 0.15*cm))
-            continue
+        elif part_type == 'paragraph':
+            content = part[1]
+            content_html = clean_html_for_reportlab(content)
+            if content_html:
+                elements.append(Paragraph(content_html, styles['Normal']))
+                elements.append(Spacer(1, 0.3*cm))
         
-        # Fallback per titoli malformati (senza spazio dopo #)
-        # Controlla se inizia con # ma non è stato riconosciuto dal pattern principale
-        if line.startswith('#') and not re.match(r'^#{1,6}\s', line):
-            # Potrebbe essere un titolo malformato (es: ##Titolo invece di ## Titolo)
-            # Conta i # e estrai il testo
-            hash_count = len(re.match(r'^(#+)', line).group(1))
-            title_text = line[hash_count:].strip()
-            if title_text:
-                title_text = convert_inline_markdown(title_text)
-                if hash_count == 1:
-                    elements.append(Paragraph(title_text, styles['CustomHeading1']))
-                    elements.append(Spacer(1, 0.4*cm))
-                elif hash_count == 2:
-                    elements.append(Paragraph(title_text, styles['CustomHeading2']))
-                    elements.append(Spacer(1, 0.3*cm))
-                else:
-                    elements.append(Paragraph(title_text, styles['Heading3']))
-                    elements.append(Spacer(1, 0.2*cm))
-                i += 1
-                continue
-        
-        # Paragrafo normale - raccogli righe consecutive fino a un blocco speciale
-        para_lines = []
-        while i < len(lines):
-            current_line = lines[i].strip()
-            if not current_line:
-                # Se troviamo una riga vuota, fermiamoci (fine paragrafo)
-                i += 1
-                break
-            
-            # Se inizia un nuovo blocco speciale, fermati
-            if (re.match(r'^#{1,6}\s', current_line) or 
-                re.match(r'^[-*+]\s+', current_line) or 
-                re.match(r'^\d+[.)]\s+', current_line)):
-                break
-            
-            para_lines.append(current_line)
-            i += 1
-        
-        if para_lines:
-            para_text = ' '.join(para_lines)
-            para_text = convert_inline_markdown(para_text)
-            elements.append(Paragraph(para_text, styles['Normal']))
-            elements.append(Spacer(1, 0.3*cm))
-        elif line:
-            # Ultimo fallback: se non abbiamo riconosciuto nulla e la riga non è vuota
-            # tratta come paragrafo normale
-            para_text = convert_inline_markdown(line)
-            elements.append(Paragraph(para_text, styles['Normal']))
-            elements.append(Spacer(1, 0.3*cm))
-            i += 1
+        elif part_type == 'text':
+            content = part[1]
+            # Rimuovi tag <p> se presenti
+            content = re.sub(r'</?p[^>]*>', '', content)
+            content_html = clean_html_for_reportlab(content)
+            if content_html:
+                elements.append(Paragraph(content_html, styles['Normal']))
+                elements.append(Spacer(1, 0.3*cm))
     
     return elements
 
