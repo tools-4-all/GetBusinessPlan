@@ -105,6 +105,7 @@ def markdown_to_paragraphs(text, styles):
                         # - "SEZIONE 1", "SEZIONE 2"
                         # - "CONCLUSIONI"
                         # Tratta come titolo: aggiungi markdown H2
+                        print(f"✅ Riconosciuto titolo in maiuscolo: '{line}'")
                         processed_lines.append(f'## {line}')
                         i += 1
                         continue
@@ -1014,6 +1015,14 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
         if contenuto:
             # Preprocessa il contenuto per normalizzazione
             contenuto = preprocess_content_for_pdf(contenuto)
+            # Log per debug: verifica se ci sono titoli in maiuscolo
+            lines_with_uppercase = [line.strip() for line in contenuto.split('\n') 
+                                   if line.strip() and len(line.strip()) >= 3 
+                                   and not line.strip().startswith('#')
+                                   and sum(1 for c in line.strip() if c.isupper() and c.isalpha()) >= 3
+                                   and sum(1 for c in line.strip() if c.isupper() and c.isalpha()) / max(1, sum(1 for c in line.strip() if c.isalpha())) >= 0.8]
+            if lines_with_uppercase:
+                print(f"📌 Titoli in maiuscolo rilevati nel capitolo '{titolo_ch}': {lines_with_uppercase[:3]}")
             elements = markdown_to_paragraphs(contenuto, styles)
             story.extend(elements)
         
