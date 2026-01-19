@@ -421,16 +421,43 @@ def create_chart_image(chart_data, width=15*cm, height=10*cm):
         
         # Verifica che ci siano dati da visualizzare
         has_data = False
+        data_info = {}
+        
         if tipo == 'line':
             has_data = any(len(serie.get('points', [])) > 0 for serie in series)
+            data_info = {
+                'serie_count': len(series),
+                'points_per_serie': [len(s.get('points', [])) for s in series]
+            }
         elif tipo == 'bar':
-            has_data = 'x_values' in locals() and 'y_data' in locals() and len(x_values) > 0 and len(y_data) > 0
+            # Verifica se x_values e y_data sono stati definiti
+            if 'x_values' in locals() and 'y_data' in locals():
+                has_data = len(x_values) > 0 and len(y_data) > 0
+                data_info = {
+                    'x_values_count': len(x_values),
+                    'y_data_series': len(y_data),
+                    'x_values': x_values[:3] if x_values else []
+                }
+            else:
+                has_data = False
+                data_info = {'error': 'x_values o y_data non definiti'}
         elif tipo == 'pie':
-            has_data = 'labels' in locals() and 'values' in locals() and len(labels) > 0 and len(values) > 0
+            # Verifica se labels e values sono stati definiti
+            if 'labels' in locals() and 'values' in locals():
+                has_data = len(labels) > 0 and len(values) > 0
+                data_info = {
+                    'labels_count': len(labels),
+                    'values_count': len(values)
+                }
+            else:
+                has_data = False
+                data_info = {'error': 'labels o values non definiti'}
+        
+        print(f"   🔍 Verifica dati grafico '{titolo}': has_data={has_data}, info={data_info}")
         
         if not has_data:
             plt.close(fig)
-            print(f"⚠️  Grafico '{titolo}' non ha dati validi da visualizzare")
+            print(f"⚠️  Grafico '{titolo}' non ha dati validi da visualizzare. Tipo: {tipo}, Info: {data_info}")
             return None
         
         # Titolo e labels
@@ -1112,19 +1139,37 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
                     chart = charts_dict[chart_id]
                     print(f"📈 Generando grafico: {chart_id} - {chart.get('titolo', 'N/A')}")
                     try:
+                        print(f"   🔧 Chiamata create_chart_image per {chart_id}...")
                         chart_img = create_chart_image(chart, width=15*cm, height=10*cm)
+                        print(f"   📦 Risultato create_chart_image: {type(chart_img)}, is None: {chart_img is None}")
+                        
                         if chart_img:
-                            img = Image(chart_img, width=15*cm, height=10*cm)
-                            story.append(img)
-                            story.append(Spacer(1, 0.3*cm))
-                            print(f"✅ Grafico {chart_id} aggiunto con successo al PDF")
-                            
-                            # Aggiungi caption se presente
-                            caption = chart.get('caption', '')
-                            if caption:
-                                caption_clean = caption.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-                                story.append(Paragraph(f"<i>{caption_clean}</i>", styles['Normal']))
+                            try:
+                                # Verifica che il buffer sia valido
+                                if hasattr(chart_img, 'read'):
+                                    chart_img.seek(0)
+                                    img_data = chart_img.read()
+                                    print(f"   📏 Dimensione immagine: {len(img_data)} bytes")
+                                    if len(img_data) == 0:
+                                        print(f"⚠️  Immagine vuota per grafico {chart_id}")
+                                        continue
+                                    chart_img.seek(0)  # Reset per Image()
+                                
+                                img = Image(chart_img, width=15*cm, height=10*cm)
+                                story.append(img)
                                 story.append(Spacer(1, 0.3*cm))
+                                print(f"✅ Grafico {chart_id} aggiunto con successo al PDF")
+                                
+                                # Aggiungi caption se presente
+                                caption = chart.get('caption', '')
+                                if caption:
+                                    caption_clean = caption.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                                    story.append(Paragraph(f"<i>{caption_clean}</i>", styles['Normal']))
+                                    story.append(Spacer(1, 0.3*cm))
+                            except Exception as img_error:
+                                import traceback
+                                print(f"❌ Errore nell'aggiungere immagine al PDF per {chart_id}: {str(img_error)}")
+                                print(traceback.format_exc())
                         else:
                             print(f"⚠️  Grafico {chart_id} non generato (chart_img è None)")
                     except Exception as e:
