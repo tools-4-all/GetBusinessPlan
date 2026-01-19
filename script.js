@@ -1347,6 +1347,40 @@ function initializeAll() {
             } else {
                 console.error('❌ Plan modal NON trovato!');
             }
+        } else if (pendingDocType === 'validate-idea') {
+            // Apri il modal della validazione immediatamente
+            const validationModal = document.getElementById('validationModal');
+            console.log('Validation modal trovato:', !!validationModal);
+            if (validationModal) {
+                validationModal.style.display = 'block';
+                document.body.style.overflow = 'hidden';
+                window.paymentDocumentType = 'validate-idea';
+                console.log('✅ Modal validazione aperto immediatamente');
+                console.log('Modal display style:', validationModal.style.display);
+                
+                // Nascondi il wizard e mostra il loading immediatamente
+                const validationWizardContainer = document.getElementById('validationWizardContainer');
+                const validationWizardNavigation = document.getElementById('validationWizardNavigation');
+                const validationLoadingState = document.getElementById('validationLoadingState');
+                const validationResultState = document.getElementById('validationResultState');
+                
+                if (validationWizardContainer) {
+                    validationWizardContainer.style.display = 'none';
+                    console.log('✅ Wizard validazione nascosto');
+                }
+                if (validationWizardNavigation) {
+                    validationWizardNavigation.style.display = 'none';
+                }
+                if (validationResultState) {
+                    validationResultState.style.display = 'none';
+                }
+                if (validationLoadingState) {
+                    validationLoadingState.style.display = 'block';
+                    console.log('✅ Loading validazione mostrato');
+                }
+            } else {
+                console.error('❌ Validation modal NON trovato!');
+            }
         } else {
             console.warn('⚠️ Tipo documento non trovato:', pendingDocType);
         }
@@ -1379,6 +1413,7 @@ function initializeAll() {
         console.log('Tipo documento salvato in localStorage:', pendingDocType);
         console.log('pendingBusinessPlanData:', localStorage.getItem('pendingBusinessPlanData') ? 'Presente' : 'Assente');
         console.log('pendingMarketAnalysisData:', localStorage.getItem('pendingMarketAnalysisData') ? 'Presente' : 'Assente');
+        console.log('pendingValidationData:', localStorage.getItem('pendingValidationData') ? 'Presente' : 'Assente');
         
         // Alert di debug (rimuovi in produzione)
         if (!pendingDocType) {
@@ -1659,6 +1694,102 @@ function initializeAll() {
                     alert('Errore dopo il pagamento: ' + error.message);
                 }
             })();
+        } else if (pendingDocType === 'validate-idea') {
+            // Usa async/await per gestire correttamente l'autenticazione
+            (async () => {
+                try {
+                    // Aspetta che Firebase Auth ripristini lo stato di autenticazione
+                    console.log('⏳ Aspetto che Firebase Auth ripristini lo stato...');
+                    let attempts = 0;
+                    while ((!authInitialized || !currentUser) && attempts < 20) {
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                        attempts++;
+                    }
+                    
+                    // Se dopo l'attesa l'utente è ancora non autenticato, richiedi autenticazione
+                    if (!currentUser || !currentUser.uid) {
+                        console.log('⚠️ Utente non autenticato dopo attesa, richiedo autenticazione...');
+                        await requireAuth();
+                        console.log('✅ Utente autenticato dopo requireAuth');
+                    } else {
+                        console.log('✅ Utente già autenticato:', currentUser.email);
+                    }
+                    
+                    // Poi verifica il pagamento
+                    const validationVerified = await verifyPaymentAfterRedirect('validate-idea');
+                    if (validationVerified) {
+                        window.paymentVerified_validation = true;
+                        window.paymentSessionId_validation = finalSessionId;
+                        console.log('✅ Pagamento validazione verificato');
+                        
+                        // Genera la validazione dopo il pagamento verificato
+                        // Recupera i dati da localStorage o da memoria
+                        let validationWizardData = null;
+                        try {
+                            const savedData = localStorage.getItem('pendingValidationData');
+                            if (savedData) {
+                                validationWizardData = JSON.parse(savedData);
+                                localStorage.removeItem('pendingValidationData');
+                                localStorage.removeItem('pendingDocumentType');
+                                console.log('✅ Dati validazione recuperati da localStorage');
+                            } else if (window.pendingValidationData) {
+                                validationWizardData = window.pendingValidationData;
+                                window.pendingValidationData = null;
+                                console.log('✅ Dati validazione recuperati da memoria');
+                            }
+                        } catch (e) {
+                            console.error('Errore nel recupero dati validazione:', e);
+                        }
+                        
+                        // Dopo il pagamento verificato, genera direttamente la validazione
+                        if (validationWizardData && Object.keys(validationWizardData).length > 0) {
+                            console.log('📄 ===== GENERAZIONE VALIDAZIONE DOPO PAGAMENTO =====');
+                            console.log('Dati validazione recuperati:', Object.keys(validationWizardData));
+                            console.log('Numero di campi:', Object.keys(validationWizardData).length);
+                            console.log('Utente autenticato:', currentUser?.email);
+                            console.log('Session ID:', finalSessionId);
+                        
+                            // Assicurati che gli elementi DOM siano inizializzati
+                            if (!validationModal) validationModal = document.getElementById('validationModal');
+                            if (!validationWizardContainer) validationWizardContainer = document.getElementById('validationWizardContainer');
+                            if (!validationWizardNavigation) validationWizardNavigation = document.getElementById('validationWizardNavigation');
+                            if (!validationLoadingState) validationLoadingState = document.getElementById('validationLoadingState');
+                            if (!validationResultState) validationResultState = document.getElementById('validationResultState');
+                            if (!validationContent) validationContent = document.getElementById('validationContent');
+                            
+                            console.log('Elementi DOM:', {
+                                modal: !!validationModal,
+                                wizardContainer: !!validationWizardContainer,
+                                loadingState: !!validationLoadingState,
+                                resultState: !!validationResultState,
+                                content: !!validationContent
+                            });
+                            
+                            // Apri il modal della validazione PRIMA di tutto
+                            if (!validationModal) {
+                                console.error('❌ Modal validazione non trovato');
+                                alert('Errore: modal non trovato. Ricarica la pagina.');
+                                return;
+                            }
+                            
+                            validationModal.style.display = 'block';
+                            document.body.style.overflow = 'hidden';
+                            
+                            // Genera la validazione
+                            await generateValidationAfterPayment(validationWizardData);
+                        } else {
+                            console.error('❌ Dati validazione non trovati o vuoti');
+                            alert('Errore: dati validazione non trovati. Ricarica la pagina e riprova.');
+                        }
+                    } else {
+                        console.error('❌ Pagamento validazione non verificato');
+                        alert('Errore: pagamento non verificato. Contatta il supporto.');
+                    }
+                } catch (error) {
+                    console.error('❌ Errore nella generazione validazione dopo pagamento:', error);
+                    alert('Errore durante la generazione della validazione: ' + error.message);
+                }
+            })();
         } else {
             console.warn('⚠️ Tipo documento non trovato in localStorage!');
             console.warn('Tentativo di recupero da URL o verifica entrambi...');
@@ -1666,8 +1797,9 @@ function initializeAll() {
             // Prova a determinare dal sessionId verificando entrambi
             Promise.all([
                 verifyPaymentAfterRedirect('business-plan'),
-                verifyPaymentAfterRedirect('market-analysis')
-            ]).then(([bpVerified, maVerified]) => {
+                verifyPaymentAfterRedirect('market-analysis'),
+                verifyPaymentAfterRedirect('validate-idea')
+            ]).then(([bpVerified, maVerified, valVerified]) => {
                 console.log('Verifica fallback - BP:', bpVerified, 'MA:', maVerified);
                 
                 if (bpVerified) {
@@ -3790,6 +3922,8 @@ async function handlePayment(documentType) {
                 window.paymentSessionId = data.sessionId;
             } else if (documentType === 'market-analysis') {
                 window.paymentSessionId_analysis = data.sessionId;
+            } else if (documentType === 'validate-idea') {
+                window.paymentSessionId_validation = data.sessionId;
             }
             
             // Reindirizza a Stripe Checkout
@@ -5776,6 +5910,40 @@ function validationPrevStep() {
 async function generateValidation() {
     if (!validationWizardContainer || !validationLoadingState || !validationResultState) return;
     
+    // NON nascondere il wizard qui - rimane visibile fino al pagamento
+    // Il wizard verrà nascosto solo dopo il redirect da Stripe
+    
+    // PRIMA: Richiedi il pagamento prima di generare il documento
+    try {
+        // Salva i dati del wizard in localStorage per recuperarli dopo il redirect
+        try {
+            const dataToSave = JSON.stringify(validationWizardData);
+            localStorage.setItem('pendingValidationData', dataToSave);
+            localStorage.setItem('pendingDocumentType', 'validate-idea');
+            console.log('✅ Dati validazione salvati in localStorage');
+        } catch (e) {
+            console.error('❌ ERRORE nel salvataggio localStorage:', e);
+            window.pendingValidationData = validationWizardData;
+        }
+        
+        await handlePayment('validate-idea');
+        // Se il pagamento è stato avviato, la funzione reindirizza a Stripe
+        // Il wizard rimane visibile durante il redirect
+        // Dopo il redirect, il wizard verrà nascosto e verrà mostrato il loading
+        return;
+    } catch (error) {
+        if (error.message !== 'Pagamento annullato') {
+            alert('Errore nel pagamento: ' + error.message);
+        }
+        // Se l'utente annulla, il wizard rimane visibile (non serve ripristinarlo)
+        return;
+    }
+}
+
+// Funzione per generare la validazione dopo il pagamento verificato
+async function generateValidationAfterPayment(validationWizardData) {
+    if (!validationWizardContainer || !validationLoadingState || !validationResultState) return;
+    
     validationWizardContainer.style.display = 'none';
     if (validationWizardNavigation) validationWizardNavigation.style.display = 'none';
     validationLoadingState.style.display = 'block';
@@ -5785,6 +5953,12 @@ async function generateValidation() {
     console.log('⚠️ NOTA: La validazione dell\'idea può richiedere 2-4 minuti. Attendi...');
     console.log('⏱️ Timestamp inizio:', new Date().toISOString());
     
+    // Aggiungi il sessionId ai dati se disponibile
+    const formDataWithSession = { ...validationWizardData };
+    if (window.paymentSessionId_validation) {
+        formDataWithSession._payment_session_id = window.paymentSessionId_validation;
+    }
+    
     // Crea un AbortController per timeout - 10 minuti
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 minuti timeout
@@ -5792,13 +5966,17 @@ async function generateValidation() {
     
     let response;
     try {
+        // Ottieni il token di autenticazione
+        const idToken = await window.firebaseAuth.currentUser.getIdToken();
+        
         response = await fetch(`${API_BASE_URL}/api/validate-idea`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${idToken}`
             },
             body: JSON.stringify({
-                formData: validationWizardData
+                formData: formDataWithSession
             }),
             signal: controller.signal
         });

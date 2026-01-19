@@ -186,6 +186,7 @@ STRIPE_PRICE_BUSINESS_PLAN = os.getenv("STRIPE_PRICE_BUSINESS_PLAN", "")
 STRIPE_PRICE_MARKET_ANALYSIS = os.getenv("STRIPE_PRICE_MARKET_ANALYSIS", "")
 STRIPE_PRICE_BUSINESS_PLAN_UPSELL = os.getenv("STRIPE_PRICE_BUSINESS_PLAN_UPSELL", "")
 STRIPE_PRICE_MARKET_ANALYSIS_UPSELL = os.getenv("STRIPE_PRICE_MARKET_ANALYSIS_UPSELL", "")
+STRIPE_PRICE_VALIDATE_IDEA = os.getenv("STRIPE_PRICE_VALIDATE_IDEA", "")
 
 # Modelli per le richieste
 class BusinessPlanRequest(BaseModel):
@@ -759,6 +760,27 @@ async def create_checkout_session(
                         },
                         'quantity': 1,
                     })
+        elif request.documentType == "validate-idea":
+            # Usa Price ID se configurato, altrimenti usa price_data
+            if STRIPE_PRICE_VALIDATE_IDEA:
+                line_items.append({
+                    'price': STRIPE_PRICE_VALIDATE_IDEA,
+                    'quantity': 1,
+                })
+            else:
+                # Fallback a price_data se Price ID non configurato
+                # Usa un prezzo di default (es. 9.99€) se non configurato
+                PRICE_VALIDATE_IDEA = int(os.getenv("PRICE_VALIDATE_IDEA_CENTS", "999"))  # 9.99€ default
+                line_items.append({
+                    'price_data': {
+                        'currency': 'eur',
+                        'product_data': {
+                            'name': 'Validazione Idea di Business',
+                        },
+                        'unit_amount': PRICE_VALIDATE_IDEA,
+                    },
+                    'quantity': 1,
+                })
         else:
             raise HTTPException(status_code=400, detail="Tipo documento non valido")
         
@@ -1044,8 +1066,8 @@ Rispondi SOLO con un JSON array di stringhe, esempio:
         })
 
 @app.post("/api/validate-idea")
-async def validate_idea(request: ValidateIdeaRequest):
-    """Valida un'idea di business e fornisce un report di validazione"""
+async def validate_idea(request: ValidateIdeaRequest, user: dict = Depends(verify_firebase_token)):
+    """Valida un'idea di business e fornisce un report di validazione (richiede autenticazione e pagamento verificato)"""
     import datetime
     start_time = datetime.datetime.now()
     print(f"=== INIZIO VALIDAZIONE IDEA ===")
@@ -1053,18 +1075,32 @@ async def validate_idea(request: ValidateIdeaRequest):
     print(f"Dati ricevuti: {len(str(request.formData))} caratteri")
     
     try:
+        # Verifica che ci sia sessionId nel request (opzionale per retrocompatibilità)
+        session_id = request.formData.get('_payment_session_id')
+        
+        if session_id and STRIPE_SECRET_KEY:
+            # Verifica il pagamento
+            try:
+                session = stripe.checkout.Session.retrieve(session_id)
+                if session.payment_status != 'paid':
+                    raise HTTPException(status_code=402, detail="Pagamento non completato")
+            except stripe.error.StripeError as e:
+                raise HTTPException(status_code=402, detail=f"Errore verifica pagamento: {str(e)}")
+        
+        # Rimuovi il campo temporaneo dal formData prima di processare
+        form_data_clean = {k: v for k, v in request.formData.items() if k != '_payment_session_id'}
         # Prepara i dati utente
         idea_data = {
-            "idea": request.formData.get('idea', ''),
-            "problema": request.formData.get('problem', ''),
-            "soluzione": request.formData.get('solution', ''),
-            "mercato_target": request.formData.get('targetMarket', ''),
-            "concorrenti": request.formData.get('competitors', ''),
-            "vantaggio_competitivo": request.formData.get('competitiveAdvantage', ''),
-            "modello_ricavi": request.formData.get('revenueModel', ''),
-            "traction": request.formData.get('traction', ''),
-            "team": request.formData.get('team', ''),
-            "risorse_necessarie": request.formData.get('resources', '')
+            "idea": form_data_clean.get('idea', ''),
+            "problema": form_data_clean.get('problem', ''),
+            "soluzione": form_data_clean.get('solution', ''),
+            "mercato_target": form_data_clean.get('targetMarket', ''),
+            "concorrenti": form_data_clean.get('competitors', ''),
+            "vantaggio_competitivo": form_data_clean.get('competitiveAdvantage', ''),
+            "modello_ricavi": form_data_clean.get('revenueModel', ''),
+            "traction": form_data_clean.get('traction', ''),
+            "team": form_data_clean.get('team', ''),
+            "risorse_necessarie": form_data_clean.get('resources', '')
         }
         
         idea_data_json = json.dumps(idea_data, ensure_ascii=False, indent=2)
