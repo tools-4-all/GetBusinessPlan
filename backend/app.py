@@ -225,10 +225,12 @@ class ValidateIdeaRequest(BaseModel):
     formData: dict
 
 @app.get("/")
+@app.head("/")
 async def root():
     return {"message": "GetBusinessPlan API", "status": "running"}
 
 @app.get("/health")
+@app.head("/health")
 async def health():
     return {"status": "healthy"}
 

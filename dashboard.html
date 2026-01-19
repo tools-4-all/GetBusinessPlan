@@ -254,12 +254,24 @@
                         <button class="btn-secondary" id="authBtn">Accedi</button>
                         <div id="userInfo" style="display: none; align-items: center; gap: 10px;">
                             <span id="userEmail" style="color: var(--text-secondary); font-size: 0.9em;"></span>
-                            <button class="btn-secondary" id="logoutBtn">Esci</button>
                         </div>
                     </div>
                     <a href="index.html" class="btn-link">Home</a>
                     <a href="dashboard.html" class="btn-link" style="font-weight: 600;">Dashboard</a>
-                    <a href="blog.html" class="btn-link">Blog</a>
+                    <!-- Menu a tendina -->
+                    <div class="dropdown-menu">
+                        <button class="dropdown-toggle" id="menuToggle" aria-label="Menu">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="1"></circle>
+                                <circle cx="19" cy="12" r="1"></circle>
+                                <circle cx="5" cy="12" r="1"></circle>
+                            </svg>
+                        </button>
+                        <div class="dropdown-content" id="menuDropdown">
+                            <a href="blog.html" class="dropdown-item">Blog</a>
+                            <button class="dropdown-item" id="logoutBtn" style="display: none;">Esci</button>
+                        </div>
+                    </div>
                 </nav>
             </div>
         </div>
@@ -340,9 +352,15 @@
             if (currentUser) {
                 if (authBtn) authBtn.style.display = 'none';
                 if (userInfo) userInfo.style.display = 'flex';
-                if (userEmail) userEmail.textContent = currentUser.email || 'Utente';
+                // Nella dashboard l'email è sempre visibile
+                if (userEmail) {
+                    userEmail.textContent = currentUser.email || 'Utente';
+                    userEmail.style.display = 'block';
+                }
                 
+                // Mostra il pulsante "Esci" nel menu dropdown
                 if (logoutBtn) {
+                    logoutBtn.style.display = 'block';
                     logoutBtn.onclick = async () => {
                         try {
                             const authFunctions = getAuthFunctions();
@@ -366,6 +384,9 @@
                     };
                 }
                 if (userInfo) userInfo.style.display = 'none';
+                
+                // Nascondi il pulsante "Esci" nel menu dropdown
+                if (logoutBtn) logoutBtn.style.display = 'none';
             }
         }
 
@@ -806,11 +827,54 @@
             });
         }
 
+        // Gestione menu dropdown
+        function initializeDropdownMenu() {
+            const menuToggle = document.getElementById('menuToggle');
+            const menuDropdown = document.getElementById('menuDropdown');
+            
+            if (!menuToggle || !menuDropdown) return;
+            
+            // Toggle menu quando si clicca sul pulsante
+            menuToggle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                menuDropdown.classList.toggle('show');
+            });
+            
+            // Chiudi menu quando si clicca fuori
+            document.addEventListener('click', (e) => {
+                if (!menuToggle.contains(e.target) && !menuDropdown.contains(e.target)) {
+                    menuDropdown.classList.remove('show');
+                }
+            });
+            
+            // Chiudi menu quando si preme ESC
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && menuDropdown.classList.contains('show')) {
+                    menuDropdown.classList.remove('show');
+                }
+            });
+            
+            // Chiudi menu quando si clicca su un elemento del menu
+            const menuItems = menuDropdown.querySelectorAll('.dropdown-item');
+            menuItems.forEach(item => {
+                item.addEventListener('click', () => {
+                    // Aspetta un po' prima di chiudere per permettere la navigazione
+                    setTimeout(() => {
+                        menuDropdown.classList.remove('show');
+                    }, 100);
+                });
+            });
+        }
+
         // Inizializza quando il DOM è pronto
         if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', initializeAuth);
+            document.addEventListener('DOMContentLoaded', () => {
+                initializeAuth();
+                initializeDropdownMenu();
+            });
         } else {
             initializeAuth();
+            initializeDropdownMenu();
         }
     </script>
 </body>

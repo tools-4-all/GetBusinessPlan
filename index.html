@@ -60,12 +60,24 @@
                         <button class="btn-secondary" id="authBtn">Accedi</button>
                         <div id="userInfo" style="display: none; align-items: center; gap: 10px;">
                             <span id="userEmail" style="color: var(--text-secondary); font-size: 0.9em;"></span>
-                            <button class="btn-secondary" id="logoutBtn">Esci</button>
                         </div>
                     </div>
                     <button class="btn-primary" id="createPlanBtn">Inizia</button>
                     <a href="dashboard.html" class="btn-link" id="dashboardLink" style="display: none;">Dashboard</a>
-                    <a href="blog.html" class="btn-link">Blog</a>
+                    <!-- Menu a tendina -->
+                    <div class="dropdown-menu">
+                        <button class="dropdown-toggle" id="menuToggle" aria-label="Menu">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="1"></circle>
+                                <circle cx="19" cy="12" r="1"></circle>
+                                <circle cx="5" cy="12" r="1"></circle>
+                            </svg>
+                        </button>
+                        <div class="dropdown-content" id="menuDropdown">
+                            <a href="blog.html" class="dropdown-item">Blog</a>
+                            <button class="dropdown-item" id="logoutBtn" style="display: none;">Esci</button>
+                        </div>
+                    </div>
                 </nav>
             </div>
         </div>

@@ -3675,14 +3675,27 @@ function updateAuthUI() {
     const logoutBtn = document.getElementById('logoutBtn');
     const dashboardLink = document.getElementById('dashboardLink');
     
+    // Controlla se siamo nella dashboard
+    const isDashboard = window.location.pathname.includes('dashboard.html') || 
+                        window.location.href.includes('dashboard.html');
+    
     if (currentUser) {
         // Utente autenticato
         if (authBtn) authBtn.style.display = 'none';
         if (userInfo) userInfo.style.display = 'flex';
-        if (userEmail) userEmail.textContent = currentUser.email || 'Utente';
+        
+        // Mostra l'email solo nella dashboard
+        if (userEmail) {
+            userEmail.textContent = currentUser.email || 'Utente';
+            // Nascondi l'email nella pagina principale, mostra nella dashboard
+            userEmail.style.display = isDashboard ? 'block' : 'none';
+        }
+        
         if (dashboardLink) dashboardLink.style.display = 'block';
         
+        // Mostra il pulsante "Esci" nel menu dropdown
         if (logoutBtn) {
+            logoutBtn.style.display = 'block';
             logoutBtn.onclick = async () => {
                 try {
                     const authFunctions = getAuthFunctions();
@@ -3708,6 +3721,9 @@ function updateAuthUI() {
         }
         if (userInfo) userInfo.style.display = 'none';
         if (dashboardLink) dashboardLink.style.display = 'none';
+        
+        // Nascondi il pulsante "Esci" nel menu dropdown
+        if (logoutBtn) logoutBtn.style.display = 'none';
     }
 }
 
@@ -6175,4 +6191,50 @@ if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initializeValidationListeners);
 } else {
     initializeValidationListeners();
+}
+
+// Gestione menu dropdown
+function initializeDropdownMenu() {
+    const menuToggle = document.getElementById('menuToggle');
+    const menuDropdown = document.getElementById('menuDropdown');
+    
+    if (!menuToggle || !menuDropdown) return;
+    
+    // Toggle menu quando si clicca sul pulsante
+    menuToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        menuDropdown.classList.toggle('show');
+    });
+    
+    // Chiudi menu quando si clicca fuori
+    document.addEventListener('click', (e) => {
+        if (!menuToggle.contains(e.target) && !menuDropdown.contains(e.target)) {
+            menuDropdown.classList.remove('show');
+        }
+    });
+    
+    // Chiudi menu quando si preme ESC
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && menuDropdown.classList.contains('show')) {
+            menuDropdown.classList.remove('show');
+        }
+    });
+    
+    // Chiudi menu quando si clicca su un elemento del menu
+    const menuItems = menuDropdown.querySelectorAll('.dropdown-item');
+    menuItems.forEach(item => {
+        item.addEventListener('click', () => {
+            // Aspetta un po' prima di chiudere per permettere la navigazione
+            setTimeout(() => {
+                menuDropdown.classList.remove('show');
+            }, 100);
+        });
+    });
+}
+
+// Inizializza il menu dropdown quando il DOM è pronto
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeDropdownMenu);
+} else {
+    initializeDropdownMenu();
 }
