@@ -99,14 +99,36 @@ def markdown_to_paragraphs(text, styles):
                     # Se almeno l'80% dei caratteri alfabetici è maiuscolo
                     # E la riga non è solo numeri/punteggiatura
                     if upper_ratio >= 0.8:
-                        # Pattern comuni per titoli in maiuscolo:
-                        # - "PUNTO CHIAVE 1", "PUNTO CHIAVE 2"
-                        # - "ANALISI DEL MERCATO"
-                        # - "SEZIONE 1", "SEZIONE 2"
-                        # - "CONCLUSIONI"
-                        # Tratta come titolo: aggiungi markdown H2
-                        print(f"✅ Riconosciuto titolo in maiuscolo: '{line}'")
-                        processed_lines.append(f'## {line}')
+                        # Sezioni che devono essere trattate come sottoparagrafi (H3)
+                        # invece di titoli principali (H2)
+                        sottoparagrafi_keywords = [
+                            'PUNTI CHIAVE',
+                            'PUNTO CHIAVE',
+                            'PIANO OPERATIVO',
+                            'ROADMAP',
+                            'PIANO OPERATIVO E ROADMAP',
+                            'ANALISI DEI RISCHI',
+                            'ANALISI RISCHI'
+                        ]
+                        
+                        # Normalizza la riga per il confronto (rimuovi spazi extra, punteggiatura)
+                        line_normalized = ' '.join(line.split()).upper()
+                        
+                        # Controlla se contiene una delle keyword dei sottoparagrafi
+                        is_sottoparagrafo = any(keyword in line_normalized for keyword in sottoparagrafi_keywords)
+                        
+                        if is_sottoparagrafo:
+                            # Tratta come sottoparagrafo: aggiungi markdown H3
+                            print(f"✅ Riconosciuto sottoparagrafo in maiuscolo: '{line}'")
+                            processed_lines.append(f'### {line}')
+                        else:
+                            # Pattern comuni per titoli in maiuscolo:
+                            # - "ANALISI DEL MERCATO"
+                            # - "SEZIONE 1", "SEZIONE 2"
+                            # - "CONCLUSIONI"
+                            # Tratta come titolo: aggiungi markdown H2
+                            print(f"✅ Riconosciuto titolo in maiuscolo: '{line}'")
+                            processed_lines.append(f'## {line}')
                         i += 1
                         continue
         
