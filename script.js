@@ -261,12 +261,18 @@ function openServicesModal() {
     }
 }
 
+// Esponi come globale per uso in dashboard.html
+window.openServicesModal = openServicesModal;
+
 function closeServicesModal() {
     const servicesModal = document.getElementById('servicesModal');
     if (servicesModal) {
         servicesModal.style.display = 'none';
     }
 }
+
+// Esponi come globale per uso in dashboard.html
+window.closeServicesModal = closeServicesModal;
 
 async function openModal() {
     if (!planModal) {
@@ -1072,7 +1078,7 @@ function initializeEventListeners() {
     if (ctaPlanBtn) {
         ctaPlanBtn.addEventListener('click', () => {
             console.log('ctaPlanBtn clicked');
-            openModal();
+            openServicesModal();
         });
         console.log('ctaPlanBtn listener added');
     } else {
@@ -4443,6 +4449,9 @@ function closeAnalysisModalFunc() {
         resetAnalysisWizard();
     }
 }
+
+// Esponi come globale per uso in dashboard.html
+window.openAnalysisModal = openAnalysisModal;
 
 function resetAnalysisWizard() {
     analysisCurrentStep = 0;

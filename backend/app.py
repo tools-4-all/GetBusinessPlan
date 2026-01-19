@@ -1144,9 +1144,18 @@ async def validate_idea(request: ValidateIdeaRequest, user: dict = Depends(verif
         # Prepara il request body
         request_body = {
             "model": model_name,
-            "messages": messages,
-            "temperature": prompt_config.get("temperature", 0.7)
+            "messages": messages
         }
+        
+        # Aggiungi temperature solo se supportata dal modello
+        # Alcuni modelli (come gpt-5-nano) supportano solo temperature=1
+        if prompt_config.get("temperature") is not None:
+            # Per modelli che supportano solo temperature=1, usa 1 invece del valore configurato
+            if "gpt-5" in model_name.lower() or "nano" in model_name.lower():
+                request_body["temperature"] = 1
+                print(f"⚠️ Modello {model_name} supporta solo temperature=1, usando valore default")
+            else:
+                request_body["temperature"] = prompt_config.get("temperature", 0.7)
         
         # Aggiungi max_tokens se specificato
         if "max_tokens" in prompt_config:

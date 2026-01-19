@@ -1,5 +1,6 @@
 {
   "model": "gpt-5-nano-2025-08-07",
+  "temperature": 1,
   "input": [
     {
       "role": "system",

@@ -256,8 +256,9 @@
                             <span id="userEmail" style="color: var(--text-secondary); font-size: 0.9em;"></span>
                         </div>
                     </div>
+                    <button class="btn-primary" id="createPlanBtn">Inizia</button>
                     <a href="index.html" class="btn-link">Home</a>
-                    <a href="dashboard.html" class="btn-link" style="font-weight: 600;">Dashboard</a>
+                    <a href="dashboard.html" class="btn-link" id="dashboardLink" style="display: none; font-weight: 600;">Dashboard</a>
                     <!-- Menu a tendina -->
                     <div class="dropdown-menu">
                         <button class="dropdown-toggle" id="menuToggle" aria-label="Menu">
@@ -827,55 +828,203 @@
             });
         }
 
-        // Gestione menu dropdown
-        function initializeDropdownMenu() {
-            const menuToggle = document.getElementById('menuToggle');
-            const menuDropdown = document.getElementById('menuDropdown');
-            
-            if (!menuToggle || !menuDropdown) return;
-            
-            // Toggle menu quando si clicca sul pulsante
-            menuToggle.addEventListener('click', (e) => {
-                e.stopPropagation();
-                menuDropdown.classList.toggle('show');
-            });
-            
-            // Chiudi menu quando si clicca fuori
-            document.addEventListener('click', (e) => {
-                if (!menuToggle.contains(e.target) && !menuDropdown.contains(e.target)) {
-                    menuDropdown.classList.remove('show');
-                }
-            });
-            
-            // Chiudi menu quando si preme ESC
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape' && menuDropdown.classList.contains('show')) {
-                    menuDropdown.classList.remove('show');
-                }
-            });
-            
-            // Chiudi menu quando si clicca su un elemento del menu
-            const menuItems = menuDropdown.querySelectorAll('.dropdown-item');
-            menuItems.forEach(item => {
-                item.addEventListener('click', () => {
-                    // Aspetta un po' prima di chiudere per permettere la navigazione
-                    setTimeout(() => {
-                        menuDropdown.classList.remove('show');
-                    }, 100);
-                });
-            });
-        }
+        // Il menu dropdown viene gestito da script.js - non serve una funzione locale
+
+        // Esponi le funzioni necessarie come globali per renderle disponibili
+        window.openServicesModal = function() {
+            const servicesModal = document.getElementById('servicesModal');
+            if (servicesModal) {
+                servicesModal.style.display = 'block';
+            }
+        };
+        
+        window.closeServicesModal = function() {
+            const servicesModal = document.getElementById('servicesModal');
+            if (servicesModal) {
+                servicesModal.style.display = 'none';
+            }
+        };
 
         // Inizializza quando il DOM è pronto
+        // Le funzioni di script.js verranno chiamate automaticamente
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', () => {
                 initializeAuth();
-                initializeDropdownMenu();
+                // Aspetta che script.js sia completamente caricato
+                setTimeout(() => {
+                    // Le funzioni di script.js dovrebbero essere già disponibili
+                    console.log('Dashboard initialized');
+                }, 100);
             });
         } else {
             initializeAuth();
-            initializeDropdownMenu();
+            // Aspetta che script.js sia completamente caricato
+            setTimeout(() => {
+                console.log('Dashboard initialized');
+            }, 100);
         }
     </script>
+    
+    <!-- Modal for Services Selection -->
+    <div class="modal" id="servicesModal" style="display: none;">
+        <div class="modal-content services-modal-content">
+            <span class="close" id="closeServicesModal">&times;</span>
+            <div class="services-modal-header">
+                <h2>I Nostri Servizi</h2>
+                <p class="services-modal-subtitle">Scegli il servizio che fa per te</p>
+            </div>
+            <div class="services-grid">
+                <button class="service-card" id="serviceBusinessPlan">
+                    <div class="service-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                            <line x1="16" y1="17" x2="8" y2="17"></line>
+                            <polyline points="10 9 9 9 8 9"></polyline>
+                        </svg>
+                    </div>
+                    <div class="service-content">
+                        <h3>Business Plan</h3>
+                        <p>Crea un business plan professionale completo in 15 minuti con l'AI</p>
+                    </div>
+                    <div class="service-arrow">→</div>
+                </button>
+                <button class="service-card" id="serviceMarketAnalysis">
+                    <div class="service-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <path d="m21 21-4.35-4.35"></path>
+                        </svg>
+                    </div>
+                    <div class="service-content">
+                        <h3>Analisi di Mercato</h3>
+                        <p>Analisi approfondita del mercato italiano con competitor e tendenze</p>
+                    </div>
+                    <div class="service-arrow">→</div>
+                </button>
+                <button class="service-card" id="serviceValidateIdea">
+                    <div class="service-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                        </svg>
+                    </div>
+                    <div class="service-content">
+                        <h3>Valida la tua idea</h3>
+                        <p>Ottieni un report completo di validazione per la tua idea di business</p>
+                    </div>
+                    <div class="service-arrow">→</div>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Authentication -->
+    <div class="modal" id="authModal" style="display: none;">
+        <div class="modal-content" style="max-width: 480px;">
+            <span class="close" id="closeAuthModal">&times;</span>
+            <div style="text-align: center; margin-bottom: 24px;">
+                <h2 style="margin-bottom: 8px; font-size: 1.75em;">Accedi al tuo account</h2>
+                <p style="color: #64748b; font-size: 0.95em;">Per procedere con il pagamento, è necessario accedere o creare un account.</p>
+            </div>
+            
+            <!-- Unified Auth Form -->
+            <form id="authForm" onsubmit="return false;">
+                <div style="margin-bottom: 18px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 500; color: var(--text-primary);">Email</label>
+                    <input 
+                        type="email" 
+                        id="authEmail" 
+                        placeholder="nome@esempio.com" 
+                        required 
+                        autocomplete="email"
+                        style="width: 100%; padding: 12px 16px; border: 2px solid var(--border); border-radius: 8px; font-size: 1em; transition: all 0.2s ease;"
+                        onfocus="this.style.borderColor='var(--accent)'; this.style.boxShadow='0 0 0 3px rgba(37, 99, 235, 0.1)';"
+                        onblur="this.style.borderColor='var(--border)'; this.style.boxShadow='none';"
+                    >
+                </div>
+                
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 500; color: var(--text-primary);">Password</label>
+                    <input 
+                        type="password" 
+                        id="authPassword" 
+                        placeholder="Inserisci la tua password" 
+                        required 
+                        minlength="6"
+                        autocomplete="current-password"
+                        style="width: 100%; padding: 12px 16px; border: 2px solid var(--border); border-radius: 8px; font-size: 1em; transition: all 0.2s ease;"
+                        onfocus="this.style.borderColor='var(--accent)'; this.style.boxShadow='0 0 0 3px rgba(37, 99, 235, 0.1)';"
+                        onblur="this.style.borderColor='var(--border)'; this.style.boxShadow='none';"
+                    >
+                    <div id="passwordHint" style="display: none; margin-top: 6px; font-size: 0.85em; color: #64748b;">
+                        <span id="passwordHintText"></span>
+                    </div>
+                </div>
+                
+                <!-- Confirm Password (solo per registrazione) -->
+                <div id="confirmPasswordContainer" style="margin-bottom: 20px; display: none;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 500; color: var(--text-primary);">Conferma Password</label>
+                    <input 
+                        type="password" 
+                        id="authPasswordConfirm" 
+                        placeholder="Ripeti la password" 
+                        minlength="6"
+                        autocomplete="new-password"
+                        style="width: 100%; padding: 12px 16px; border: 2px solid var(--border); border-radius: 8px; font-size: 1em; transition: all 0.2s ease;"
+                        onfocus="this.style.borderColor='var(--accent)'; this.style.boxShadow='0 0 0 3px rgba(37, 99, 235, 0.1)';"
+                        onblur="this.style.borderColor='var(--border)'; this.style.boxShadow='none';"
+                    >
+                </div>
+                
+                <!-- Error Message -->
+                <div id="authError" style="display: none; color: #dc2626; padding: 12px; background: #fee2e2; border-radius: 8px; margin-bottom: 16px; font-size: 0.9em; line-height: 1.5;"></div>
+                
+                <!-- Success/Info Message -->
+                <div id="authInfo" style="display: none; color: #059669; padding: 12px; background: #d1fae5; border-radius: 8px; margin-bottom: 16px; font-size: 0.9em; line-height: 1.5;"></div>
+                
+                <!-- Submit Button -->
+                <button 
+                    type="submit" 
+                    class="btn-primary" 
+                    id="submitAuth" 
+                    style="width: 100%; padding: 14px; font-size: 1em; font-weight: 600; margin-bottom: 16px;"
+                >
+                    Accedi
+                </button>
+                
+                <!-- Switch Mode Link -->
+                <div id="switchModeContainer" style="text-align: center; padding-top: 16px; border-top: 1px solid var(--border);">
+                    <p style="color: #64748b; font-size: 0.9em; margin-bottom: 8px;" id="switchModeText">
+                        Non hai un account?
+                    </p>
+                    <button 
+                        type="button" 
+                        id="switchModeBtn" 
+                        style="background: none; border: none; color: var(--accent); cursor: pointer; font-weight: 600; font-size: 0.95em; text-decoration: underline;"
+                    >
+                        Crea un account
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal for Payment -->
+    <div class="modal" id="paymentModal" style="display: none;">
+        <div class="modal-content" style="max-width: 500px;">
+            <span class="close" id="closePaymentModal">&times;</span>
+            <h2>Completa il Pagamento</h2>
+            <div id="paymentContent">
+                <p>Per scaricare il PDF professionale, completa il pagamento.</p>
+                <div id="paymentLoading" style="text-align: center; padding: 20px;">
+                    <div class="spinner"></div>
+                    <p>Preparazione pagamento...</p>
+                </div>
+                <div id="paymentError" style="display: none; color: #dc2626; padding: 10px; background: #fee2e2; border-radius: 6px; margin: 10px 0;"></div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
