@@ -3880,19 +3880,35 @@ async function handlePayment(documentType) {
             
             console.log('📡 Invio richiesta checkout session...');
             console.log('URL:', `${API_BASE_URL}/api/create-checkout-session`);
+            console.log('Document Type:', documentType);
+            console.log('Request Body:', requestBody);
             console.log('Headers:', {
                 'Content-Type': 'application/json',
                 'Authorization': idToken ? `Bearer ${idToken.substring(0, 20)}...` : 'MISSING'
             });
             
-            const response = await fetch(`${API_BASE_URL}/api/create-checkout-session`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${idToken}`,
-                },
-                body: JSON.stringify(requestBody)
-            });
+            let response;
+            try {
+                response = await fetch(`${API_BASE_URL}/api/create-checkout-session`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${idToken}`,
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+            } catch (fetchError) {
+                console.error('❌ Errore nella chiamata fetch:', fetchError);
+                console.error('Tipo errore:', fetchError.name);
+                console.error('Messaggio:', fetchError.message);
+                
+                // Se è un errore di rete
+                if (fetchError.name === 'TypeError' && fetchError.message.includes('fetch')) {
+                    throw new Error('Errore di connessione al server. Verifica la tua connessione internet e riprova.');
+                }
+                
+                throw new Error('Errore nella chiamata al server: ' + (fetchError.message || 'Errore sconosciuto'));
+            }
             
             console.log('📥 Risposta ricevuta:', response.status, response.statusText);
             

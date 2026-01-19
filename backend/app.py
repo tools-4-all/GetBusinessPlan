@@ -180,6 +180,7 @@ else:
 # Prezzi (in centesimi di euro) - usati come fallback se Price ID non configurati
 PRICE_BUSINESS_PLAN = int(os.getenv("PRICE_BUSINESS_PLAN_CENTS", "1999"))  # 19.99€ default
 PRICE_MARKET_ANALYSIS = int(os.getenv("PRICE_MARKET_ANALYSIS_CENTS", "1499"))  # 14.99€ default
+PRICE_VALIDATE_IDEA = int(os.getenv("PRICE_VALIDATE_IDEA_CENTS", "999"))  # 9.99€ default
 
 # Price ID Stripe (raccomandato - crea i Price in Stripe Dashboard e inserisci gli ID qui)
 STRIPE_PRICE_BUSINESS_PLAN = os.getenv("STRIPE_PRICE_BUSINESS_PLAN", "")
@@ -763,16 +764,20 @@ async def create_checkout_session(
                         'quantity': 1,
                     })
         elif request.documentType == "validate-idea":
+            print(f"💰 Creazione checkout per validazione idea")
+            print(f"   STRIPE_PRICE_VALIDATE_IDEA: {STRIPE_PRICE_VALIDATE_IDEA if STRIPE_PRICE_VALIDATE_IDEA else 'NON CONFIGURATO'}")
+            print(f"   PRICE_VALIDATE_IDEA (fallback): {PRICE_VALIDATE_IDEA} centesimi")
+            
             # Usa Price ID se configurato, altrimenti usa price_data
             if STRIPE_PRICE_VALIDATE_IDEA:
+                print(f"   Usando Price ID Stripe: {STRIPE_PRICE_VALIDATE_IDEA}")
                 line_items.append({
                     'price': STRIPE_PRICE_VALIDATE_IDEA,
                     'quantity': 1,
                 })
             else:
                 # Fallback a price_data se Price ID non configurato
-                # Usa un prezzo di default (es. 9.99€) se non configurato
-                PRICE_VALIDATE_IDEA = int(os.getenv("PRICE_VALIDATE_IDEA_CENTS", "999"))  # 9.99€ default
+                print(f"   Usando price_data con prezzo: {PRICE_VALIDATE_IDEA} centesimi")
                 line_items.append({
                     'price_data': {
                         'currency': 'eur',
@@ -784,7 +789,8 @@ async def create_checkout_session(
                     'quantity': 1,
                 })
         else:
-            raise HTTPException(status_code=400, detail="Tipo documento non valido")
+            print(f"❌ Tipo documento non valido: {request.documentType}")
+            raise HTTPException(status_code=400, detail=f"Tipo documento non valido: {request.documentType}")
         
         # Crea la sessione di checkout
         metadata = {
