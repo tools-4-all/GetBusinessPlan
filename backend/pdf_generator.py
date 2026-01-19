@@ -21,182 +21,343 @@ def escape_for_pdf(s):
     return str(s).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
 
 
+def preprocess_content_for_pdf(content):
+    """Preprocessa e normalizza il contenuto markdown prima della generazione PDF"""
+    if not content:
+        return ""
+    
+    # Normalizza newline (gestisce Windows, Unix, Mac)
+    content = content.replace('\r\n', '\n').replace('\r', '\n')
+    
+    # Rimuovi spazi eccessivi ma mantieni struttura markdown
+    content = re.sub(r'[ \t]+', ' ', content)  # Spazi multipli -> singolo spazio
+    
+    # Normalizza newline multiple (mantieni max 2 consecutive)
+    content = re.sub(r'\n{3,}', '\n\n', content)
+    
+    # Assicurati che i titoli inizino con # (rimuovi spazi prima)
+    content = re.sub(r'^[ \t]+(#+)', r'\1', content, flags=re.MULTILINE)
+    
+    # Normalizza spazi dopo # (deve esserci almeno uno spazio)
+    content = re.sub(r'^(#+)[ \t]*([^#\s])', r'\1 \2', content, flags=re.MULTILINE)
+    
+    # Rimuovi spazi alla fine delle righe
+    content = re.sub(r'[ \t]+\n', '\n', content)
+    
+    return content.strip()
+
+
 def markdown_to_paragraphs(text, styles):
-    """Converte markdown in paragrafi ReportLab con supporto migliorato per grassetto e corsivo"""
+    """Parser markdown migliorato e più deterministico per ReportLab"""
     elements = []
     
     if not text:
         return elements
     
+    # Normalizza il testo prima del parsing
+    text = preprocess_content_for_pdf(text)
+    
     # Funzione helper per convertire markdown inline a HTML per ReportLab
     def convert_inline_markdown(line_text):
-        """Converte **grassetto** e *corsivo* in HTML"""
-        # Escape caratteri HTML speciali prima
+        """Converte markdown inline a HTML per ReportLab"""
+        if not line_text:
+            return ""
+        
+        # Escape caratteri HTML speciali
         line_text = line_text.replace('&', '&amp;')
         line_text = line_text.replace('<', '&lt;').replace('>', '&gt;')
         
-        # Converti **grassetto** in <b>grassetto</b>
-        line_text = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', line_text)
+        # Converti **grassetto** (gestisce anche spazi)
+        line_text = re.sub(r'\*\*([^*]+?)\*\*', r'<b>\1</b>', line_text)
         
-        # Converti *corsivo* in <i>corsivo</i> (ma non **)
-        # Usa lookahead e lookbehind per evitare di matchare **
-        line_text = re.sub(r'(?<!\*)\*([^*]+?)\*(?!\*)', r'<i>\1</i>', line_text)
+        # Converti *corsivo* (ma non **)
+        line_text = re.sub(r'(?<!\*)\*([^*\n]+?)\*(?!\*)', r'<i>\1</i>', line_text)
+        
+        # Converti `codice` in monospace
+        line_text = re.sub(r'`([^`]+?)`', r'<font name="Courier">\1</font>', line_text)
         
         return line_text
     
-    # Dividi per righe
-    lines = text.split('\n')
-    current_paragraph = []
+    # Dividi in blocchi (separati da righe vuote)
+    blocks = re.split(r'\n\s*\n', text)
     
-    for line in lines:
-        line = line.strip()
+    for block in blocks:
+        block = block.strip()
+        if not block:
+            continue
         
-        if not line:
-            if current_paragraph:
-                para_text = ' '.join(current_paragraph)
+        lines = block.split('\n')
+        i = 0
+        
+        while i < len(lines):
+            line = lines[i].strip()
+            
+            if not line:
+                i += 1
+                continue
+            
+            # Controlla i titoli (deve iniziare con #, non spazi)
+            # Usa regex per matchare correttamente i livelli
+            heading_match = re.match(r'^(#{1,6})\s+(.+)$', line)
+            if heading_match:
+                level = len(heading_match.group(1))
+                title_text = heading_match.group(2).strip()
+                title_text = convert_inline_markdown(title_text)
+                
+                # Chiudi paragrafo corrente se presente
+                if i > 0 and lines[i-1].strip():
+                    # Non chiudere se la riga precedente era già un titolo o lista
+                    prev_line = lines[i-1].strip()
+                    if not (re.match(r'^#{1,6}\s+', prev_line) or 
+                           re.match(r'^[-*+]\s+', prev_line) or 
+                           re.match(r'^\d+[.)]\s+', prev_line)):
+                        elements.append(Spacer(1, 0.2*cm))
+                
+                # Usa lo stile appropriato
+                if level == 1:
+                    elements.append(Paragraph(title_text, styles['CustomHeading1']))
+                    elements.append(Spacer(1, 0.4*cm))
+                elif level == 2:
+                    elements.append(Paragraph(title_text, styles['CustomHeading2']))
+                    elements.append(Spacer(1, 0.3*cm))
+                elif level >= 3:
+                    elements.append(Paragraph(title_text, styles['Heading3']))
+                    elements.append(Spacer(1, 0.2*cm))
+                
+                i += 1
+                continue
+            
+            # Liste (bullet) - supporta -, *, +
+            list_match = re.match(r'^[-*+]\s+(.+)$', line)
+            if list_match:
+                items = []
+                # Raccogli tutti gli elementi della lista consecutivi
+                while i < len(lines) and re.match(r'^[-*+]\s+', lines[i].strip()):
+                    item_text = re.sub(r'^[-*+]\s+', '', lines[i].strip())
+                    item_text = convert_inline_markdown(item_text)
+                    items.append(item_text)
+                    i += 1
+                
+                for item in items:
+                    elements.append(Paragraph(f"• {item}", styles['Normal']))
+                    elements.append(Spacer(1, 0.15*cm))
+                continue
+            
+            # Liste numerate - supporta 1. e 1)
+            numbered_match = re.match(r'^\d+[.)]\s+(.+)$', line)
+            if numbered_match:
+                items = []
+                item_numbers = []
+                # Raccogli tutti gli elementi numerati consecutivi
+                while i < len(lines) and re.match(r'^\d+[.)]\s+', lines[i].strip()):
+                    match = re.match(r'^(\d+)[.)]\s+(.+)$', lines[i].strip())
+                    if match:
+                        item_numbers.append(int(match.group(1)))
+                        item_text = match.group(2)
+                        item_text = convert_inline_markdown(item_text)
+                        items.append(item_text)
+                    i += 1
+                
+                # Usa i numeri originali se sono sequenziali, altrimenti enumera
+                start_num = item_numbers[0] if item_numbers else 1
+                for idx, item in enumerate(items):
+                    num = start_num + idx
+                    elements.append(Paragraph(f"{num}. {item}", styles['Normal']))
+                    elements.append(Spacer(1, 0.15*cm))
+                continue
+            
+            # Paragrafo normale - raccogli righe consecutive
+            para_lines = []
+            while i < len(lines):
+                line = lines[i].strip()
+                if not line:
+                    break
+                # Se inizia un nuovo blocco, fermati
+                if (re.match(r'^#{1,6}\s+', line) or 
+                    re.match(r'^[-*+]\s+', line) or 
+                    re.match(r'^\d+[.)]\s+', line)):
+                    break
+                para_lines.append(line)
+                i += 1
+            
+            if para_lines:
+                para_text = ' '.join(para_lines)
                 para_text = convert_inline_markdown(para_text)
                 elements.append(Paragraph(para_text, styles['Normal']))
                 elements.append(Spacer(1, 0.3*cm))
-                current_paragraph = []
-            continue
-        
-        # Titoli
-        if line.startswith('###'):
-            if current_paragraph:
-                para_text = ' '.join(current_paragraph)
-                para_text = convert_inline_markdown(para_text)
-                elements.append(Paragraph(para_text, styles['Normal']))
-                current_paragraph = []
-            title = line.replace('###', '').strip()
-            title = convert_inline_markdown(title)
-            elements.append(Paragraph(title, styles['Heading3']))
-            elements.append(Spacer(1, 0.2*cm))
-        elif line.startswith('##'):
-            if current_paragraph:
-                para_text = ' '.join(current_paragraph)
-                para_text = convert_inline_markdown(para_text)
-                elements.append(Paragraph(para_text, styles['Normal']))
-                current_paragraph = []
-            title = line.replace('##', '').strip()
-            title = convert_inline_markdown(title)
-            elements.append(Paragraph(title, styles['Heading2']))
-            elements.append(Spacer(1, 0.3*cm))
-        elif line.startswith('#'):
-            if current_paragraph:
-                para_text = ' '.join(current_paragraph)
-                para_text = convert_inline_markdown(para_text)
-                elements.append(Paragraph(para_text, styles['Normal']))
-                current_paragraph = []
-            title = line.replace('#', '').strip()
-            title = convert_inline_markdown(title)
-            elements.append(Paragraph(title, styles['Heading1']))
-            elements.append(Spacer(1, 0.4*cm))
-        # Liste
-        elif line.startswith('- ') or line.startswith('* '):
-            if current_paragraph:
-                para_text = ' '.join(current_paragraph)
-                para_text = convert_inline_markdown(para_text)
-                elements.append(Paragraph(para_text, styles['Normal']))
-                current_paragraph = []
-            item = line[2:].strip()
-            item = convert_inline_markdown(item)
-            elements.append(Paragraph(f"• {item}", styles['Normal']))
-            elements.append(Spacer(1, 0.2*cm))
-        # Liste numerate
-        elif re.match(r'^\d+\.\s', line):
-            if current_paragraph:
-                para_text = ' '.join(current_paragraph)
-                para_text = convert_inline_markdown(para_text)
-                elements.append(Paragraph(para_text, styles['Normal']))
-                current_paragraph = []
-            item = re.sub(r'^\d+\.\s', '', line).strip()
-            item = convert_inline_markdown(item)
-            elements.append(Paragraph(f"• {item}", styles['Normal']))
-            elements.append(Spacer(1, 0.2*cm))
-        else:
-            # Testo normale - aggiungi alla riga corrente
-            current_paragraph.append(line)
-    
-    # Aggiungi ultimo paragrafo
-    if current_paragraph:
-        para_text = ' '.join(current_paragraph)
-        para_text = convert_inline_markdown(para_text)
-        elements.append(Paragraph(para_text, styles['Normal']))
-        elements.append(Spacer(1, 0.3*cm))
     
     return elements
 
 def create_chart_image(chart_data, width=15*cm, height=10*cm):
-    """Crea un'immagine del grafico da inserire nel PDF"""
+    """Crea un grafico professionale con stile aziendale e alta qualità"""
     tipo = chart_data.get('tipo', 'line')
     titolo = chart_data.get('titolo', '')
     x_label = chart_data.get('x_label', '')
     y_label = chart_data.get('y_label', '')
     series = chart_data.get('series', [])
     
-    # Crea la figura
-    fig, ax = plt.subplots(figsize=(width/cm, height/cm))
+    # Configurazione stile professionale
+    plt.rcParams.update({
+        'figure.facecolor': 'white',
+        'axes.facecolor': 'white',
+        'axes.edgecolor': '#333333',
+        'axes.linewidth': 1.2,
+        'axes.grid': True,
+        'axes.grid.alpha': 0.3,
+        'axes.grid.color': '#E0E0E0',
+        'axes.labelcolor': '#333333',
+        'axes.labelsize': 11,
+        'axes.titlesize': 13,
+        'axes.titleweight': 'bold',
+        'xtick.color': '#333333',
+        'ytick.color': '#333333',
+        'text.color': '#333333',
+        'font.family': 'sans-serif',
+        'font.sans-serif': ['Arial', 'DejaVu Sans', 'Liberation Sans'],
+        'font.size': 10,
+        'legend.frameon': True,
+        'legend.framealpha': 0.9,
+        'legend.facecolor': 'white',
+        'legend.edgecolor': '#CCCCCC',
+        'legend.fontsize': 9,
+        'figure.dpi': 300,
+        'savefig.dpi': 300,
+        'savefig.bbox': 'tight',
+        'savefig.pad_inches': 0.1
+    })
     
-    # Colori per le serie
-    colors_list = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c']
+    # Palette colori professionale (blu/grigio aziendale)
+    professional_colors = [
+        '#1e3a8a',  # Blu scuro
+        '#3b82f6',  # Blu medio
+        '#10b981',  # Verde
+        '#f59e0b',  # Arancione
+        '#8b5cf6',  # Viola
+        '#ef4444',  # Rosso
+        '#64748b',  # Grigio
+        '#06b6d4',  # Ciano
+    ]
+    
+    # Crea figura con dimensioni precise
+    fig, ax = plt.subplots(figsize=(width/cm, height/cm), 
+                          facecolor='white',
+                          edgecolor='none')
+    
+    # Rimuovi bordi superflui per aspetto più pulito
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['left'].set_color('#CCCCCC')
+    ax.spines['bottom'].set_color('#CCCCCC')
     
     if tipo == 'line':
         for idx, serie in enumerate(series):
             name = serie.get('name', f'Serie {idx+1}')
             points = serie.get('points', [])
-            x_values = [p.get('x', '') for p in points]
-            y_values = [p.get('y', 0) for p in points]
-            # Rimuovi valori vuoti
-            x_clean = []
-            y_clean = []
-            for x, y in zip(x_values, y_values):
-                if x and y is not None:
-                    x_clean.append(x)
-                    y_clean.append(y)
-            if x_clean and y_clean:
-                ax.plot(x_clean, y_clean, marker='o', label=name, 
-                        color=colors_list[idx % len(colors_list)], linewidth=2, markersize=6)
-        ax.legend()
-        ax.grid(True, alpha=0.3)
+            x_values = [str(p.get('x', '')) for p in points if p.get('x')]
+            y_values = [float(p.get('y', 0)) for p in points if p.get('x') and p.get('y') is not None]
+            
+            if x_values and y_values:
+                color = professional_colors[idx % len(professional_colors)]
+                ax.plot(x_values, y_values, 
+                       marker='o', 
+                       label=name,
+                       color=color,
+                       linewidth=2.5,
+                       markersize=7,
+                       markerfacecolor=color,
+                       markeredgecolor='white',
+                       markeredgewidth=1.5,
+                       alpha=0.9)
+        
+        ax.legend(loc='best', frameon=True, fancybox=True, shadow=False)
+        ax.grid(True, alpha=0.3, linestyle='--', linewidth=0.8)
+        ax.set_axisbelow(True)
         
     elif tipo == 'bar':
+        # Raccogli dati da tutte le serie per grafico a barre raggruppate
+        x_values = []
+        y_data = {}
+        
         for idx, serie in enumerate(series):
             name = serie.get('name', f'Serie {idx+1}')
             points = serie.get('points', [])
-            x_values = [p.get('x', '') for p in points if p.get('x')]
-            y_values = [p.get('y', 0) for p in points if p.get('x')]
-            if x_values and y_values:
-                x_pos = range(len(x_values))
-                ax.bar([p + idx*0.25 for p in x_pos], y_values, 
-                       width=0.25, label=name, color=colors_list[idx % len(colors_list)], alpha=0.8)
-                ax.set_xticks([p + 0.125 for p in x_pos])
-                ax.set_xticklabels(x_values, rotation=45, ha='right')
-        ax.legend()
-        ax.grid(True, alpha=0.3, axis='y')
+            for p in points:
+                x_val = str(p.get('x', ''))
+                y_val = float(p.get('y', 0)) if p.get('y') is not None else 0
+                if x_val:
+                    if x_val not in x_values:
+                        x_values.append(x_val)
+                    if name not in y_data:
+                        y_data[name] = {}
+                    y_data[name][x_val] = y_val
+        
+        # Crea grafico a barre raggruppate
+        if x_values and y_data:
+            x_pos = range(len(x_values))
+            bar_width = 0.35
+            offset = 0
+            
+            for idx, (name, values) in enumerate(y_data.items()):
+                positions = [x + offset for x in x_pos]
+                heights = [values.get(x_val, 0) for x_val in x_values]
+                
+                color = professional_colors[idx % len(professional_colors)]
+                ax.bar(positions, heights, 
+                      width=bar_width,
+                      label=name,
+                      color=color,
+                      alpha=0.85,
+                      edgecolor='white',
+                      linewidth=1.5)
+                offset += bar_width
+            
+            ax.set_xticks([x + bar_width * (len(y_data) - 1) / 2 for x in x_pos])
+            ax.set_xticklabels(x_values, rotation=45, ha='right')
+            ax.legend(loc='best', frameon=True)
+            ax.grid(True, alpha=0.3, axis='y', linestyle='--')
+            ax.set_axisbelow(True)
         
     elif tipo == 'pie':
-        for serie in series:
+        # Prendi la prima serie per il pie chart
+        if series:
+            serie = series[0]
             points = serie.get('points', [])
-            labels = [p.get('x', '') for p in points if p.get('x')]
-            values = [p.get('y', 0) for p in points if p.get('x')]
+            labels = [str(p.get('x', '')) for p in points if p.get('x')]
+            values = [float(p.get('y', 0)) for p in points if p.get('x') and p.get('y') is not None]
+            
             if labels and values:
-                ax.pie(values, labels=labels, autopct='%1.1f%%', 
-                      colors=colors_list[:len(values)], startangle=90)
-                ax.axis('equal')
+                colors_pie = professional_colors[:len(labels)]
+                wedges, texts, autotexts = ax.pie(
+                    values, 
+                    labels=labels,
+                    autopct='%1.1f%%',
+                    colors=colors_pie,
+                    startangle=90,
+                    textprops={'fontsize': 10, 'fontweight': 'bold'},
+                    wedgeprops={'edgecolor': 'white', 'linewidth': 2}
+                )
+                # Migliora leggibilità percentuali
+                for autotext in autotexts:
+                    autotext.set_color('white')
+                    autotext.set_fontweight('bold')
     
-    ax.set_title(titolo, fontsize=12, fontweight='bold', pad=10)
+    # Titolo e labels
+    if titolo:
+        ax.set_title(titolo, fontsize=14, fontweight='bold', 
+                   pad=15, color='#1a1a1a')
     if x_label:
-        ax.set_xlabel(x_label, fontsize=10)
+        ax.set_xlabel(x_label, fontsize=11, fontweight='medium', color='#333333')
     if y_label:
-        ax.set_ylabel(y_label, fontsize=10)
+        ax.set_ylabel(y_label, fontsize=11, fontweight='medium', color='#333333')
     
-    plt.tight_layout()
+    plt.tight_layout(pad=1.5)
     
-    # Salva in un buffer
+    # Salva con alta qualità
     buf = io.BytesIO()
-    plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+    plt.savefig(buf, format='png', dpi=300, bbox_inches='tight', 
+               facecolor='white', edgecolor='none', pad_inches=0.1)
     buf.seek(0)
-    plt.close()
+    plt.close(fig)
     
     return buf
 
@@ -559,6 +720,8 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
         
         sintesi = exec_summary.get('sintesi', '')
         if sintesi:
+            # Preprocessa e normalizza
+            sintesi = preprocess_content_for_pdf(sintesi)
             # Dividi in paragrafi se contiene doppie newline
             paragraphs = sintesi.split('\n\n')
             for para in paragraphs:
@@ -809,6 +972,8 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
                     story.append(Spacer(1, 0.3*cm))
         
         if contenuto:
+            # Preprocessa il contenuto per normalizzazione
+            contenuto = preprocess_content_for_pdf(contenuto)
             elements = markdown_to_paragraphs(contenuto, styles)
             story.extend(elements)
         
