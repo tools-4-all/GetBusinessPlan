@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 import utils
 import pdf_generator
 import pdf_generator_analysis
+import pdf_generator_validation
 import stripe
 import firebase_admin
 from firebase_admin import credentials, auth
@@ -969,10 +970,7 @@ async def generate_pdf_validation(request: PDFValidationRequest, user: dict = De
         pdf_json = {k: v for k, v in request.validationJson.items() if k != '_payment_session_id'}
         
         print("=== INIZIO GENERAZIONE PDF VALIDAZIONE IDEA ===")
-        # Per ora usiamo lo stesso generatore PDF dell'analisi, ma potresti creare un generatore specifico
-        # output_path = await pdf_generator_validation.create_pdf_from_validation(pdf_json)
-        # Per semplicità, usiamo il generatore dell'analisi (dovrai creare un generatore specifico se necessario)
-        output_path = await pdf_generator_analysis.create_pdf_from_market_analysis(pdf_json)  # TODO: creare generatore specifico
+        output_path = await pdf_generator_validation.create_pdf_from_validation(pdf_json)
         
         if not Path(output_path).exists():
             raise HTTPException(status_code=500, detail="File PDF non generato correttamente")
