@@ -282,6 +282,8 @@ def create_chart_image(chart_data, width=15*cm, height=10*cm):
             print(f"⚠️  Tipo grafico non valido: {tipo} per grafico {chart_id}")
             return None
         
+        print(f"   📊 Creando grafico {chart_id}: tipo={tipo}, serie={len(series)}")
+        
         # Configurazione stile professionale con supporto UTF-8
         # Trova un font che supporta caratteri italiani
         available_fonts = [f.name for f in fm.fontManager.ttflist]
@@ -502,15 +504,30 @@ def create_chart_image(chart_data, width=15*cm, height=10*cm):
         data_info = {}
         
         if tipo == 'line':
-            has_data = any(len(serie.get('points', [])) > 0 for serie in series)
+            # Per line chart, verifica che ci sia almeno una serie con punti validi
+            has_data = False
+            for serie in series:
+                points = serie.get('points', [])
+                valid_points = [p for p in points if p.get('x') and p.get('y') is not None]
+                if len(valid_points) > 0:
+                    has_data = True
+                    break
             data_info = {
                 'serie_count': len(series),
                 'points_per_serie': [len(s.get('points', [])) for s in series]
             }
         elif tipo == 'bar':
-            # Verifica se x_values e y_data sono stati definiti
+            # Per bar chart, verifica che x_values e y_data siano stati definiti e non vuoti
             if 'x_values' in locals() and 'y_data' in locals():
                 has_data = len(x_values) > 0 and len(y_data) > 0
+                # Verifica anche che ci sia almeno un valore y non zero
+                if has_data:
+                    has_non_zero = False
+                    for values_dict in y_data.values():
+                        if any(v != 0 for v in values_dict.values()):
+                            has_non_zero = True
+                            break
+                    has_data = has_non_zero
                 data_info = {
                     'x_values_count': len(x_values),
                     'y_data_series': len(y_data),
@@ -520,9 +537,12 @@ def create_chart_image(chart_data, width=15*cm, height=10*cm):
                 has_data = False
                 data_info = {'error': 'x_values o y_data non definiti'}
         elif tipo == 'pie':
-            # Verifica se labels e values sono stati definiti
+            # Per pie chart, verifica che labels e values siano stati definiti e non vuoti
             if 'labels' in locals() and 'values' in locals():
-                has_data = len(labels) > 0 and len(values) > 0
+                has_data = len(labels) > 0 and len(values) > 0 and len(labels) == len(values)
+                # Verifica anche che ci sia almeno un valore > 0
+                if has_data:
+                    has_data = any(v > 0 for v in values)
                 data_info = {
                     'labels_count': len(labels),
                     'values_count': len(values)
@@ -531,9 +551,11 @@ def create_chart_image(chart_data, width=15*cm, height=10*cm):
                 has_data = False
                 data_info = {'error': 'labels o values non definiti'}
         
+        print(f"   🔍 Verifica dati: has_data={has_data}, info={data_info}")
+        
         if not has_data:
             plt.close(fig)
-            print(f"⚠️  Grafico '{titolo}' (ID: {chart_id}) non ha dati validi")
+            print(f"⚠️  Grafico '{titolo}' (ID: {chart_id}) non ha dati validi: {data_info}")
             return None
         
         # Titolo e labels (assicura encoding UTF-8)
@@ -1050,8 +1072,21 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
     
     # Crea un dizionario dei grafici per accesso rapido
     charts_list = business_plan_json.get('charts', [])
-    charts_dict = {chart['id']: chart for chart in charts_list}
+    if not isinstance(charts_list, list):
+        charts_list = []
+    
+    # Crea dizionario solo per grafici con 'id' valido
+    charts_dict = {}
+    for chart in charts_list:
+        chart_id = chart.get('id') if isinstance(chart, dict) else None
+        if chart_id:
+            charts_dict[chart_id] = chart
+        else:
+            print(f"⚠️  Grafico senza 'id' valido ignorato: {chart}")
+    
     print(f"📊 Totale grafici nel JSON: {len(charts_list)}")
+    print(f"📊 Grafici nel dizionario (con id valido): {len(charts_dict)}")
+    print(f"📊 ID grafici disponibili: {list(charts_dict.keys())}")
     
     # Dati per tabelle riassuntive
     data = business_plan_json.get('data', {})
@@ -1061,6 +1096,9 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
         titolo_ch = chapter.get('titolo', '')
         contenuto = chapter.get('contenuto_markdown', '')
         chart_ids = chapter.get('chart_ids', [])
+        # Assicurati che chart_ids sia una lista
+        if not isinstance(chart_ids, list):
+            chart_ids = []
         
         if titolo_ch:
             story.append(Paragraph(titolo_ch, styles['CustomHeading1']))
@@ -1235,38 +1273,51 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
         
         # Processa i grafici SOLO per il capitolo CH7_CHARTS
         if chapter_id == "CH7_CHARTS":
+            print(f"📊 ===== PROCESSANDO CAPITOLO CH7_CHARTS =====")
+            print(f"📊 chart_ids nel capitolo: {chart_ids}")
+            print(f"📊 Totale grafici disponibili: {len(charts_dict)}")
             story.append(Spacer(1, 0.5*cm))
             
             # Strategia 1: Usa chart_ids se presenti e non vuoti
             charts_to_process = []
             if chart_ids and len(chart_ids) > 0:
+                print(f"📊 Strategia 1: Usando chart_ids ({len(chart_ids)} grafici referenziati)")
                 for chart_id in chart_ids:
                     if chart_id in charts_dict:
                         charts_to_process.append((chart_id, charts_dict[chart_id]))
+                        print(f"   ✅ Grafico {chart_id} trovato")
                     else:
-                        print(f"⚠️  Grafico {chart_id} non trovato in charts_dict")
+                        print(f"   ⚠️  Grafico {chart_id} non trovato in charts_dict")
+                        print(f"   📋 Grafici disponibili: {list(charts_dict.keys())[:5]}...")
             
             # Strategia 2: Fallback - prendi tutti i grafici con chapter_id='CH7_CHARTS'
             if len(charts_to_process) == 0:
+                print(f"📊 Strategia 2: Fallback - cercando tutti i grafici con chapter_id='CH7_CHARTS'")
                 for chart_id, chart in charts_dict.items():
                     chart_chapter_id = chart.get('chapter_id', '')
+                    print(f"   🔍 Grafico {chart_id}: chapter_id='{chart_chapter_id}'")
                     if chart_chapter_id == 'CH7_CHARTS':
                         charts_to_process.append((chart_id, chart))
+                        print(f"   ✅ Aggiunto grafico {chart_id} al processamento")
             
-            print(f"📊 Processando {len(charts_to_process)} grafici per CH7_CHARTS")
+            print(f"📊 Totale grafici da processare: {len(charts_to_process)}")
             
             # Processa tutti i grafici trovati
             for chart_id, chart in charts_to_process:
+                print(f"📈 Processando grafico: {chart_id} - {chart.get('titolo', 'N/A')}")
                 try:
                     chart_img = create_chart_image(chart, width=15*cm, height=10*cm)
                     
                     if chart_img:
+                        print(f"   ✅ Immagine grafico generata per {chart_id}")
                         try:
                             # Verifica che il buffer sia valido
                             if hasattr(chart_img, 'read'):
                                 chart_img.seek(0)
                                 img_data = chart_img.read()
+                                print(f"   📏 Dimensione immagine: {len(img_data)} bytes")
                                 if len(img_data) == 0:
+                                    print(f"   ⚠️  Immagine vuota per {chart_id}")
                                     continue
                                 chart_img.seek(0)  # Reset per Image()
                             
@@ -1277,6 +1328,7 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
                             story.append(img)
                             story.append(Spacer(1, 0.2*cm))
                             charts_added_count += 1
+                            print(f"   ✅ Grafico {chart_id} aggiunto al PDF (totale: {charts_added_count})")
                             
                             # Aggiungi caption se presente
                             caption = chart.get('caption', '')
@@ -1287,16 +1339,71 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
                                 story.append(Paragraph(f"<i>{caption_clean}</i>", styles['Normal']))
                                 story.append(Spacer(1, 0.3*cm))
                         except Exception as img_error:
-                            print(f"❌ Errore nell'aggiungere immagine al PDF per {chart_id}: {str(img_error)}")
+                            print(f"   ❌ Errore nell'aggiungere immagine al PDF per {chart_id}: {str(img_error)}")
+                            import traceback
+                            print(traceback.format_exc())
                             continue
                     else:
-                        print(f"⚠️  Grafico {chart_id} non generato (dati invalidi)")
+                        print(f"   ⚠️  Grafico {chart_id} non generato (create_chart_image ha restituito None)")
+                        print(f"   📊 Dettagli grafico: tipo={chart.get('tipo')}, serie={len(chart.get('series', []))}")
                 except Exception as e:
-                    print(f"❌ Errore nel generare il grafico {chart_id}: {str(e)}")
+                    print(f"   ❌ Errore nel generare il grafico {chart_id}: {str(e)}")
+                    import traceback
+                    print(traceback.format_exc())
                     continue
+            
+            print(f"📊 ===== RIEPILOGO: {charts_added_count} grafici aggiunti al PDF per CH7_CHARTS =====")
+        else:
+            # Se non siamo nel capitolo CH7_CHARTS, verifica se ci sono grafici non processati
+            # Questo è un fallback di sicurezza
+            if chapter_id != "CH7_CHARTS" and len(charts_dict) > 0:
+                # Conta quanti grafici con chapter_id='CH7_CHARTS' ci sono
+                unprocessed_charts = [c for c in charts_dict.values() if c.get('chapter_id') == 'CH7_CHARTS']
+                if len(unprocessed_charts) > 0:
+                    print(f"⚠️  Attenzione: trovati {len(unprocessed_charts)} grafici con chapter_id='CH7_CHARTS' ma il capitolo CH7_CHARTS non è stato ancora processato")
         
         story.append(Spacer(1, 0.5*cm))
         story.append(PageBreak())
+    
+    # Fallback finale: se non abbiamo processato nessun grafico ma ci sono grafici con chapter_id='CH7_CHARTS',
+    # aggiungili alla fine (caso in cui il capitolo CH7_CHARTS non esiste o non è stato trovato)
+    total_charts_processed = sum(1 for chapter in chapters if chapter.get('id') == 'CH7_CHARTS')
+    if total_charts_processed == 0:
+        print(f"⚠️  ===== FALLBACK FINALE: Capitolo CH7_CHARTS non trovato nei chapters =====")
+        unprocessed_charts = [(c['id'], c) for c in charts_dict.values() if c.get('chapter_id') == 'CH7_CHARTS']
+        if len(unprocessed_charts) > 0:
+            print(f"📊 Trovati {len(unprocessed_charts)} grafici non processati, aggiungendo alla fine del documento")
+            story.append(Paragraph("GRAFICI", styles['CustomHeading1']))
+            story.append(Spacer(1, 0.5*cm))
+            
+            for chart_id, chart in unprocessed_charts:
+                print(f"📈 Processando grafico (fallback finale): {chart_id} - {chart.get('titolo', 'N/A')}")
+                try:
+                    chart_img = create_chart_image(chart, width=15*cm, height=10*cm)
+                    if chart_img:
+                        try:
+                            chart_img.seek(0)
+                            img = Image(chart_img, width=15*cm, height=10*cm)
+                            story.append(Spacer(1, 0.3*cm))
+                            story.append(img)
+                            story.append(Spacer(1, 0.2*cm))
+                            
+                            caption = chart.get('caption', '')
+                            if caption:
+                                if isinstance(caption, bytes):
+                                    caption = caption.decode('utf-8', errors='replace')
+                                caption_clean = escape_for_pdf(caption)
+                                story.append(Paragraph(f"<i>{caption_clean}</i>", styles['Normal']))
+                                story.append(Spacer(1, 0.3*cm))
+                            print(f"✅ Grafico {chart_id} aggiunto (fallback finale)")
+                        except Exception as img_error:
+                            print(f"❌ Errore nell'aggiungere immagine al PDF per {chart_id} (fallback): {str(img_error)}")
+                            continue
+                except Exception as e:
+                    print(f"❌ Errore nel generare il grafico {chart_id} (fallback): {str(e)}")
+                    continue
+            
+            story.append(PageBreak())
     
     # Assunzioni e Dati Mancanti
     assumptions = business_plan_json.get('assumptions', [])
