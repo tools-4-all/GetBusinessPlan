@@ -909,16 +909,40 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
     
     # Costruisci l'indice dai capitoli
     narrative = business_plan_json.get('narrative', {})
-    chapters = narrative.get('chapters', [])
+    print(f"\n🔍 ===== ESTRAZIONE CAPITOLI =====")
+    print(f"📖 narrative presente: {narrative is not None}")
+    print(f"📖 narrative tipo: {type(narrative)}")
+    
+    chapters = narrative.get('chapters', []) if isinstance(narrative, dict) else []
+    print(f"📖 chapters estratto: {len(chapters)} capitoli")
+    print(f"📖 chapters tipo: {type(chapters)}")
+    
+    # Log ID dei capitoli
+    if chapters:
+        print(f"📖 ID capitoli trovati: {[ch.get('id', 'N/A') for ch in chapters]}")
+        # Verifica se CH7_CHARTS è presente
+        ch7_found = any(ch.get('id') == 'CH7_CHARTS' for ch in chapters)
+        print(f"📖 CH7_CHARTS presente: {ch7_found}")
+        if ch7_found:
+            ch7 = next((ch for ch in chapters if ch.get('id') == 'CH7_CHARTS'), None)
+            if ch7:
+                ch7_chart_ids = ch7.get('chart_ids', [])
+                print(f"📖 CH7_CHARTS chart_ids: {ch7_chart_ids} (tipo: {type(ch7_chart_ids)})")
+    
     chapter_order = pdf_layout.get('chapter_order', [])
+    print(f"📖 chapter_order: {chapter_order}")
     
     if chapter_order:
-        chapters_dict = {ch['id']: ch for ch in chapters}
+        chapters_dict = {ch['id']: ch for ch in chapters if ch.get('id')}
+        print(f"📖 chapters_dict creato: {len(chapters_dict)} capitoli")
         ordered_chapters = [chapters_dict.get(ch_id) for ch_id in chapter_order if ch_id in chapters_dict]
+        print(f"📖 ordered_chapters (da chapter_order): {len(ordered_chapters)}")
         for ch in chapters:
-            if ch['id'] not in chapter_order:
+            if ch.get('id') and ch['id'] not in chapter_order:
                 ordered_chapters.append(ch)
         chapters = ordered_chapters
+        print(f"📖 Capitoli finali dopo ordinamento: {len(chapters)}")
+        print(f"📖 ID capitoli ordinati: {[ch.get('id', 'N/A') for ch in chapters]}")
     
     toc_entries = []
     page_num = 3  # Inizia dopo copertina e indice
@@ -1070,10 +1094,15 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
     # === CAPITOLI NARRATIVI ===
     # (chapters già ordinati sopra)
     
+    print(f"\n{'='*80}")
+    print(f"🔍 ===== INIZIO PROCESSAMENTO CAPITOLI =====")
+    print(f"📖 Totale capitoli da processare: {len(chapters)}")
+    
     # Crea un dizionario dei grafici per accesso rapido
     charts_list = business_plan_json.get('charts', [])
     if not isinstance(charts_list, list):
         charts_list = []
+        print(f"⚠️  'charts' non è una lista, convertito a lista vuota")
     
     # Crea dizionario solo per grafici con 'id' valido
     charts_dict = {}
@@ -1088,17 +1117,29 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
     print(f"📊 Grafici nel dizionario (con id valido): {len(charts_dict)}")
     print(f"📊 ID grafici disponibili: {list(charts_dict.keys())}")
     
+    # Log dettagliato dei grafici
+    for chart_id, chart in charts_dict.items():
+        chapter_id_chart = chart.get('chapter_id', 'N/A')
+        print(f"   📈 {chart_id} -> chapter_id: '{chapter_id_chart}'")
+    
     # Dati per tabelle riassuntive
     data = business_plan_json.get('data', {})
     
-    for chapter in chapters:
+    print(f"\n📖 ===== INIZIO CICLO CAPITOLI =====")
+    for idx, chapter in enumerate(chapters):
         chapter_id = chapter.get('id', '')
         titolo_ch = chapter.get('titolo', '')
         contenuto = chapter.get('contenuto_markdown', '')
         chart_ids = chapter.get('chart_ids', [])
         # Assicurati che chart_ids sia una lista
         if not isinstance(chart_ids, list):
+            print(f"⚠️  chart_ids non è una lista per capitolo {chapter_id}, tipo: {type(chart_ids)}, valore: {chart_ids}")
             chart_ids = []
+        
+        print(f"\n📖 ===== CAPITOLO {idx+1}/{len(chapters)}: {chapter_id} =====")
+        print(f"📖 Titolo: {titolo_ch}")
+        print(f"📖 chart_ids: {chart_ids} (tipo: {type(chart_ids)}, lunghezza: {len(chart_ids)})")
+        print(f"📖 chapter_id == 'CH7_CHARTS': {chapter_id == 'CH7_CHARTS'}")
         
         if titolo_ch:
             story.append(Paragraph(titolo_ch, styles['CustomHeading1']))
