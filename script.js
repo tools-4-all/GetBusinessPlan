@@ -4048,9 +4048,22 @@ async function handlePayment(documentType) {
                 console.error('Tipo errore:', fetchError.name);
                 console.error('Messaggio:', fetchError.message);
                 
-                // Se è un errore di rete
-                if (fetchError.name === 'TypeError' && fetchError.message.includes('fetch')) {
-                    throw new Error('Errore di connessione al server. Verifica la tua connessione internet e riprova.');
+                // Gestisci diversi tipi di errori di rete
+                if (fetchError.name === 'TypeError') {
+                    if (fetchError.message.includes('Load failed') || fetchError.message.includes('Failed to fetch')) {
+                        throw new Error('Impossibile connettersi al server. Verifica la tua connessione internet e che il server sia raggiungibile.');
+                    } else if (fetchError.message.includes('fetch')) {
+                        throw new Error('Errore di connessione al server. Verifica la tua connessione internet e riprova.');
+                    }
+                }
+                
+                // Se è un errore di timeout o di rete generico
+                if (fetchError.message && (
+                    fetchError.message.includes('timeout') || 
+                    fetchError.message.includes('network') ||
+                    fetchError.message.includes('CORS')
+                )) {
+                    throw new Error('Errore di rete: ' + fetchError.message);
                 }
                 
                 throw new Error('Errore nella chiamata al server: ' + (fetchError.message || 'Errore sconosciuto'));

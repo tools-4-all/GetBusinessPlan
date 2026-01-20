@@ -1323,12 +1323,20 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
                             
                             # Crea l'immagine con dimensioni appropriate
                             chart_img.seek(0)
-                            img = Image(chart_img, width=15*cm, height=10*cm)
-                            story.append(Spacer(1, 0.3*cm))
-                            story.append(img)
-                            story.append(Spacer(1, 0.2*cm))
-                            charts_added_count += 1
-                            print(f"   ✅ Grafico {chart_id} aggiunto al PDF (totale: {charts_added_count})")
+                            try:
+                                img = Image(chart_img, width=15*cm, height=10*cm)
+                                print(f"   ✅ Immagine ReportLab creata per {chart_id}")
+                                story.append(Spacer(1, 0.3*cm))
+                                story.append(img)
+                                print(f"   ✅ Immagine aggiunta alla story per {chart_id}")
+                                story.append(Spacer(1, 0.2*cm))
+                                charts_added_count += 1
+                                print(f"   ✅✅✅ Grafico {chart_id} AGGIUNTO AL PDF (totale: {charts_added_count}) ✅✅✅")
+                            except Exception as img_error:
+                                print(f"   ❌❌❌ ERRORE nella creazione dell'immagine ReportLab per {chart_id}: {str(img_error)}")
+                                import traceback
+                                print(traceback.format_exc())
+                                raise  # Rilancia l'errore per vedere cosa succede
                             
                             # Aggiungi caption se presente
                             caption = chart.get('caption', '')
@@ -1339,20 +1347,37 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
                                 story.append(Paragraph(f"<i>{caption_clean}</i>", styles['Normal']))
                                 story.append(Spacer(1, 0.3*cm))
                         except Exception as img_error:
-                            print(f"   ❌ Errore nell'aggiungere immagine al PDF per {chart_id}: {str(img_error)}")
+                            print(f"   ❌❌❌ ERRORE CRITICO nell'aggiungere immagine al PDF per {chart_id}: {str(img_error)}")
                             import traceback
+                            print("=" * 80)
+                            print("TRACEBACK COMPLETO:")
                             print(traceback.format_exc())
+                            print("=" * 80)
                             continue
                     else:
-                        print(f"   ⚠️  Grafico {chart_id} non generato (create_chart_image ha restituito None)")
+                        print(f"   ⚠️⚠️⚠️  Grafico {chart_id} NON GENERATO (create_chart_image ha restituito None)")
                         print(f"   📊 Dettagli grafico: tipo={chart.get('tipo')}, serie={len(chart.get('series', []))}")
+                        # Log dettagliato delle serie
+                        for idx, serie in enumerate(chart.get('series', [])):
+                            points = serie.get('points', [])
+                            print(f"      Serie {idx+1} '{serie.get('name', 'N/A')}': {len(points)} punti")
+                            if points:
+                                print(f"         Primo punto: x={points[0].get('x')}, y={points[0].get('y')}")
                 except Exception as e:
-                    print(f"   ❌ Errore nel generare il grafico {chart_id}: {str(e)}")
+                    print(f"   ❌❌❌ ERRORE GENERALE nel generare il grafico {chart_id}: {str(e)}")
                     import traceback
+                    print("=" * 80)
+                    print("TRACEBACK COMPLETO:")
                     print(traceback.format_exc())
+                    print("=" * 80)
                     continue
             
-            print(f"📊 ===== RIEPILOGO: {charts_added_count} grafici aggiunti al PDF per CH7_CHARTS =====")
+            print(f"📊 ===== RIEPILOGO FINALE CAPITOLO CH7_CHARTS =====")
+            print(f"📊 Grafici processati: {len(charts_to_process)}")
+            print(f"📊 Grafici aggiunti al PDF: {charts_added_count}")
+            if charts_added_count == 0:
+                print(f"⚠️⚠️⚠️  ATTENZIONE: NESSUN GRAFICO AGGIUNTO AL PDF! ⚠️⚠️⚠️")
+            print(f"📊 =================================================")
         else:
             # Se non siamo nel capitolo CH7_CHARTS, verifica se ci sono grafici non processati
             # Questo è un fallback di sicurezza
