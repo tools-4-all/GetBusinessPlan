@@ -379,10 +379,31 @@ async function getSuggestions(questionId, questionTitle, questionDescription, cu
             })
         });
         
-        const data = await response.json();
-        return data.success ? data.suggestions : [];
+        // Controlla se la risposta è ok prima di parsare JSON
+        if (!response.ok) {
+            console.error(`Errore HTTP nel recupero suggerimenti: ${response.status} ${response.statusText}`);
+            return [];
+        }
+        
+        // Prova a parsare il JSON
+        let data;
+        try {
+            data = await response.json();
+        } catch (jsonError) {
+            console.error('Errore nel parsing JSON della risposta suggerimenti:', jsonError);
+            return [];
+        }
+        
+        return data.success ? (data.suggestions || []) : [];
     } catch (error) {
-        console.error('Errore nel recupero suggerimenti:', error);
+        // Gestisci diversi tipi di errori
+        if (error.name === 'TypeError' && error.message.includes('Load failed')) {
+            console.error('Errore di rete nel recupero suggerimenti: impossibile connettersi al server');
+        } else if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+            console.error('Errore di rete nel recupero suggerimenti: richiesta fallita');
+        } else {
+            console.error('Errore nel recupero suggerimenti:', error);
+        }
         return [];
     }
 }
