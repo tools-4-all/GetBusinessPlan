@@ -564,13 +564,24 @@ def create_chart_image(chart_data, width=15*cm, height=10*cm):
         
         # Salva con alta qualità
         buf = io.BytesIO()
-        plt.savefig(buf, format='png', dpi=300, bbox_inches='tight', 
-                   facecolor='white', edgecolor='none', pad_inches=0.1)
-        buf.seek(0)
-        buf_size = len(buf.getvalue())
-        plt.close(fig)
-        print(f"   ✅ Grafico '{titolo}' (ID: {chart_id}) creato con successo ({buf_size} bytes)")
-        return buf
+        try:
+            plt.savefig(buf, format='png', dpi=150, bbox_inches='tight', 
+                       facecolor='white', edgecolor='none', pad_inches=0.1)
+            buf.seek(0)
+            buf_size = len(buf.getvalue())
+            if buf_size == 0:
+                print(f"   ⚠️  Buffer vuoto per grafico {chart_id}", flush=True)
+                plt.close(fig)
+                return None
+            plt.close(fig)
+            print(f"   ✅ Grafico '{titolo}' (ID: {chart_id}) creato con successo ({buf_size} bytes)", flush=True)
+            return buf
+        except Exception as save_error:
+            print(f"   ❌ Errore nel salvare il grafico {chart_id}: {str(save_error)}", flush=True)
+            import traceback
+            print(traceback.format_exc(), flush=True)
+            plt.close(fig)
+            return None
     except Exception as e:
         # Cattura qualsiasi errore durante la creazione del grafico
         chart_id = chart_data.get('id', 'N/A') if 'chart_data' in locals() else 'N/A'
@@ -1041,6 +1052,7 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
                     ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f9f9f9')]),
                 ]))
                 story.append(kpi_table)
+                print(f"✅ Tabella KPI aggiunta al PDF", flush=True)
         
         story.append(Spacer(1, 0.5*cm))
         story.append(PageBreak())
@@ -1122,6 +1134,7 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
                         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f9f9f9')]),
                     ]))
                     story.append(pricing_table)
+                    print(f"✅ Tabella Pricing aggiunta al PDF", flush=True)
                     story.append(Spacer(1, 0.3*cm))
             
             # Unit Economics
@@ -1154,6 +1167,7 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
                         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
                     ]))
                     story.append(ue_table)
+                    print(f"✅ Tabella Unit Economics aggiunta al PDF", flush=True)
                     story.append(Spacer(1, 0.3*cm))
         
         elif chapter_id == "CH2_MARKET":
@@ -1186,6 +1200,7 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
                         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
                     ]))
                     story.append(market_table)
+                    print(f"✅ Tabella Market aggiunta al PDF", flush=True)
                     story.append(Spacer(1, 0.3*cm))
         
         elif chapter_id == "CH6_RISKS_ROADMAP":
@@ -1221,6 +1236,7 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
                         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f9f9f9')]),
                     ]))
                     story.append(risks_table)
+                    print(f"✅ Tabella Risks aggiunta al PDF", flush=True)
                     story.append(Spacer(1, 0.3*cm))
         
         # Aggiungi il contenuto del capitolo PRIMA dei grafici
@@ -1274,9 +1290,14 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
                                 
                                 # Crea l'immagine con dimensioni appropriate
                                 try:
-                                    img = Image(chart_img, width=15*cm, height=10*cm, kind='proportional')
-                                    print(f"   ✅ Immagine ReportLab creata per {chart_id}", flush=True)
-                                    story.append(KeepTogether([img, Spacer(1, 0.2*cm)]))
+                                    # Reset del buffer prima di creare l'immagine
+                                    chart_img.seek(0)
+                                    img = Image(chart_img, width=15*cm, height=10*cm)
+                                    print(f"   ✅ Immagine ReportLab creata per {chart_id} (dimensione: {15*cm}x{10*cm})", flush=True)
+                                    # Aggiungi direttamente l'immagine senza KeepTogether per evitare problemi
+                                    story.append(Spacer(1, 0.3*cm))
+                                    story.append(img)
+                                    story.append(Spacer(1, 0.2*cm))
                                     charts_added_count += 1
                                     print(f"✅ Grafico {chart_id} aggiunto con successo al PDF (totale aggiunti: {charts_added_count})", flush=True)
                                 except Exception as img_create_error:
@@ -1331,8 +1352,11 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
                         chart_img = create_chart_image(chart, width=15*cm, height=10*cm)
                         if chart_img:
                             try:
-                                img = Image(chart_img, width=15*cm, height=10*cm, kind='proportional')
-                                story.append(KeepTogether([img, Spacer(1, 0.2*cm)]))
+                                chart_img.seek(0)
+                                img = Image(chart_img, width=15*cm, height=10*cm)
+                                story.append(Spacer(1, 0.3*cm))
+                                story.append(img)
+                                story.append(Spacer(1, 0.2*cm))
                                 charts_added_fallback += 1
                                 charts_added_count += 1
                                 print(f"✅ Grafico {chart_id} aggiunto con successo al PDF (fallback, totale: {charts_added_count})", flush=True)
