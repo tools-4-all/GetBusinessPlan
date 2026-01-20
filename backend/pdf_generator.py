@@ -2,6 +2,7 @@ import json
 import re
 import io
 import os
+import sys
 from datetime import datetime
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -9,19 +10,31 @@ from reportlab.lib.units import cm
 from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, Table, TableStyle, Image, KeepTogether
 from reportlab.lib.enums import TA_JUSTIFY, TA_CENTER, TA_LEFT
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from pathlib import Path
 import matplotlib
 matplotlib.use('Agg')  # Backend non interattivo per server
 import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
 import markdown
 from markdown.extensions import fenced_code, tables, nl2br
 
+# Configura encoding UTF-8
+if sys.stdout.encoding != 'utf-8':
+    sys.stdout.reconfigure(encoding='utf-8')
+
 
 def escape_for_pdf(s):
-    """Escape caratteri speciali per uso in Paragraph/HTML di ReportLab."""
+    """Escape caratteri speciali per uso in Paragraph/HTML di ReportLab, preservando UTF-8."""
     if s is None:
         return ''
-    return str(s).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+    # Assicura che la stringa sia in UTF-8
+    if isinstance(s, bytes):
+        s = s.decode('utf-8', errors='replace')
+    s = str(s)
+    # Escape solo caratteri HTML speciali, mantieni tutti gli altri caratteri UTF-8
+    return s.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
 
 
 def preprocess_content_for_pdf(content):
@@ -145,11 +158,15 @@ def markdown_to_paragraphs(text, styles):
     # Converti markdown in HTML
     html = md.convert(text)
     
-    # Funzione per convertire tag HTML in formato ReportLab
+    # Funzione per convertire tag HTML in formato ReportLab con supporto UTF-8
     def clean_html_for_reportlab(html_text):
-        """Converte HTML in formato compatibile con ReportLab Paragraph"""
+        """Converte HTML in formato compatibile con ReportLab Paragraph, preservando UTF-8"""
         if not html_text:
             return ""
+        # Assicura encoding UTF-8
+        if isinstance(html_text, bytes):
+            html_text = html_text.decode('utf-8', errors='replace')
+        html_text = str(html_text)
         # ReportLab supporta: <b>, <i>, <u>, <font>, <br/>, <a>, <sup>, <sub>
         html_text = re.sub(r'<strong>(.+?)</strong>', r'<b>\1</b>', html_text, flags=re.DOTALL)
         html_text = re.sub(r'<em>(.+?)</em>', r'<i>\1</i>', html_text, flags=re.DOTALL)
@@ -265,7 +282,18 @@ def create_chart_image(chart_data, width=15*cm, height=10*cm):
         
         print(f"   📊 Creando grafico tipo '{tipo}' con {len(series)} serie")
         
-        # Configurazione stile professionale
+        # Configurazione stile professionale con supporto UTF-8
+        # Trova un font che supporta caratteri italiani
+        available_fonts = [f.name for f in fm.fontManager.ttflist]
+        italian_font = None
+        for font_name in ['DejaVu Sans', 'Liberation Sans', 'Arial', 'Helvetica', 'Verdana']:
+            if font_name in available_fonts:
+                italian_font = font_name
+                break
+        
+        if not italian_font:
+            italian_font = 'sans-serif'
+        
         plt.rcParams.update({
             'figure.facecolor': 'white',
             'axes.facecolor': 'white',
@@ -282,7 +310,7 @@ def create_chart_image(chart_data, width=15*cm, height=10*cm):
             'ytick.color': '#333333',
             'text.color': '#333333',
             'font.family': 'sans-serif',
-            'font.sans-serif': ['Arial', 'DejaVu Sans', 'Liberation Sans'],
+            'font.sans-serif': [italian_font, 'DejaVu Sans', 'Liberation Sans', 'Arial', 'Helvetica'],
             'font.size': 10,
             'legend.frameon': True,
             'legend.framealpha': 0.9,
@@ -294,6 +322,9 @@ def create_chart_image(chart_data, width=15*cm, height=10*cm):
             'savefig.bbox': 'tight',
             'savefig.pad_inches': 0.1
         })
+        
+        # Imposta encoding UTF-8 per matplotlib
+        plt.rcParams['axes.unicode_minus'] = False
         
         # Palette colori professionale (blu/grigio aziendale)
         professional_colors = [
@@ -331,9 +362,13 @@ def create_chart_image(chart_data, width=15*cm, height=10*cm):
                 
                 if x_values and y_values and len(x_values) == len(y_values):
                     color = professional_colors[idx % len(professional_colors)]
+                    # Assicura che il nome della serie sia UTF-8
+                    label_name = str(name)
+                    if isinstance(name, bytes):
+                        label_name = name.decode('utf-8', errors='replace')
                     ax.plot(x_values, y_values, 
                            marker='o', 
-                           label=name,
+                           label=label_name,
                            color=color,
                            linewidth=2.5,
                            markersize=7,
@@ -348,45 +383,86 @@ def create_chart_image(chart_data, width=15*cm, height=10*cm):
             
         elif tipo == 'bar':
             # Raccogli dati da tutte le serie per grafico a barre raggruppate
+            # Gestisce anche il caso in cui ogni serie ha lo stesso valore x (come scenari)
             x_values = []
             y_data = {}
             
             for idx, serie in enumerate(series):
                 name = serie.get('name', f'Serie {idx+1}')
                 points = serie.get('points', [])
+                
+                # Se tutti i punti hanno lo stesso x, usa il primo valore y (caso scenari)
+                unique_x_values = set()
                 for p in points:
                     x_val = str(p.get('x', '')).strip()
-                    y_val = float(p.get('y', 0)) if p.get('y') is not None else 0
-                    # Ignora punti con x vuoto o solo spazi
                     if x_val and x_val != '':
-                        if x_val not in x_values:
-                            x_values.append(x_val)
-                        if name not in y_data:
-                            y_data[name] = {}
-                        y_data[name][x_val] = y_val
+                        unique_x_values.add(x_val)
+                
+                # Se c'è un solo valore x unico per questa serie, prendi il primo y
+                if len(unique_x_values) == 1:
+                    x_val = list(unique_x_values)[0]
+                    # Prendi il primo valore y valido
+                    for p in points:
+                        y_val = p.get('y')
+                        if y_val is not None:
+                            try:
+                                y_val = float(y_val)
+                                if x_val not in x_values:
+                                    x_values.append(x_val)
+                                if name not in y_data:
+                                    y_data[name] = {}
+                                y_data[name][x_val] = y_val
+                                break  # Prendi solo il primo valore
+                            except (ValueError, TypeError):
+                                continue
+                else:
+                    # Caso normale: più valori x diversi
+                    for p in points:
+                        x_val = str(p.get('x', '')).strip()
+                        y_val = p.get('y')
+                        if y_val is not None:
+                            try:
+                                y_val = float(y_val)
+                                # Ignora punti con x vuoto o solo spazi
+                                if x_val and x_val != '':
+                                    if x_val not in x_values:
+                                        x_values.append(x_val)
+                                    if name not in y_data:
+                                        y_data[name] = {}
+                                    # Se ci sono più valori per lo stesso x, prendi l'ultimo (o potresti fare la media)
+                                    y_data[name][x_val] = y_val
+                            except (ValueError, TypeError):
+                                continue
             
             # Crea grafico a barre raggruppate
             if x_values and y_data:
                 x_pos = range(len(x_values))
-                bar_width = 0.35
-                offset = 0
+                num_series = len(y_data)
+                bar_width = 0.8 / max(num_series, 1)  # Adatta la larghezza in base al numero di serie
+                offset = -bar_width * (num_series - 1) / 2
                 
                 for idx, (name, values) in enumerate(y_data.items()):
                     positions = [x + offset for x in x_pos]
                     heights = [values.get(x_val, 0) for x_val in x_values]
                     
                     color = professional_colors[idx % len(professional_colors)]
+                    # Assicura che il nome della serie sia UTF-8
+                    label_name = str(name)
+                    if isinstance(name, bytes):
+                        label_name = name.decode('utf-8', errors='replace')
                     ax.bar(positions, heights, 
                           width=bar_width,
-                          label=name,
+                          label=label_name,
                           color=color,
                           alpha=0.85,
                           edgecolor='white',
                           linewidth=1.5)
                     offset += bar_width
                 
-                ax.set_xticks([x + bar_width * (len(y_data) - 1) / 2 for x in x_pos])
-                ax.set_xticklabels(x_values, rotation=45, ha='right')
+                ax.set_xticks(x_pos)
+                # Assicura che le etichette siano UTF-8
+                x_labels_utf8 = [str(x) if not isinstance(x, bytes) else x.decode('utf-8', errors='replace') for x in x_values]
+                ax.set_xticklabels(x_labels_utf8, rotation=45, ha='right')
                 ax.legend(loc='best', frameon=True)
                 ax.grid(True, alpha=0.3, axis='y', linestyle='--')
                 ax.set_axisbelow(True)
@@ -405,9 +481,11 @@ def create_chart_image(chart_data, width=15*cm, height=10*cm):
                 
                 if labels and values and len(labels) == len(values):
                     colors_pie = professional_colors[:len(labels)]
+                    # Assicura che le etichette siano UTF-8
+                    labels_utf8 = [str(l) if not isinstance(l, bytes) else l.decode('utf-8', errors='replace') for l in labels]
                     wedges, texts, autotexts = ax.pie(
                         values, 
-                        labels=labels,
+                        labels=labels_utf8,
                         autopct='%1.1f%%',
                         colors=colors_pie,
                         startangle=90,
@@ -460,14 +538,21 @@ def create_chart_image(chart_data, width=15*cm, height=10*cm):
             print(f"⚠️  Grafico '{titolo}' non ha dati validi da visualizzare. Tipo: {tipo}, Info: {data_info}")
             return None
         
-        # Titolo e labels
+        # Titolo e labels (assicura encoding UTF-8)
         if titolo:
-            ax.set_title(titolo, fontsize=14, fontweight='bold', 
+            # Assicura che il titolo sia una stringa UTF-8 valida
+            if isinstance(titolo, bytes):
+                titolo = titolo.decode('utf-8', errors='replace')
+            ax.set_title(str(titolo), fontsize=14, fontweight='bold', 
                        pad=15, color='#1a1a1a')
         if x_label:
-            ax.set_xlabel(x_label, fontsize=11, fontweight='medium', color='#333333')
+            if isinstance(x_label, bytes):
+                x_label = x_label.decode('utf-8', errors='replace')
+            ax.set_xlabel(str(x_label), fontsize=11, fontweight='medium', color='#333333')
         if y_label:
-            ax.set_ylabel(y_label, fontsize=11, fontweight='medium', color='#333333')
+            if isinstance(y_label, bytes):
+                y_label = y_label.decode('utf-8', errors='replace')
+            ax.set_ylabel(str(y_label), fontsize=11, fontweight='medium', color='#333333')
         
         plt.tight_layout(pad=1.5)
         
@@ -565,14 +650,15 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
     footer_info = pdf_layout.get('footer', {})
     confidenzialita = pdf_layout.get('confidenzialita', 'pubblico')
     
-    # Crea il documento PDF
+    # Crea il documento PDF con encoding UTF-8
     doc = SimpleDocTemplate(
         str(output_path),
         pagesize=A4,
         rightMargin=2*cm,
         leftMargin=2*cm,
         topMargin=3*cm,
-        bottomMargin=2.5*cm
+        bottomMargin=2.5*cm,
+        encoding='utf-8'
     )
     
     # Crea le funzioni callback per header/footer
@@ -589,8 +675,11 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
     doc.onFirstPage = on_first_page
     doc.onLaterPages = on_later_pages
     
-    # Stili con font professionali (Times New Roman)
+    # Stili con font professionali (Times New Roman) con supporto UTF-8
     styles = getSampleStyleSheet()
+    
+    # Configura encoding per ReportLab Paragraph (supporta UTF-8 nativamente)
+    # Times-Roman e Times-Bold supportano caratteri latini estesi (accenti italiani)
     
     # Stili personalizzati con Times-Roman per aspetto formale
     styles.add(ParagraphStyle(
@@ -601,7 +690,8 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
         textColor=colors.HexColor('#000000'),
         spaceAfter=20,
         alignment=TA_CENTER,
-        leading=34
+        leading=34,
+        encoding='utf-8'
     ))
     
     styles.add(ParagraphStyle(
@@ -648,11 +738,13 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
     ))
     
     # Modifica lo stile Normal esistente invece di aggiungerne uno nuovo
+    # Times-Roman supporta caratteri latini estesi (UTF-8)
     styles['Normal'].fontName = 'Times-Roman'
     styles['Normal'].fontSize = 11
     styles['Normal'].textColor = colors.HexColor('#000000')
     styles['Normal'].leading = 14
     styles['Normal'].alignment = TA_JUSTIFY
+    styles['Normal'].encoding = 'utf-8'
     
     styles.add(ParagraphStyle(
         name='TOCEntry',
@@ -1155,21 +1247,25 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
                                         continue
                                     chart_img.seek(0)  # Reset per Image()
                                 
-                                img = Image(chart_img, width=15*cm, height=10*cm)
-                                story.append(img)
-                                story.append(Spacer(1, 0.3*cm))
+                                # Crea l'immagine con dimensioni appropriate
+                                img = Image(chart_img, width=15*cm, height=10*cm, kind='proportional')
+                                story.append(KeepTogether([img, Spacer(1, 0.2*cm)]))
                                 print(f"✅ Grafico {chart_id} aggiunto con successo al PDF")
                                 
                                 # Aggiungi caption se presente
                                 caption = chart.get('caption', '')
                                 if caption:
-                                    caption_clean = caption.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                                    # Assicura encoding UTF-8 per la caption
+                                    if isinstance(caption, bytes):
+                                        caption = caption.decode('utf-8', errors='replace')
+                                    caption_clean = escape_for_pdf(caption)
                                     story.append(Paragraph(f"<i>{caption_clean}</i>", styles['Normal']))
                                     story.append(Spacer(1, 0.3*cm))
                             except Exception as img_error:
                                 import traceback
                                 print(f"❌ Errore nell'aggiungere immagine al PDF per {chart_id}: {str(img_error)}")
                                 print(traceback.format_exc())
+                                # Non aggiungere messaggio di errore nel PDF, continua con il prossimo grafico
                         else:
                             print(f"⚠️  Grafico {chart_id} non generato (chart_img è None)")
                     except Exception as e:
@@ -1180,8 +1276,7 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
                         print(f"   Serie: {len(chart.get('series', []))}")
                         print(f"   Dettagli completi:")
                         print(error_details)
-                        # Aggiungi un messaggio di errore nel PDF invece di fallire silenziosamente
-                        story.append(Paragraph(f"<i>Errore nella generazione del grafico: {chart_id} - {str(e)}</i>", styles['Normal']))
+                        # Non aggiungere messaggio di errore nel PDF, continua con il prossimo grafico
                 else:
                     print(f"⚠️  Grafico {chart_id} non trovato in charts_dict. Grafici disponibili: {list(charts_dict.keys())}")
         elif chart_ids and chapter_id != "CH7_CHARTS":
@@ -1197,14 +1292,15 @@ async def create_pdf_from_json(business_plan_json: dict) -> str:
                     try:
                         chart_img = create_chart_image(chart, width=15*cm, height=10*cm)
                         if chart_img:
-                            img = Image(chart_img, width=15*cm, height=10*cm)
-                            story.append(img)
-                            story.append(Spacer(1, 0.3*cm))
+                            img = Image(chart_img, width=15*cm, height=10*cm, kind='proportional')
+                            story.append(KeepTogether([img, Spacer(1, 0.2*cm)]))
                             print(f"✅ Grafico {chart_id} aggiunto con successo al PDF")
                             
                             caption = chart.get('caption', '')
                             if caption:
-                                caption_clean = caption.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                                if isinstance(caption, bytes):
+                                    caption = caption.decode('utf-8', errors='replace')
+                                caption_clean = escape_for_pdf(caption)
                                 story.append(Paragraph(f"<i>{caption_clean}</i>", styles['Normal']))
                                 story.append(Spacer(1, 0.3*cm))
                     except Exception as e:
