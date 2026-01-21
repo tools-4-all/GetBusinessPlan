@@ -364,6 +364,11 @@ function updateProgressBar() {
 async function getSuggestions(questionId, questionTitle, questionDescription, currentValue, formType = 'business-plan', contextData = {}) {
     try {
         const API_BASE_URL = window.API_BASE_URL || 'https://getbusinessplan.onrender.com';
+        
+        // Crea un AbortController per timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 secondi timeout
+        
         const response = await fetch(`${API_BASE_URL}/api/get-suggestions`, {
             method: 'POST',
             headers: {
@@ -376,12 +381,15 @@ async function getSuggestions(questionId, questionTitle, questionDescription, cu
                 currentValue,
                 formType,
                 contextData
-            })
+            }),
+            signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
         
         // Controlla se la risposta è ok prima di parsare JSON
         if (!response.ok) {
-            console.error(`Errore HTTP nel recupero suggerimenti: ${response.status} ${response.statusText}`);
+            // Non loggare errori HTTP per i suggerimenti (non critici)
             return [];
         }
         
@@ -390,19 +398,26 @@ async function getSuggestions(questionId, questionTitle, questionDescription, cu
         try {
             data = await response.json();
         } catch (jsonError) {
-            console.error('Errore nel parsing JSON della risposta suggerimenti:', jsonError);
+            // Non loggare errori di parsing per i suggerimenti (non critici)
             return [];
         }
         
         return data.success ? (data.suggestions || []) : [];
     } catch (error) {
-        // Gestisci diversi tipi di errori
-        if (error.name === 'TypeError' && error.message.includes('Load failed')) {
-            console.error('Errore di rete nel recupero suggerimenti: impossibile connettersi al server');
-        } else if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-            console.error('Errore di rete nel recupero suggerimenti: richiesta fallita');
-        } else {
-            console.error('Errore nel recupero suggerimenti:', error);
+        // I suggerimenti non sono critici, quindi non mostriamo errori all'utente
+        // Solo log silenzioso in console per debug
+        if (error.name === 'AbortError') {
+            // Timeout - non loggare, è normale se il server è lento
+            return [];
+        }
+        
+        // Altri errori di rete - log silenzioso solo in modalità debug
+        if (window.DEBUG_MODE) {
+            if (error.name === 'TypeError' && (error.message.includes('Load failed') || error.message.includes('Failed to fetch'))) {
+                console.debug('Suggerimenti non disponibili (server non raggiungibile)');
+            } else {
+                console.debug('Errore nel recupero suggerimenti:', error);
+            }
         }
         return [];
     }
@@ -4102,11 +4117,22 @@ async function handlePayment(documentType) {
                 throw new Error(errorData.detail || 'Errore nella creazione della sessione di pagamento');
             }
             
-            const data = await response.json();
+            let data;
+            try {
+                data = await response.json();
+            } catch (jsonError) {
+                console.error('❌ Errore nel parsing JSON della risposta checkout:', jsonError);
+                throw new Error('Risposta del server non valida. Riprova.');
+            }
             
             if (!data.success || !data.url) {
-                throw new Error('Risposta API non valida');
+                console.error('❌ Risposta API checkout non valida:', data);
+                throw new Error('Risposta API non valida: ' + (data.error || 'URL di checkout mancante'));
             }
+            
+            console.log('✅ Checkout session creata con successo');
+            console.log('🔗 URL checkout:', data.url);
+            console.log('🆔 Session ID:', data.sessionId);
             
             // Salva il sessionId per la verifica successiva in base al tipo di documento
             if (documentType === 'business-plan') {
@@ -4118,7 +4144,43 @@ async function handlePayment(documentType) {
             }
             
             // Reindirizza a Stripe Checkout
-            window.location.href = data.url;
+            console.log('🔄 Reindirizzamento a Stripe Checkout...');
+            console.log('🔗 URL completo:', data.url);
+            
+            // Verifica che l'URL sia valido
+            if (!data.url || !data.url.startsWith('http')) {
+                console.error('❌ URL di checkout non valido:', data.url);
+                throw new Error('URL di checkout non valido');
+            }
+            
+            // Risolvi la Promise prima del redirect per evitare che si blocchi
+            resolve();
+            
+            // Usa requestAnimationFrame per assicurarsi che il DOM sia pronto
+            // ma senza delay eccessivo
+            requestAnimationFrame(() => {
+                try {
+                    // Prova prima con window.location (più compatibile)
+                    window.location = data.url;
+                } catch (redirectError) {
+                    console.error('❌ Errore nel redirect:', redirectError);
+                    // Fallback: usa window.location.replace
+                    try {
+                        window.location.replace(data.url);
+                    } catch (replaceError) {
+                        console.error('❌ Errore anche con replace:', replaceError);
+                        // Ultimo fallback: crea un link e cliccalo
+                        const link = document.createElement('a');
+                        link.href = data.url;
+                        link.target = '_self';
+                        link.style.display = 'none';
+                        document.body.appendChild(link);
+                        link.click();
+                        // Rimuovi il link dopo il click
+                        setTimeout(() => document.body.removeChild(link), 100);
+                    }
+                }
+            });
             
         } catch (error) {
             console.error('Errore nella creazione checkout session:', error);
@@ -4163,6 +4225,13 @@ async function verifyPaymentAfterRedirect(documentType) {
     
     console.log(`🔍 Verifica pagamento per ${documentType}:`, { sessionId, paymentStatus });
     
+    // NON verificare il pagamento se non siamo dopo un redirect da Stripe
+    // (cioè se non c'è paymentStatus === 'success' nell'URL)
+    if (!paymentStatus || paymentStatus !== 'success') {
+        console.log(`ℹ️  Nessun redirect da Stripe rilevato (paymentStatus: ${paymentStatus}), skip verifica pagamento`);
+        return false;
+    }
+    
     if (paymentStatus === 'success' && sessionId) {
         try {
             console.log(`📡 Chiamata API verify-payment per ${documentType}...`);
@@ -4179,10 +4248,25 @@ async function verifyPaymentAfterRedirect(documentType) {
             
             if (!response.ok) {
                 console.error(`❌ Errore API verify-payment: ${response.status}`);
+                // Prova a leggere il messaggio di errore dalla risposta
+                let errorMessage = `Errore HTTP ${response.status}`;
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.detail || errorData.message || errorMessage;
+                } catch (e) {
+                    // Ignora errori di parsing
+                }
+                console.error(`❌ Dettaglio errore: ${errorMessage}`);
                 return false;
             }
             
-            const data = await response.json();
+            let data;
+            try {
+                data = await response.json();
+            } catch (jsonError) {
+                console.error(`❌ Errore nel parsing JSON della risposta verify-payment: ${jsonError}`);
+                return false;
+            }
             console.log(`📥 Risposta verify-payment per ${documentType}:`, data);
             
             if (data.success && data.paid) {
@@ -4231,7 +4315,13 @@ async function verifyPaymentAfterRedirect(documentType) {
             }
         } catch (error) {
             console.error('Errore nella verifica pagamento:', error);
-            alert('Errore nella verifica del pagamento. Riprova.');
+            // Mostra alert solo se siamo effettivamente dopo un redirect da Stripe
+            // (cioè se c'è paymentStatus === 'success' nell'URL)
+            if (paymentStatus === 'success') {
+                alert('Errore nella verifica del pagamento. Riprova.');
+            } else {
+                console.log('Verifica pagamento chiamata senza redirect da Stripe, ignorando errore');
+            }
             return false;
         }
     }
