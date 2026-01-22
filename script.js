@@ -4050,21 +4050,56 @@ async function handlePayment(documentType) {
             
             let response;
             try {
+                console.log('⏳ Invio richiesta fetch (attesa risposta)...');
+                console.log('⏳ Se il server è in sleep, potrebbe richiedere 30-60 secondi per il cold start...');
+                
+                // Mostra messaggio all'utente se disponibile
+                if (paymentLoading) {
+                    const originalText = paymentLoading.textContent;
+                    paymentLoading.textContent = 'Connessione al server... (potrebbe richiedere fino a 60 secondi se il server è in sleep)';
+                }
+                
+                // Aggiungi timeout per evitare attese infinite
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => {
+                    controller.abort();
+                    console.error('⏱️  Timeout: la richiesta ha superato 60 secondi');
+                    if (paymentLoading) {
+                        paymentLoading.textContent = 'Il server non risponde. Riprova tra qualche secondo.';
+                    }
+                }, 60000); // 60 secondi timeout (Render può richiedere fino a 60s per cold start)
+                
+                const startTime = Date.now();
                 response = await fetch(`${API_BASE_URL}/api/create-checkout-session`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${idToken}`,
                     },
-                    body: JSON.stringify(requestBody)
+                    body: JSON.stringify(requestBody),
+                    signal: controller.signal
                 });
+                
+                const elapsedTime = Date.now() - startTime;
+                clearTimeout(timeoutId);
+                console.log(`✅ Risposta fetch ricevuta dopo ${elapsedTime}ms`);
             } catch (fetchError) {
                 console.error('❌ Errore nella chiamata fetch:', fetchError);
                 console.error('Tipo errore:', fetchError.name);
                 console.error('Messaggio:', fetchError.message);
                 
                 // Gestisci diversi tipi di errori di rete
-                if (fetchError.name === 'TypeError') {
+                if (fetchError.name === 'AbortError') {
+                    console.error('⏱️  Timeout raggiunto - il server non ha risposto in 60 secondi');
+                    if (paymentLoading) {
+                        paymentLoading.style.display = 'none';
+                    }
+                    if (paymentError) {
+                        paymentError.style.display = 'block';
+                        paymentError.textContent = 'Il server non risponde in tempo. Il server potrebbe essere in sleep (cold start su Render). Riprova tra qualche secondo.';
+                    }
+                    throw new Error('Il server non risponde in tempo. Il server potrebbe essere in sleep (cold start). Riprova tra qualche secondo.');
+                } else if (fetchError.name === 'TypeError') {
                     if (fetchError.message.includes('Load failed') || fetchError.message.includes('Failed to fetch')) {
                         throw new Error('Impossibile connettersi al server. Verifica la tua connessione internet e che il server sia raggiungibile.');
                     } else if (fetchError.message.includes('fetch')) {
@@ -4143,44 +4178,52 @@ async function handlePayment(documentType) {
                 window.paymentSessionId_validation = data.sessionId;
             }
             
-            // Reindirizza a Stripe Checkout
-            console.log('🔄 Reindirizzamento a Stripe Checkout...');
-            console.log('🔗 URL completo:', data.url);
-            
             // Verifica che l'URL sia valido
             if (!data.url || !data.url.startsWith('http')) {
                 console.error('❌ URL di checkout non valido:', data.url);
                 throw new Error('URL di checkout non valido');
             }
             
-            // Risolvi la Promise prima del redirect per evitare che si blocchi
-            resolve();
+            console.log('🔄 Reindirizzamento a Stripe Checkout...');
+            console.log('🔗 URL:', data.url.substring(0, 100) + '...');
             
-            // Usa requestAnimationFrame per assicurarsi che il DOM sia pronto
-            // ma senza delay eccessivo
-            requestAnimationFrame(() => {
-                try {
-                    // Prova prima con window.location (più compatibile)
-                    window.location = data.url;
-                } catch (redirectError) {
-                    console.error('❌ Errore nel redirect:', redirectError);
-                    // Fallback: usa window.location.replace
-                    try {
-                        window.location.replace(data.url);
-                    } catch (replaceError) {
-                        console.error('❌ Errore anche con replace:', replaceError);
-                        // Ultimo fallback: crea un link e cliccalo
-                        const link = document.createElement('a');
-                        link.href = data.url;
-                        link.target = '_self';
-                        link.style.display = 'none';
-                        document.body.appendChild(link);
-                        link.click();
-                        // Rimuovi il link dopo il click
-                        setTimeout(() => document.body.removeChild(link), 100);
-                    }
+            // Verifica che l'URL sia effettivamente una stringa valida
+            if (typeof data.url !== 'string' || data.url.length === 0) {
+                throw new Error('URL di checkout non valido o vuoto');
+            }
+            
+            // Redirect IMMEDIATO - NON risolvere la Promise prima
+            // Il redirect deve avvenire PRIMA che qualsiasi altro codice possa interferire
+            console.log('🔄 Esecuzione redirect immediato...');
+            console.log('🔗 URL completo (primi 200 caratteri):', data.url.substring(0, 200));
+            
+            // Prova prima con location.replace (più diretto)
+            try {
+                window.location.replace(data.url);
+            } catch (e) {
+                console.warn('⚠️  location.replace fallito, provo con href:', e);
+                window.location.href = data.url;
+            }
+            
+            // Fallback: se il redirect non funziona entro 100ms, crea un link e cliccalo
+            setTimeout(() => {
+                // Controlla se siamo ancora sulla stessa pagina
+                if (window.location.href.indexOf('localhost') !== -1 || window.location.href.indexOf('getbusinessplan') !== -1) {
+                    console.warn('⚠️  Redirect non completato, uso fallback con link');
+                    const link = document.createElement('a');
+                    link.href = data.url;
+                    link.target = '_self';
+                    link.style.display = 'none';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
                 }
-            });
+            }, 100);
+            
+            // Risolvi la Promise dopo un breve delay per dare tempo al redirect
+            setTimeout(() => {
+                resolve();
+            }, 50);
             
         } catch (error) {
             console.error('Errore nella creazione checkout session:', error);
