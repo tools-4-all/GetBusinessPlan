@@ -569,7 +569,7 @@ async def generate_market_analysis(request: MarketAnalysisRequest):
         request_body = {
             "model": model_name,
             "messages": messages,
-            "temperature": prompt_config.get("temperature", 0.3)
+            
         }
         
         # Nota: web_search non è supportato direttamente dall'API OpenAI standard
