@@ -4248,6 +4248,19 @@ async function handlePayment(documentType) {
             } catch (healthError) {
                 console.warn('⚠️ Health check non disponibile (il server potrebbe essere in cold start):', healthError.message);
                 console.log('ℹ️ Continuando comunque con il tentativo di pagamento...');
+                
+                // Se il health check fallisce, prova il CORS test
+                try {
+                    console.log('🔍 Tentativo CORS test...');
+                    const corsResponse = await fetch(`${API_BASE_URL}/api/cors-test`, {
+                        method: 'GET',
+                        timeout: 3000
+                    });
+                    const corsData = await corsResponse.json();
+                    console.log('✅ CORS test OK:', corsData);
+                } catch (corsError) {
+                    console.warn('⚠️ CORS test fallito:', corsError.message);
+                }
             }
             
             let response;
@@ -4322,28 +4335,74 @@ async function handlePayment(documentType) {
                 } else if (fetchError.name === 'TypeError') {
                     let errorMsg = 'Errore di connessione al server';
                     let userMsg = '';
+                    let errorCode = 'CONNECTION_ERROR';
+                    let diagnostics = '';
                     
-                    if (fetchError.message.includes('Load failed') || fetchError.message.includes('Failed to fetch')) {
-                        errorMsg = 'Impossibile connettersi al server';
+                    // Log dettagliati per debug
+                    console.error('🔍 Dettagli TypeError:');
+                    console.error('   Message:', fetchError.message);
+                    console.error('   Origin:', window.location.origin);
+                    console.error('   API URL:', `${API_BASE_URL}/api/create-checkout-session`);
+                    console.error('   Online:', navigator.onLine);
+                    
+                    if (fetchError.message.includes('Load failed')) {
+                        errorMsg = '❌ Impossibile connettersi al server (Load failed)';
+                        errorCode = 'LOAD_FAILED';
+                        userMsg = `Possibili cause:
+                        • Il server non è raggiungibile
+                        • Problema di rete o firewall
+                        • Problema CORS (se su dominio diverso)
+                        • Certificato HTTPS non valido`;
+                        diagnostics = `
+                        <p style="font-size: 11px; color: #999; margin-top: 15px;">
+                            <strong>Per il supporto:</strong><br>
+                            URL Server: ${API_BASE_URL}<br>
+                            Origin: ${window.location.origin}<br>
+                            Online: ${navigator.onLine}<br>
+                            Codice: LOAD_FAILED
+                        </p>
+                        `;
+                    } else if (fetchError.message.includes('Failed to fetch')) {
+                        errorMsg = '❌ Connessione fallita al server';
+                        errorCode = 'FETCH_FAILED';
                         userMsg = 'Verifica la tua connessione internet e che il server sia raggiungibile.';
                     } else if (fetchError.message.includes('fetch')) {
                         errorMsg = 'Errore di connessione al server';
+                        errorCode = 'FETCH_ERROR';
                         userMsg = 'Verifica la tua connessione internet e riprova.';
                     } else if (fetchError.message.includes('CORS')) {
                         errorMsg = 'Errore CORS - Il server ha rifiutato la richiesta';
+                        errorCode = 'CORS_ERROR';
                         userMsg = 'Questo è un problema di configurazione. Contatta il supporto.';
+                        diagnostics = `
+                        <p style="font-size: 11px; color: #999; margin-top: 15px;">
+                            Problema CORS: Il dominio del frontend è diverso dal backend.<br>
+                            Frontend: ${window.location.origin}<br>
+                            Backend: ${API_BASE_URL}
+                        </p>
+                        `;
                     }
                     
                     if (paymentError) {
                         paymentError.innerHTML = `
-                        <div style="padding: 15px; text-align: left;">
-                            <strong>❌ ${errorMsg}</strong>
-                            <p>${userMsg}</p>
-                            <p style="font-size: 12px; color: #666; margin-top: 10px;">Codice errore: ${errorMsg.toUpperCase().replace(/\s+/g, '_')}</p>
+                        <div style="padding: 15px; text-align: left; background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 5px;">
+                            <strong style="color: #721c24;">${errorMsg}</strong>
+                            <p style="color: #721c24; white-space: pre-wrap; margin-top: 10px;">${userMsg}</p>
+                            <p style="margin-top: 10px;">
+                                <strong>Cosa fare:</strong>
+                                <ul>
+                                    <li>Verifica che Internet sia connesso</li>
+                                    <li>Ricarica la pagina (Ctrl+F5)</li>
+                                    <li>Prova da un'altra rete (mobile data vs WiFi)</li>
+                                    <li>Se il problema persiste, contatta il supporto</li>
+                                </ul>
+                            </p>
+                            ${diagnostics}
+                            <p style="font-size: 12px; color: #721c24; margin-top: 10px;"><code>${errorCode}</code></p>
                         </div>
                         `;
                     }
-                    throw new Error(errorMsg + ' - ' + userMsg);
+                    throw new Error(errorCode + ': ' + errorMsg + ' - ' + userMsg);
                 }
                 
                 // Se è un errore di timeout o di rete generico

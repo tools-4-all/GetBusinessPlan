@@ -424,6 +424,23 @@ async def health_full():
     
     return diagnostics
 
+@app.get("/api/cors-test")
+async def cors_test():
+    """Endpoint per testare CORS - Restituisce informazioni sulla connessione"""
+    import datetime
+    return {
+        "status": "ok",
+        "cors_enabled": True,
+        "timestamp": datetime.datetime.now().isoformat(),
+        "message": "CORS è abilitato - la richiesta è arrivata al server",
+        "test": {
+            "should_show": "CORS headers nella risposta",
+            "access_control_allow_origin": "*",
+            "access_control_allow_methods": "*",
+            "access_control_allow_headers": "*"
+        }
+    }
+
 @app.post("/api/generate-business-plan")
 async def generate_business_plan(request: BusinessPlanRequest):
     """Genera il business plan chiamando OpenAI"""
