@@ -239,6 +239,17 @@ async def root():
 async def health():
     return {"status": "healthy"}
 
+@app.get("/api/keep-alive")
+@app.head("/api/keep-alive")
+async def keep_alive():
+    """Endpoint di keep-alive per prevenire il cold start su Render - da pingare ogni 10 minuti"""
+    import datetime
+    return {
+        "status": "ok",
+        "message": "Server is alive",
+        "timestamp": datetime.datetime.now().isoformat()
+    }
+
 @app.get("/api/test")
 async def test():
     """Endpoint di test per verificare che l'API funzioni"""

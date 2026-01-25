@@ -54,6 +54,37 @@ function escape(str) {
         .replace(/'/g, '&#039;');
 }
 
+// Funzione di retry con backoff esponenziale per gestire timeout e errori temporanei
+async function fetchWithRetry(url, options = {}, maxRetries = 3) {
+    const maxRetriesParam = options.maxRetries || maxRetries;
+    delete options.maxRetries; // Rimuovi il parametro custom
+    
+    for (let attempt = 0; attempt < maxRetriesParam; attempt++) {
+        try {
+            console.log(`🔄 Tentativo ${attempt + 1}/${maxRetriesParam} per ${url}`);
+            const response = await fetch(url, options);
+            if (!response.ok && attempt < maxRetriesParam - 1) {
+                // Se la risposta non è OK e abbiamo altri tentativi, ritenta
+                const delayMs = Math.min(1000 * Math.pow(2, attempt), 30000); // Backoff esponenziale fino a 30s
+                console.log(`⏳ Errore HTTP ${response.status}, ritenta tra ${delayMs}ms`);
+                await new Promise(resolve => setTimeout(resolve, delayMs));
+                continue;
+            }
+            return response;
+        } catch (error) {
+            if (attempt < maxRetriesParam - 1) {
+                // Errore di rete, ritenta con backoff
+                const delayMs = Math.min(1000 * Math.pow(2, attempt), 30000); // Backoff esponenziale fino a 30s
+                console.log(`⏳ Errore di rete: "${error.message}", ritenta tra ${delayMs}ms`);
+                await new Promise(resolve => setTimeout(resolve, delayMs));
+            } else {
+                // Ultimo tentativo fallito
+                throw error;
+            }
+        }
+    }
+}
+
 // DOM Elements - will be initialized when DOM is ready
 let planModal;
 let closeModal;
@@ -961,6 +992,13 @@ async function generateBusinessPlanAfterPayment(wizardData) {
             if (showFullContent) {
                 // Se il contenuto è breve, mostra tutto
                 planContent.innerHTML = businessPlanHTML;
+                // Renderizza i grafici immediatamente
+                if (jsonData && jsonData.charts && jsonData.charts.length > 0) {
+                    setTimeout(() => {
+                        console.log('📊 Rendering grafici (contenuto completo)...');
+                        renderChartsFromJSON(jsonData.charts);
+                    }, 100);
+                }
             } else {
                 // Mostra solo preview con pulsante per espandere
                 const previewHTML = businessPlanHTML.substring(0, previewLength);
@@ -984,12 +1022,25 @@ async function generateBusinessPlanAfterPayment(wizardData) {
                     if (showFullBtn) {
                         showFullBtn.addEventListener('click', () => {
                             planContent.innerHTML = planContent.dataset.fullContent;
+                            // Renderizza i grafici dopo aver mostrato il contenuto completo
+                            if (jsonData && jsonData.charts && jsonData.charts.length > 0) {
+                                setTimeout(() => {
+                                    console.log('📊 Rendering grafici dopo "Mostra tutto"...');
+                                    renderChartsFromJSON(jsonData.charts);
+                                }, 100);
+                            }
                         });
                     }
                 }, 100);
             }
             
             console.log('HTML inserito. Contenuto planContent:', planContent.innerHTML.substring(0, 200));
+            
+            // Renderizza i grafici dopo che l'HTML è stato inserito
+            if (jsonData && jsonData.charts && jsonData.charts.length > 0) {
+                console.log('📊 Rendering grafici... Trovati', jsonData.charts.length, 'grafici');
+                renderChartsFromJSON(jsonData.charts);
+            }
         } else {
             console.error('ERRORE: planContent non disponibile!');
         }
@@ -1929,6 +1980,33 @@ function initializeAll() {
     } else {
         console.log('⚠️ Pagamento in corso, event listeners già inizializzati');
     }
+    
+    // Avvia il ping keep-alive per prevenire il cold start su Render
+    // Invia un ping ogni 10 minuti (600000 ms) per mantenere il server attivo
+    console.log('✅ Avviando keep-alive ping per prevenire cold start su Render (ogni 10 minuti)');
+    setInterval(() => {
+        fetch(`${API_BASE_URL}/api/keep-alive`)
+            .then(response => {
+                if (response.ok) {
+                    console.log('🟢 Keep-alive ping inviato con successo');
+                }
+            })
+            .catch(err => {
+                // Non loggare errori per non inquinare la console - è un ping di background
+                console.log('🔵 Keep-alive ping non critico');
+            });
+    }, 600000); // Ogni 10 minuti
+    
+    // Invia il primo ping subito per verificare che il server sia raggiungibile
+    fetch(`${API_BASE_URL}/api/keep-alive`)
+        .then(response => {
+            if (response.ok) {
+                console.log('🟢 Keep-alive ping iniziale inviato con successo');
+            }
+        })
+        .catch(err => {
+            console.log('ℹ️ Server non raggiungibile al caricamento della pagina (potrebbe essere in sleep)');
+        });
 }
 
 // Controlla immediatamente se c'è un pagamento in corso (anche prima che il DOM sia completamente caricato)
@@ -2506,28 +2584,37 @@ function convertBusinessPlanJSONToHTML(bpData) {
             
             // Aggiungi grafici associati al capitolo se presenti
             if (chapter.chart_ids && chapter.chart_ids.length > 0 && bpData.charts) {
+                console.log('📊 Trovati chart_ids nel capitolo:', chapter.id, chapter.chart_ids);
                 chapter.chart_ids.forEach(chartId => {
                     const chart = bpData.charts.find(c => c.id === chartId);
                     if (chart) {
-                        html += `<div class="analysis-info-box">`;
+                        console.log('📊 Grafico trovato:', chart.id, chart.titolo, 'Tipo:', chart.tipo, 'Series:', chart.series?.length || 0);
+                        html += `<div class="analysis-info-box" style="margin: 20px 0;">`;
                         html += `<h4>${escape(chart.titolo)}</h4>`;
-                        html += `<p><em>Tipo:</em> ${escape(chart.tipo)} | <em>X:</em> ${escape(chart.x_label)} | <em>Y:</em> ${escape(chart.y_label)}</p>`;
-                        if (chart.series && chart.series.length > 0) {
-                            html += `<table style="width: 100%; border-collapse: collapse; margin: 10px 0;">`;
-                            chart.series.forEach(serie => {
-                                html += `<tr><th colspan="2" style="text-align: left; padding: 8px; background: #f1f5f9;">${escape(serie.name)}</th></tr>`;
-                                if (serie.points && serie.points.length > 0) {
-                                    serie.points.forEach(point => {
-                                        html += `<tr><td style="padding: 6px; border-bottom: 1px solid #e2e8f0;">${escape(point.x)}</td><td style="padding: 6px; border-bottom: 1px solid #e2e8f0; text-align: right;">${formatNumber(point.y)}</td></tr>`;
-                                    });
-                                }
-                            });
-                            html += `</table>`;
+                        
+                        // Verifica che il grafico abbia dati validi
+                        const hasValidData = chart.series && chart.series.length > 0 && chart.series.some(serie => {
+                            return serie.points && Array.isArray(serie.points) && serie.points.length > 0 && 
+                                   serie.points.some(p => p && p.y !== null && p.y !== undefined && !isNaN(parseFloat(p.y)));
+                        });
+                        
+                        if (hasValidData) {
+                            // Aggiungi canvas per il grafico
+                            html += `<div style="position: relative; height: 400px; margin: 20px 0;">`;
+                            html += `<canvas id="chart_${escape(chart.id)}" style="max-width: 100%;"></canvas>`;
+                            html += `</div>`;
+                            console.log('✅ Canvas aggiunto per grafico:', chart.id);
+                        } else {
+                            console.warn('⚠️ Grafico senza dati validi:', chart.id);
+                            html += `<p style="color: #dc2626;">⚠️ Grafico senza dati validi</p>`;
                         }
+                        
                         if (chart.caption) {
-                            html += `<p style="font-size: 0.9em; color: #64748b; font-style: italic;">${escape(chart.caption)}</p>`;
+                            html += `<p style="font-size: 0.9em; color: #64748b; font-style: italic; margin-top: 10px;">${escape(chart.caption)}</p>`;
                         }
                         html += `</div>`;
+                    } else {
+                        console.warn('⚠️ Grafico non trovato per ID:', chartId);
                     }
                 });
             }
@@ -2641,6 +2728,169 @@ function convertBusinessPlanJSONToHTML(bpData) {
     
     console.log('convertBusinessPlanJSONToHTML completata. Lunghezza HTML finale:', html.length);
     return html;
+}
+
+// Funzione per renderizzare i grafici con Chart.js
+function renderChartsFromJSON(charts) {
+    console.log('📊 renderChartsFromJSON chiamata con', charts.length, 'grafici');
+    
+    // Funzione per caricare Chart.js
+    function loadChartJS() {
+        return new Promise((resolve, reject) => {
+            // Se Chart.js è già caricato, risolvi immediatamente
+            if (typeof Chart !== 'undefined') {
+                console.log('✅ Chart.js già caricato');
+                resolve();
+                return;
+            }
+            
+            console.log('📥 Caricamento Chart.js...');
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js';
+            script.onload = () => {
+                console.log('✅ Chart.js caricato con successo');
+                resolve();
+            };
+            script.onerror = () => {
+                console.error('❌ Errore nel caricamento di Chart.js');
+                reject(new Error('Impossibile caricare Chart.js'));
+            };
+            document.head.appendChild(script);
+        });
+    }
+    
+    // Funzione per renderizzare un singolo grafico
+    function renderChart(chart) {
+        const canvas = document.getElementById('chart_' + chart.id);
+        if (!canvas) {
+            console.warn('⚠️ Canvas non trovato per grafico:', chart.id);
+            return;
+        }
+        
+        // Verifica che il grafico abbia dati validi
+        if (!chart.series || !Array.isArray(chart.series) || chart.series.length === 0) {
+            console.warn('⚠️ Grafico senza serie dati:', chart.id);
+            return;
+        }
+        
+        const hasValidData = chart.series.some(serie => {
+            if (!serie.points || !Array.isArray(serie.points) || serie.points.length === 0) {
+                return false;
+            }
+            return serie.points.some(p => {
+                if (!p || p.y === null || p.y === undefined) {
+                    return false;
+                }
+                const y = typeof p.y === 'string' ? parseFloat(p.y) : p.y;
+                return !isNaN(y) && y !== '';
+            });
+        });
+        
+        if (!hasValidData) {
+            console.warn('⚠️ Grafico senza dati validi:', chart.id);
+            return;
+        }
+        
+        console.log('✅ Rendering grafico:', chart.id, chart.titolo);
+        
+        const ctx = canvas.getContext('2d');
+        const type = (chart.tipo || 'line').toLowerCase();
+        
+        // Funzione per convertire i punti in formato Chart.js
+        function toXY(points) {
+            return points.map(p => ({ x: p.x, y: typeof p.y === 'string' ? parseFloat(p.y) : p.y }));
+        }
+        
+        // Funzione per costruire i dataset
+        function buildDataset(series, chartType) {
+            return series.map((s, idx) => {
+                const data = toXY(s.points || []);
+                return {
+                    label: (s.name || ('Serie ' + (idx + 1))).trim(),
+                    data: data,
+                    parsing: { xAxisKey: 'x', yAxisKey: 'y' },
+                    tension: chartType === 'line' ? 0.25 : 0,
+                };
+            });
+        }
+        
+        const commonOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: true, position: 'bottom', labels: { boxWidth: 10 } },
+                title: { display: false },
+                tooltip: { enabled: true }
+            },
+            animation: false
+        };
+        
+        // Gestione grafici a torta
+        if (type === 'pie') {
+            const pieData = (chart.series[0].points || []).map(p => {
+                const y = typeof p.y === 'string' ? parseFloat(p.y) : p.y;
+                return isNaN(y) ? 0 : y;
+            });
+            const pieLabels = (chart.series[0].points || []).map(p => p.x);
+            
+            new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: pieLabels,
+                    datasets: [{ label: chart.titolo || chart.id, data: pieData }]
+                },
+                options: commonOptions
+            });
+            return;
+        }
+        
+        // Gestione altri tipi di grafici
+        const datasets = buildDataset(chart.series, type);
+        const chartType = type === 'bar' ? 'bar' : 'line';
+        
+        new Chart(ctx, {
+            type: chartType,
+            data: { datasets: datasets },
+            options: {
+                ...commonOptions,
+                scales: {
+                    x: {
+                        type: 'category',
+                        title: { display: !!chart.x_label, text: chart.x_label || '' },
+                        grid: { display: false }
+                    },
+                    y: {
+                        title: { display: !!chart.y_label, text: chart.y_label || '' },
+                        ticks: {
+                            callback: (v) => {
+                                if (typeof v === 'number') {
+                                    return new Intl.NumberFormat('it-IT').format(v);
+                                }
+                                return v;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Carica Chart.js e poi renderizza i grafici
+    loadChartJS()
+        .then(() => {
+            console.log('📊 Inizio rendering di', charts.length, 'grafici');
+            charts.forEach(chart => {
+                try {
+                    renderChart(chart);
+                } catch (error) {
+                    console.error('❌ Errore nel rendering del grafico', chart.id, ':', error);
+                }
+            });
+            console.log('✅ Rendering grafici completato');
+        })
+        .catch(error => {
+            console.error('❌ Errore nel caricamento di Chart.js:', error);
+        });
 }
 
 // Funzione rimossa per motivi di sicurezza: le chiavi API non devono essere esposte nel frontend.
@@ -4051,33 +4301,36 @@ async function handlePayment(documentType) {
             let response;
             try {
                 console.log('⏳ Invio richiesta fetch (attesa risposta)...');
-                console.log('⏳ Se il server è in sleep, potrebbe richiedere 30-60 secondi per il cold start...');
+                console.log('⏳ Se il server è in sleep, potrebbe richiedere fino a 120 secondi per il cold start...');
                 
                 // Mostra messaggio all'utente se disponibile
                 if (paymentLoading) {
                     const originalText = paymentLoading.textContent;
-                    paymentLoading.textContent = 'Connessione al server... (potrebbe richiedere fino a 60 secondi se il server è in sleep)';
+                    paymentLoading.textContent = 'Connessione al server... (potrebbe richiedere fino a 120 secondi se il server è in sleep)';
                 }
                 
                 // Aggiungi timeout per evitare attese infinite
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => {
                     controller.abort();
-                    console.error('⏱️  Timeout: la richiesta ha superato 60 secondi');
+                    console.error('⏱️  Timeout: la richiesta ha superato 120 secondi');
                     if (paymentLoading) {
                         paymentLoading.textContent = 'Il server non risponde. Riprova tra qualche secondo.';
                     }
-                }, 60000); // 60 secondi timeout (Render può richiedere fino a 60s per cold start)
+                }, 120000); // 120 secondi timeout (Render può richiedere fino a 120s per cold start)
                 
                 const startTime = Date.now();
-                response = await fetch(`${API_BASE_URL}/api/create-checkout-session`, {
+                
+                // Usa fetchWithRetry per gestire automaticamente i retry con backoff
+                response = await fetchWithRetry(`${API_BASE_URL}/api/create-checkout-session`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${idToken}`,
                     },
                     body: JSON.stringify(requestBody),
-                    signal: controller.signal
+                    signal: controller.signal,
+                    maxRetries: 3 // 3 tentativi con backoff esponenziale
                 });
                 
                 const elapsedTime = Date.now() - startTime;
