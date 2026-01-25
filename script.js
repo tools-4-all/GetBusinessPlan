@@ -57,11 +57,21 @@ function escape(str) {
 // Funzione di retry con backoff esponenziale per gestire timeout e errori temporanei
 async function fetchWithRetry(url, options = {}, maxRetries = 3) {
     const maxRetriesParam = options.maxRetries || maxRetries;
+    const originalSignal = options.signal; // Salva il signal originale se presente
     delete options.maxRetries; // Rimuovi il parametro custom
     
     for (let attempt = 0; attempt < maxRetriesParam; attempt++) {
         try {
             console.log(`🔄 Tentativo ${attempt + 1}/${maxRetriesParam} per ${url}`);
+            
+            // Rimuovi il signal dai nostri tentativi di retry, manteniamo solo per il primo
+            // perché un AbortController già abortito aborterà immediatamente anche i retry
+            if (attempt === 0 && originalSignal) {
+                options.signal = originalSignal;
+            } else if (attempt > 0) {
+                delete options.signal; // Rimuovi per i retry
+            }
+            
             const response = await fetch(url, options);
             if (!response.ok && attempt < maxRetriesParam - 1) {
                 // Se la risposta non è OK e abbiamo altri tentativi, ritenta
@@ -4225,6 +4235,8 @@ async function handlePayment(documentType) {
                 const startTime = Date.now();
                 
                 // Usa fetchWithRetry per gestire automaticamente i retry con backoff
+                // NOTA: il timeout del controller si applica solo al primo tentativo
+                // Se fallisce, i retry continueranno senza il signal per evitare che un AbortController abortito blocchi tutto
                 response = await fetchWithRetry(`${API_BASE_URL}/api/create-checkout-session`, {
                     method: 'POST',
                     headers: {
