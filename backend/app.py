@@ -342,6 +342,88 @@ async def test_openai():
             "timestamp": datetime.datetime.now().isoformat()
         }
 
+@app.get("/api/health-full")
+async def health_full():
+    """Endpoint diagnostico completo per il pagamento - verifica tutte le configurazioni"""
+    import datetime
+    
+    diagnostics = {
+        "timestamp": datetime.datetime.now().isoformat(),
+        "status": "checking",
+        "components": {}
+    }
+    
+    # 1. Stripe
+    diagnostics["components"]["stripe"] = {
+        "configured": bool(STRIPE_SECRET_KEY),
+        "has_secret_key": bool(STRIPE_SECRET_KEY),
+        "has_publishable_key": bool(STRIPE_PUBLISHABLE_KEY),
+        "price_business_plan_id": bool(STRIPE_PRICE_BUSINESS_PLAN),
+        "price_market_analysis_id": bool(STRIPE_PRICE_MARKET_ANALYSIS),
+        "fallback_prices_configured": bool(PRICE_BUSINESS_PLAN and PRICE_MARKET_ANALYSIS),
+        "message": "Stripe completamente configurato" if STRIPE_SECRET_KEY else "⚠️  STRIPE_SECRET_KEY non configurata"
+    }
+    
+    # 2. Firebase
+    try:
+        app_check = firebase_admin.get_app()
+        diagnostics["components"]["firebase"] = {
+            "initialized": True,
+            "app_name": app_check.name,
+            "has_credentials": firebase_initialized,
+            "message": "Firebase Admin configurato correttamente"
+        }
+    except ValueError:
+        diagnostics["components"]["firebase"] = {
+            "initialized": False,
+            "has_credentials": firebase_initialized,
+            "message": "⚠️  Firebase Admin non inizializzato - l'autenticazione non funzionerà"
+        }
+    except Exception as e:
+        diagnostics["components"]["firebase"] = {
+            "initialized": False,
+            "error": str(e),
+            "message": f"❌ Errore Firebase: {str(e)}"
+        }
+    
+    # 3. OpenAI
+    diagnostics["components"]["openai"] = {
+        "configured": bool(OPENAI_API_KEY),
+        "key_format_valid": bool(OPENAI_API_KEY and OPENAI_API_KEY.startswith("sk-")),
+        "message": "OpenAI configurato correttamente" if OPENAI_API_KEY else "⚠️  OPENAI_API_KEY non configurata"
+    }
+    
+    # 4. Database/Storage
+    diagnostics["components"]["storage"] = {
+        "pdf_output_dir": "/tmp/pdf_output",
+        "writable": True,  # Assumiamo /tmp sia sempre writable
+        "message": "Storage temporaneo disponibile"
+    }
+    
+    # Determina lo status globale
+    all_ok = (
+        STRIPE_SECRET_KEY and 
+        firebase_initialized and 
+        OPENAI_API_KEY
+    )
+    
+    diagnostics["status"] = "ok" if all_ok else "warning"
+    diagnostics["payment_ready"] = (STRIPE_SECRET_KEY and firebase_initialized)
+    
+    # Aggiungi messaggi di riepilogo
+    warnings = []
+    if not STRIPE_SECRET_KEY:
+        warnings.append("Stripe non configurato - il pagamento non funzionerà")
+    if not firebase_initialized:
+        warnings.append("Firebase Admin non inizializzato - l'autenticazione non funzionerà")
+    if not OPENAI_API_KEY:
+        warnings.append("OpenAI non configurato - la generazione di contenuti non funzionerà")
+    
+    diagnostics["warnings"] = warnings
+    diagnostics["issues_count"] = len(warnings)
+    
+    return diagnostics
+
 @app.post("/api/generate-business-plan")
 async def generate_business_plan(request: BusinessPlanRequest):
     """Genera il business plan chiamando OpenAI"""

@@ -95,6 +95,13 @@ async function fetchWithRetry(url, options = {}, maxRetries = 3) {
     }
 }
 
+// Funzione per escapare HTML e prevenire XSS
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 // DOM Elements - will be initialized when DOM is ready
 let planModal;
 let closeModal;
@@ -4211,6 +4218,38 @@ async function handlePayment(documentType) {
                 'Authorization': idToken ? `Bearer ${idToken.substring(0, 20)}...` : 'MISSING'
             });
             
+            // Health check pre-pagamento
+            console.log('🏥 Esecuzione health check pre-pagamento...');
+            try {
+                const healthResponse = await fetch(`${API_BASE_URL}/api/health-full`, {
+                    method: 'GET',
+                    timeout: 5000
+                });
+                const healthData = await healthResponse.json();
+                console.log('🏥 Health check risultati:', healthData);
+                
+                if (healthData.status === 'ok' && healthData.payment_ready) {
+                    console.log('✅ Server è pronto per il pagamento');
+                } else if (healthData.warnings && healthData.warnings.length > 0) {
+                    console.warn('⚠️ Server ha problemi di configurazione:', healthData.warnings);
+                    if (paymentError && healthData.issues_count > 0) {
+                        paymentError.innerHTML = `
+                        <div style="padding: 15px; text-align: left; background-color: #fff3cd; border-radius: 5px;">
+                            <strong>⚠️ Problemi di configurazione server</strong>
+                            <p>Il server ha i seguenti problemi:</p>
+                            <ul>
+                                ${healthData.warnings.map(w => `<li>${w}</li>`).join('')}
+                            </ul>
+                            <p style="font-size: 12px; color: #666; margin-top: 10px;">Contatta il supporto se il pagamento non funziona.</p>
+                        </div>
+                        `;
+                    }
+                }
+            } catch (healthError) {
+                console.warn('⚠️ Health check non disponibile (il server potrebbe essere in cold start):', healthError.message);
+                console.log('ℹ️ Continuando comunque con il tentativo di pagamento...');
+            }
+            
             let response;
             try {
                 console.log('⏳ Invio richiesta fetch (attesa risposta)...');
@@ -4255,24 +4294,56 @@ async function handlePayment(documentType) {
                 console.error('❌ Errore nella chiamata fetch:', fetchError);
                 console.error('Tipo errore:', fetchError.name);
                 console.error('Messaggio:', fetchError.message);
+                console.error('Stack:', fetchError.stack);
                 
                 // Gestisci diversi tipi di errori di rete
                 if (fetchError.name === 'AbortError') {
-                    console.error('⏱️  Timeout raggiunto - il server non ha risposto in 60 secondi');
+                    console.error('⏱️  Timeout raggiunto - il server non ha risposto in 120 secondi');
                     if (paymentLoading) {
                         paymentLoading.style.display = 'none';
                     }
                     if (paymentError) {
                         paymentError.style.display = 'block';
-                        paymentError.textContent = 'Il server non risponde in tempo. Il server potrebbe essere in sleep (cold start su Render). Riprova tra qualche secondo.';
+                        paymentError.innerHTML = `
+                        <div style="padding: 15px; text-align: left;">
+                            <strong>⏱️ TIMEOUT - Il server non risponde</strong>
+                            <p>Il server potrebbe essere in sleep (cold start). Questo accade con il piano gratuito di Render.com.</p>
+                            <p><strong>Soluzioni:</strong></p>
+                            <ul>
+                                <li>Attendi 30 secondi e riprova</li>
+                                <li>Se il problema persiste, potrebbe essere un problema di connessione internet</li>
+                                <li>Contatta il supporto se l'errore continua</li>
+                            </ul>
+                            <p style="font-size: 12px; color: #666; margin-top: 10px;">Codice errore: TIMEOUT_120S</p>
+                        </div>
+                        `;
                     }
-                    throw new Error('Il server non risponde in tempo. Il server potrebbe essere in sleep (cold start). Riprova tra qualche secondo.');
+                    throw new Error('TIMEOUT_120S: Il server non risponde in tempo. Potrebbe essere in fase di avvio (cold start). Riprova tra 30 secondi.');
                 } else if (fetchError.name === 'TypeError') {
+                    let errorMsg = 'Errore di connessione al server';
+                    let userMsg = '';
+                    
                     if (fetchError.message.includes('Load failed') || fetchError.message.includes('Failed to fetch')) {
-                        throw new Error('Impossibile connettersi al server. Verifica la tua connessione internet e che il server sia raggiungibile.');
+                        errorMsg = 'Impossibile connettersi al server';
+                        userMsg = 'Verifica la tua connessione internet e che il server sia raggiungibile.';
                     } else if (fetchError.message.includes('fetch')) {
-                        throw new Error('Errore di connessione al server. Verifica la tua connessione internet e riprova.');
+                        errorMsg = 'Errore di connessione al server';
+                        userMsg = 'Verifica la tua connessione internet e riprova.';
+                    } else if (fetchError.message.includes('CORS')) {
+                        errorMsg = 'Errore CORS - Il server ha rifiutato la richiesta';
+                        userMsg = 'Questo è un problema di configurazione. Contatta il supporto.';
                     }
+                    
+                    if (paymentError) {
+                        paymentError.innerHTML = `
+                        <div style="padding: 15px; text-align: left;">
+                            <strong>❌ ${errorMsg}</strong>
+                            <p>${userMsg}</p>
+                            <p style="font-size: 12px; color: #666; margin-top: 10px;">Codice errore: ${errorMsg.toUpperCase().replace(/\s+/g, '_')}</p>
+                        </div>
+                        `;
+                    }
+                    throw new Error(errorMsg + ' - ' + userMsg);
                 }
                 
                 // Se è un errore di timeout o di rete generico
@@ -4301,6 +4372,31 @@ async function handlePayment(documentType) {
                 console.error('Status:', response.status);
                 console.error('Status Text:', response.statusText);
                 
+                // Se l'errore è 500 (errore server interno)
+                if (response.status === 500) {
+                    const errorDetail = errorData.detail || 'Errore interno del server';
+                    console.error('❌ Errore 500 - Problema interno del server');
+                    
+                    if (paymentError) {
+                        paymentError.innerHTML = `
+                        <div style="padding: 15px; text-align: left;">
+                            <strong>❌ Errore del server (500)</strong>
+                            <p>Il server ha incontrato un errore interno. Questo può accadere se:</p>
+                            <ul>
+                                <li>Stripe non è configurato correttamente</li>
+                                <li>C'è un problema con la connessione a Stripe</li>
+                                <li>Il token di autenticazione non è valido</li>
+                            </ul>
+                            <p><strong>Cosa fare:</strong> Riprova tra qualche secondo o contatta il supporto.</p>
+                            <p style="font-size: 12px; color: #666; margin-top: 10px;">Dettaglio: ${errorDetail}</p>
+                            <p style="font-size: 12px; color: #666;">Codice errore: SERVER_ERROR_500</p>
+                        </div>
+                        `;
+                    }
+                    
+                    throw new Error('SERVER_ERROR_500: ' + errorDetail);
+                }
+                
                 // Se l'errore è relativo all'autenticazione (401), potrebbe essere un problema di configurazione backend
                 if (response.status === 401) {
                     const errorDetail = errorData.detail || 'Token non valido';
@@ -4308,16 +4404,42 @@ async function handlePayment(documentType) {
                     console.error('Token inviato (primi 50 caratteri):', idToken.substring(0, 50));
                     console.error('Dettaglio errore backend:', errorDetail);
                     
-                    // Se il backend dice che Firebase Admin non è configurato
-                    if (errorDetail.includes('configurazione del server') || errorDetail.includes('Firebase Admin non inizializzato')) {
-                        throw new Error('Errore di configurazione del server. Contatta il supporto.');
+                    if (paymentError) {
+                        paymentError.innerHTML = `
+                        <div style="padding: 15px; text-align: left;">
+                            <strong>❌ Autenticazione fallita (401)</strong>
+                            <p>Il token di autenticazione non è stato accettato.</p>
+                            <p><strong>Soluzioni:</strong></p>
+                            <ul>
+                                <li>Effettua nuovamente il logout e il login</li>
+                                <li>Se il problema persiste, svuota la cache del browser e riprova</li>
+                                <li>Se continua, contatta il supporto indicando il codice: AUTH_TOKEN_401</li>
+                            </ul>
+                            <p style="font-size: 12px; color: #666; margin-top: 10px;">Dettaglio: ${errorDetail}</p>
+                        </div>
+                        `;
                     }
                     
-                    // Altrimenti, potrebbe essere un problema con il token o con la configurazione Firebase
-                    throw new Error('Il server non ha accettato il token di autenticazione. Verifica che Firebase Admin sia configurato correttamente sul server. Dettaglio: ' + errorDetail);
+                    // Se il backend dice che Firebase Admin non è configurato
+                    if (errorDetail.includes('configurazione del server') || errorDetail.includes('Firebase Admin non inizializzato')) {
+                        throw new Error('AUTH_CONFIG_ERROR: Errore di configurazione del server. Contatta il supporto.');
+                    }
+                    
+                    throw new Error('AUTH_TOKEN_401: ' + errorDetail);
                 }
                 
-                throw new Error(errorData.detail || 'Errore nella creazione della sessione di pagamento');
+                // Errore generico HTTP
+                if (paymentError) {
+                    paymentError.innerHTML = `
+                    <div style="padding: 15px; text-align: left;">
+                        <strong>❌ Errore HTTP ${response.status}</strong>
+                        <p>${errorData.detail || errorData.message || 'Errore nella richiesta'}</p>
+                        <p style="font-size: 12px; color: #666; margin-top: 10px;">Codice errore: HTTP_${response.status}</p>
+                    </div>
+                    `;
+                }
+                
+                throw new Error(`HTTP_${response.status}: ${errorData.detail || 'Errore nella creazione della sessione di pagamento'}`);
             }
             
             let data;
@@ -4395,9 +4517,53 @@ async function handlePayment(documentType) {
             
         } catch (error) {
             console.error('Errore nella creazione checkout session:', error);
+            console.error('Error message:', error.message);
+            console.error('Error stack:', error.stack);
+            
             paymentLoading.style.display = 'none';
             paymentError.style.display = 'block';
-            paymentError.textContent = 'Errore: ' + error.message;
+            
+            // Estrai il codice di errore dal messaggio
+            let errorCode = 'UNKNOWN_ERROR';
+            let errorMessage = error.message || 'Errore sconosciuto';
+            
+            if (errorMessage.includes(':')) {
+                const parts = errorMessage.split(':');
+                errorCode = parts[0];
+                errorMessage = parts.slice(1).join(':').trim();
+            }
+            
+            // Se il messaggio di errore contiene codice di errore
+            let displayMessage = errorMessage;
+            let userFriendlyMessage = '';
+            
+            if (errorCode === 'TIMEOUT_120S') {
+                userFriendlyMessage = 'Il server non risponde. Potrebbe essere in fase di avvio.';
+            } else if (errorCode.startsWith('AUTH')) {
+                userFriendlyMessage = 'Problema di autenticazione. Prova a fare nuovamente il login.';
+            } else if (errorCode === 'SERVER_ERROR_500') {
+                userFriendlyMessage = 'Errore del server. Riprova tra qualche secondo.';
+            } else if (errorCode.startsWith('HTTP')) {
+                userFriendlyMessage = 'Errore HTTP. Verifica la tua connessione.';
+            } else if (errorMessage.includes('Impossibile connettersi')) {
+                userFriendlyMessage = 'Impossibile connettersi al server. Verifica la tua connessione internet.';
+            } else {
+                userFriendlyMessage = errorMessage;
+            }
+            
+            // Mostra il messaggio formattato
+            paymentError.innerHTML = `
+            <div style="padding: 15px; text-align: left; background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 5px;">
+                <strong style="color: #721c24;">❌ Errore nel pagamento</strong>
+                <p style="color: #721c24; margin-top: 10px;">${userFriendlyMessage}</p>
+                <details style="margin-top: 10px; font-size: 12px; color: #666;">
+                    <summary style="cursor: pointer;">Dettagli tecnici</summary>
+                    <pre style="background-color: #f5f5f5; padding: 10px; border-radius: 3px; overflow-x: auto; max-height: 200px;">${escapeHtml(displayMessage)}</pre>
+                </details>
+                <p style="font-size: 12px; color: #666; margin-top: 10px;">Codice errore: <code>${errorCode}</code></p>
+            </div>
+            `;
+            
             reject(error);
         }
     });
