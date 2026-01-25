@@ -871,34 +871,20 @@ async function generateBusinessPlanFromWizard() {
     if (!resultState) resultState = document.getElementById('resultState');
     if (!planContent) planContent = document.getElementById('planContent');
     
-    // NON nascondere il wizard qui - rimane visibile fino al pagamento
-    // Il wizard verrà nascosto solo dopo il redirect da Stripe
+    // NUOVO FLUSSO: Genera il documento SUBITO senza pagamento
+    // Il pagamento avviene solo quando l'utente clicca "Scarica PDF"
     
-    // PRIMA: Richiedi il pagamento prima di generare il documento
-    try {
-        // Salva i dati del wizard in localStorage per recuperarli dopo il redirect
-        try {
-            const dataToSave = JSON.stringify(wizardData);
-            localStorage.setItem('pendingBusinessPlanData', dataToSave);
-            localStorage.setItem('pendingDocumentType', 'business-plan');
-            console.log('✅ Dati wizard salvati in localStorage');
-        } catch (e) {
-            console.error('❌ ERRORE nel salvataggio localStorage:', e);
-            window.pendingBusinessPlanData = wizardData;
-        }
-        
-        await handlePayment('business-plan');
-        // Se il pagamento è stato avviato, la funzione reindirizza a Stripe
-        // Il wizard rimane visibile durante il redirect
-        // Dopo il redirect, il wizard verrà nascosto e verrà mostrato il loading
-        return;
-    } catch (error) {
-        if (error.message !== 'Pagamento annullato') {
-            alert('Errore nel pagamento: ' + error.message);
-        }
-        // Se l'utente annulla, il wizard rimane visibile (non serve ripristinarlo)
-        return;
-    }
+    // Salva i dati del wizard in memoria per usarli dopo
+    window.currentPlanWizardData = JSON.parse(JSON.stringify(wizardData));
+    
+    // Nascondi il wizard e mostra il loading
+    if (wizardContainer) wizardContainer.style.display = 'none';
+    if (wizardNavigation) wizardNavigation.style.display = 'none';
+    if (loadingState) loadingState.style.display = 'block';
+    if (resultState) resultState.style.display = 'none';
+    
+    // Genera il piano direttamente
+    await generateBusinessPlanAfterPayment(wizardData);
 }
 
 // Funzione per generare il business plan dopo il pagamento verificato
@@ -1547,83 +1533,19 @@ function initializeAll() {
                         window.paymentSessionId = finalSessionId;
                         console.log('✅ Pagamento business plan verificato');
                         
-                        // Se include upsell per analisi di mercato, verifica anche quello
-                        if (window.upsellPaid && window.upsellType === 'market-analysis') {
-                            window.paymentVerified_analysis = true;
-                            window.paymentSessionId_analysis = finalSessionId;
-                            console.log('✅ Upsell analisi di mercato incluso nel pagamento');
-                        }
+                        // NUOVO FLUSSO: Scarica il PDF (non rigenerare il documento)
+                        // Il documento è già stato generato prima della richiesta di pagamento
+                        console.log('📥 Inizio download del PDF già generato...');
                         
-                        // Genera il business plan dopo il pagamento verificato
-                        // Recupera i dati da localStorage o da memoria
-                        let wizardData = null;
-                        try {
-                            const savedData = localStorage.getItem('pendingBusinessPlanData');
-                            if (savedData) {
-                                wizardData = JSON.parse(savedData);
-                                localStorage.removeItem('pendingBusinessPlanData');
-                                localStorage.removeItem('pendingDocumentType');
-                                console.log('✅ Dati wizard recuperati da localStorage');
-                            } else if (window.pendingBusinessPlanData) {
-                                wizardData = window.pendingBusinessPlanData;
-                                window.pendingBusinessPlanData = null;
-                                console.log('✅ Dati wizard recuperati da memoria');
-                            }
-                        } catch (e) {
-                            console.error('Errore nel recupero dati wizard:', e);
-                        }
+                        // Attendi un momento e poi scarica il PDF
+                        setTimeout(async () => {
+                            await downloadPDFAfterPayment('business-plan', finalSessionId);
+                            // Pulisci i flag di pagamento dopo il download
+                            window.paymentVerified = false;
+                            window.paymentSessionId = null;
+                        }, 500);
                         
-                        // Dopo il pagamento verificato, genera direttamente il documento
-                        if (wizardData && Object.keys(wizardData).length > 0) {
-                            console.log('📄 Generazione business plan dopo pagamento verificato...');
-                            console.log('Dati wizard recuperati:', Object.keys(wizardData));
-                            console.log('Numero di campi:', Object.keys(wizardData).length);
-                            console.log('Utente autenticato:', currentUser?.email);
-                            
-                            // Assicurati che gli elementi DOM siano inizializzati
-                            if (!planModal) planModal = document.getElementById('planModal');
-                            if (!wizardContainer) wizardContainer = document.getElementById('wizardContainer');
-                            if (!wizardNavigation) wizardNavigation = document.getElementById('wizardNavigation');
-                            if (!loadingState) loadingState = document.getElementById('loadingState');
-                            if (!resultState) resultState = document.getElementById('resultState');
-                            if (!planContent) planContent = document.getElementById('planContent');
-                            
-                            // Apri il modal del business plan
-                            if (planModal) {
-                                planModal.style.display = 'block';
-                                document.body.style.overflow = 'hidden';
-                                console.log('✅ Modal business plan aperto');
-                                
-                                // Nascondi wizard e mostra loading
-                                if (wizardContainer) wizardContainer.style.display = 'none';
-                                if (wizardNavigation) wizardNavigation.style.display = 'none';
-                                if (resultState) resultState.style.display = 'none';
-                                if (loadingState) loadingState.style.display = 'block';
-                                
-                                // Genera il business plan dopo un breve delay per assicurare che il DOM sia pronto
-                                setTimeout(() => {
-                                    console.log('🚀 Avvio generazione business plan...');
-                                    console.log('Utente autenticato:', currentUser?.email);
-                                    generateBusinessPlanAfterPayment(wizardData).catch(error => {
-                                        console.error('❌ Errore nella generazione:', error);
-                                        console.error('Stack:', error.stack);
-                                        alert('Errore nella generazione del business plan: ' + error.message);
-                                        if (loadingState) loadingState.style.display = 'none';
-                                        // Ripristina il wizard in caso di errore
-                                        if (wizardContainer) wizardContainer.style.display = 'block';
-                                        if (wizardNavigation) wizardNavigation.style.display = 'flex';
-                                    });
-                                }, 500);
-                            } else {
-                                console.error('❌ Modal business plan non trovato');
-                                alert('Errore: modal non trovato. Ricarica la pagina.');
-                            }
-                        } else {
-                            console.error('❌ Dati wizard non trovati dopo il pagamento');
-                            console.error('wizardData:', wizardData);
-                            console.error('localStorage pendingBusinessPlanData:', localStorage.getItem('pendingBusinessPlanData'));
-                            alert('Errore: dati del wizard non trovati. Completa nuovamente il wizard.');
-                        }
+                        return;
                     } else {
                         console.error('❌ Pagamento business plan non verificato');
                     }
@@ -4161,6 +4083,85 @@ function initializeAuth() {
 }
 
 // Funzione per gestire il pagamento Stripe
+// Funzione per scaricare il PDF dopo che il pagamento è stato verificato
+async function downloadPDFAfterPayment(documentType, sessionId) {
+    console.log(`📥 Inizio download PDF dopo pagamento verificato (${documentType})`);
+    
+    if (!window.currentPlanData) {
+        alert('Errore: i dati del documento non sono disponibili. Ricarica la pagina.');
+        return;
+    }
+
+    const jsonData = window.lastBusinessPlanJSON || window.currentPlanData.jsonData;
+    
+    if (!jsonData) {
+        alert('Errore: i dati JSON non sono disponibili per la generazione del PDF.');
+        return;
+    }
+
+    try {
+        console.log('📄 Generazione PDF tramite API backend...');
+        
+        // Ottieni il token di autenticazione Firebase
+        let idToken = null;
+        try {
+            if (!currentUser || !window.firebaseAuth) {
+                throw new Error('Utente non autenticato');
+            }
+            idToken = await currentUser.getIdToken(true);
+            console.log('✅ Token Firebase ottenuto');
+        } catch (tokenError) {
+            console.error('❌ Errore nell\'ottenere il token:', tokenError);
+            alert('Errore di autenticazione. Effettua nuovamente il login.');
+            return;
+        }
+        
+        // Aggiungi il sessionId al JSON per la verifica
+        const jsonWithPayment = {
+            ...jsonData,
+            _payment_session_id: sessionId
+        };
+        
+        const response = await fetch(`${API_BASE_URL}/api/generate-pdf`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${idToken}`
+            },
+            body: JSON.stringify({
+                businessPlanJson: jsonWithPayment
+            })
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ detail: 'Errore sconosciuto' }));
+            throw new Error(`Errore API: ${response.status} - ${errorData.detail || 'Errore sconosciuto'}`);
+        }
+        
+        // Ottieni il blob del PDF
+        const blob = await response.blob();
+        
+        // Crea un URL temporaneo e scarica il file
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'business-plan.pdf';
+        document.body.appendChild(a);
+        a.click();
+        
+        // Pulisci
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        console.log('✅ PDF scaricato con successo!');
+        alert('PDF scaricato con successo!');
+        
+    } catch (error) {
+        console.error('Errore nella generazione PDF:', error);
+        alert('Errore nella generazione del PDF: ' + error.message);
+    }
+}
+
 async function handlePayment(documentType) {
     console.log('💳 ===== INIZIO handlePayment =====');
     console.log('Tipo documento:', documentType);
@@ -4647,92 +4648,25 @@ async function generatePDF() {
         return;
     }
 
-    // Il pagamento è già stato verificato prima della generazione del documento
-    if (!window.paymentVerified || !window.paymentSessionId) {
-        alert('Pagamento non verificato. Genera prima il business plan.');
-        return;
-    }
-
-    // Show loading
+    // NUOVO FLUSSO: Richiedi il pagamento PRIMA di generare il PDF
+    // Il pagamento non è più stato fatto, quindi occorre farlo ora
     downloadPdfBtn.disabled = true;
-    downloadPdfBtn.textContent = 'Generazione PDF...';
+    downloadPdfBtn.textContent = 'Reindirizzamento al pagamento...';
 
     try {
-        console.log('📄 Generazione PDF tramite API backend...');
+        console.log('💳 Inizio processo di pagamento per il download PDF');
         
-        // Ottieni il token di autenticazione Firebase
-        let idToken = null;
-        try {
-            if (!currentUser || !window.firebaseAuth) {
-                throw new Error('Utente non autenticato');
-            }
-            idToken = await currentUser.getIdToken(true);
-            console.log('✅ Token Firebase ottenuto');
-        } catch (tokenError) {
-            console.error('❌ Errore nell\'ottenere il token:', tokenError);
-            alert('Errore di autenticazione. Effettua nuovamente il login.');
-            downloadPdfBtn.disabled = false;
-            downloadPdfBtn.textContent = 'Scarica PDF';
-            return;
-        }
+        // Richiedi il pagamento (questo reindirizza a Stripe)
+        await handlePayment('business-plan');
         
-        // Aggiungi il sessionId al JSON per la verifica
-        const jsonWithPayment = {
-            ...jsonData,
-            _payment_session_id: window.paymentSessionId
-        };
-        
-        const response = await fetch(`${API_BASE_URL}/api/generate-pdf`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${idToken}`
-            },
-            body: JSON.stringify({
-                businessPlanJson: jsonWithPayment
-            })
-        });
-        
-        if (!response.ok) {
-            if (response.status === 402) {
-                // Pagamento non completato, richiedi di nuovo
-                window.paymentVerified = false;
-                window.paymentSessionId = null;
-                alert('Pagamento non completato. Completa il pagamento per scaricare il PDF.');
-                await handlePayment('business-plan');
-                return;
-            }
-            const errorData = await response.json().catch(() => ({ detail: 'Errore sconosciuto' }));
-            throw new Error(`Errore API: ${response.status} - ${errorData.detail || 'Errore sconosciuto'}`);
-        }
-        
-        // Ottieni il blob del PDF
-        const blob = await response.blob();
-        
-        // Crea un URL temporaneo e scarica il file
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'business-plan.pdf';
-        document.body.appendChild(a);
-        a.click();
-        
-        // Pulisci
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        
-        console.log('✅ PDF scaricato con successo!');
-        
-        // Reset pagamento dopo il download
-        window.paymentVerified = false;
-        window.paymentSessionId = null;
-        
-        downloadPdfBtn.disabled = false;
-        downloadPdfBtn.textContent = 'Scarica PDF';
+        // Se il pagamento è completato e l'utente ritorna da Stripe, 
+        // il download del PDF verrà gestito dal verifyPaymentAfterRedirect
         
     } catch (error) {
-        console.error('Errore nella generazione PDF:', error);
-        alert('Errore nella generazione del PDF: ' + error.message + '\n\nSe il backend su Render era in pausa, riprova tra 1-2 minuti.');
+        console.error('Errore nel pagamento:', error);
+        if (error.message !== 'Pagamento annullato') {
+            alert('Errore nel pagamento: ' + error.message);
+        }
         downloadPdfBtn.disabled = false;
         downloadPdfBtn.textContent = 'Scarica PDF';
     }
