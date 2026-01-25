@@ -1585,121 +1585,10 @@ function initializeAll() {
                         window.paymentSessionId_analysis = finalSessionId;
                         console.log('✅ Pagamento analisi di mercato verificato');
                         
-                        // Se include upsell per business plan, verifica anche quello
-                        if (window.upsellPaid && window.upsellType === 'business-plan') {
-                            window.paymentVerified = true;
-                            window.paymentSessionId = finalSessionId;
-                            console.log('✅ Upsell business plan incluso nel pagamento');
-                        }
-                        
-                        // Genera l'analisi di mercato dopo il pagamento verificato
-                        // Recupera i dati da localStorage o da memoria
-                        let analysisWizardData = null;
-                        try {
-                            const savedData = localStorage.getItem('pendingMarketAnalysisData');
-                            if (savedData) {
-                                analysisWizardData = JSON.parse(savedData);
-                                localStorage.removeItem('pendingMarketAnalysisData');
-                                localStorage.removeItem('pendingDocumentType');
-                                console.log('✅ Dati analisi recuperati da localStorage');
-                            } else if (window.pendingMarketAnalysisData) {
-                                analysisWizardData = window.pendingMarketAnalysisData;
-                                window.pendingMarketAnalysisData = null;
-                                console.log('✅ Dati analisi recuperati da memoria');
-                            }
-                        } catch (e) {
-                            console.error('Errore nel recupero dati analisi:', e);
-                        }
-                        
-                        // Dopo il pagamento verificato, genera direttamente l'analisi
-                        if (analysisWizardData && Object.keys(analysisWizardData).length > 0) {
-                            console.log('📄 ===== GENERAZIONE ANALISI DOPO PAGAMENTO =====');
-                            console.log('Dati analisi recuperati:', Object.keys(analysisWizardData));
-                            console.log('Numero di campi:', Object.keys(analysisWizardData).length);
-                            console.log('Utente autenticato:', currentUser?.email);
-                            console.log('Session ID:', finalSessionId);
-                        
-                            // Assicurati che gli elementi DOM siano inizializzati
-                            if (!analysisModal) analysisModal = document.getElementById('analysisModal');
-                            if (!analysisWizardContainer) analysisWizardContainer = document.getElementById('analysisWizardContainer');
-                            if (!analysisWizardNavigation) analysisWizardNavigation = document.getElementById('analysisWizardNavigation');
-                            if (!analysisLoadingState) analysisLoadingState = document.getElementById('analysisLoadingState');
-                            if (!analysisResultState) analysisResultState = document.getElementById('analysisResultState');
-                            if (!analysisContent) analysisContent = document.getElementById('analysisContent');
-                            
-                            console.log('Elementi DOM:', {
-                                modal: !!analysisModal,
-                                wizardContainer: !!analysisWizardContainer,
-                                loadingState: !!analysisLoadingState,
-                                resultState: !!analysisResultState,
-                                content: !!analysisContent
-                            });
-                            
-                            // Apri il modal dell'analisi PRIMA di tutto
-                            if (!analysisModal) {
-                                console.error('❌ Modal analisi non trovato');
-                                alert('Errore: modal non trovato. Ricarica la pagina.');
-                                return;
-                            }
-                            
-                            // Apri il modal
-                            analysisModal.style.display = 'block';
-                            document.body.style.overflow = 'hidden';
-                            console.log('✅ Modal analisi aperto');
-                            
-                            // Nascondi wizard e mostra loading
-                            if (analysisWizardContainer) {
-                                analysisWizardContainer.style.display = 'none';
-                                console.log('✅ Wizard nascosto');
-                            }
-                            if (analysisWizardNavigation) {
-                                analysisWizardNavigation.style.display = 'none';
-                            }
-                            if (analysisResultState) {
-                                analysisResultState.style.display = 'none';
-                            }
-                            if (analysisLoadingState) {
-                                analysisLoadingState.style.display = 'block';
-                                console.log('✅ Loading mostrato');
-                                // Assicurati che il testo di loading sia visibile
-                                const loadingText = analysisLoadingState.querySelector('p');
-                                if (loadingText) {
-                                    loadingText.textContent = 'Stiamo creando la tua analisi di mercato professionale... Questo può richiedere 3-5 minuti. Attendi, non chiudere la pagina.';
-                                }
-                            } else {
-                                console.error('❌ Loading state non trovato!');
-                            }
-                            
-                            // Genera l'analisi dopo un breve delay per assicurare che il DOM sia pronto
-                            console.log('⏳ Attendo 500ms prima di avviare la generazione...');
-                            setTimeout(() => {
-                                console.log('🚀 ===== AVVIO GENERAZIONE ANALISI =====');
-                                console.log('Utente autenticato:', currentUser?.email);
-                                console.log('Modal aperto:', analysisModal.style.display);
-                                console.log('Loading visibile:', analysisLoadingState?.style.display);
-                                console.log('Dati da inviare:', Object.keys(analysisWizardData));
-                                
-                                // Chiama la funzione di generazione
-                                generateMarketAnalysisAfterPayment(analysisWizardData)
-                                    .then(() => {
-                                        console.log('✅ Generazione analisi completata con successo');
-                                    })
-                                    .catch(error => {
-                                        console.error('❌ Errore nella generazione:', error);
-                                        console.error('Stack:', error.stack);
-                                        alert('Errore nella generazione dell\'analisi: ' + error.message);
-                                        if (analysisLoadingState) analysisLoadingState.style.display = 'none';
-                                        // Ripristina il wizard in caso di errore
-                                        if (analysisWizardContainer) analysisWizardContainer.style.display = 'block';
-                                        if (analysisWizardNavigation) analysisWizardNavigation.style.display = 'flex';
-                                    });
-                            }, 500);
-                        } else {
-                            console.error('❌ Dati analisi non trovati dopo il pagamento');
-                            console.error('analysisWizardData:', analysisWizardData);
-                            console.error('localStorage pendingMarketAnalysisData:', localStorage.getItem('pendingMarketAnalysisData'));
-                            alert('Errore: dati dell\'analisi non trovati. Completa nuovamente il wizard.');
-                        }
+                        // NUOVO FLUSSO: L'analisi è già stata generata prima del pagamento
+                        // Adesso scarica solo il PDF
+                        console.log('📥 Scarico il PDF dell\'analisi dopo il pagamento...');
+                        await downloadAnalysisPDFAfterPayment('market-analysis', finalSessionId);
                     } else {
                         console.error('❌ Pagamento analisi di mercato non verificato');
                     }
@@ -3478,91 +3367,25 @@ async function generatePDFAnalysis(marketAnalysisJSON) {
         return;
     }
     
-    // Verifica se il pagamento è già stato completato (con chiave separata per analisi)
-    const paymentKey = 'paymentVerified_analysis';
-    const sessionKey = 'paymentSessionId_analysis';
-    
-    // Il pagamento è già stato verificato prima della generazione del documento
-    if (!window[paymentKey] || !window[sessionKey]) {
-        alert('Pagamento non verificato. Genera prima l\'analisi di mercato.');
-        return;
-    }
-    
+    // NUOVO FLUSSO: Richiedi il pagamento PRIMA di generare il PDF
+    // Il pagamento non è più stato fatto, quindi occorre farlo ora
     downloadAnalysisPdfBtn.disabled = true;
-    downloadAnalysisPdfBtn.textContent = 'Generazione PDF...';
-    
+    downloadAnalysisPdfBtn.textContent = 'Reindirizzamento al pagamento...';
+
     try {
-        console.log('=== INIZIO GENERAZIONE PDF ANALISI DI MERCATO ===');
-        console.log('Chiamata API backend Python...');
+        console.log('💳 Inizio processo di pagamento per il download PDF analisi');
         
-        // Ottieni il token di autenticazione
-        let idToken = null;
-        try {
-            if (!currentUser || !window.firebaseAuth) {
-                throw new Error('Utente non autenticato');
-            }
-            idToken = await currentUser.getIdToken(true);
-            console.log('✅ Token Firebase ottenuto');
-        } catch (tokenError) {
-            console.error('❌ Errore nell\'ottenere il token:', tokenError);
-            alert('Errore di autenticazione. Effettua nuovamente il login.');
-            downloadAnalysisPdfBtn.disabled = false;
-            downloadAnalysisPdfBtn.textContent = 'Scarica PDF';
-            return;
-        }
+        // Richiedi il pagamento (questo reindirizza a Stripe)
+        await handlePayment('market-analysis');
         
-        // Aggiungi il sessionId al JSON per la verifica
-        const jsonWithPayment = {
-            ...marketAnalysisJSON,
-            _payment_session_id: window[sessionKey]
-        };
+        // Se il pagamento è completato e l'utente ritorna da Stripe, 
+        // il download del PDF verrà gestito dal verifyPaymentAfterRedirect
         
-        const response = await fetch(`${API_BASE_URL}/api/generate-pdf-analysis`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${idToken}`
-            },
-            body: JSON.stringify({
-                marketAnalysisJson: jsonWithPayment
-            })
-        });
-        
-        if (!response.ok) {
-            if (response.status === 402) {
-                // Pagamento non completato, richiedi di nuovo
-                window[paymentKey] = false;
-                window[sessionKey] = null;
-                alert('Pagamento non completato. Completa il pagamento per scaricare il PDF.');
-                await handlePayment('market-analysis');
-                return;
-            }
-            const errorData = await response.json().catch(() => ({ detail: 'Errore sconosciuto' }));
-            throw new Error(`Errore API: ${response.status} - ${errorData.detail || 'Errore sconosciuto'}`);
-        }
-        
-        // Scarica il PDF
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'analisi-mercato.pdf';
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        
-        console.log('✅ PDF analisi di mercato generato e scaricato con successo');
-        
-        // Reset pagamento dopo il download
-        window[paymentKey] = false;
-        window[sessionKey] = null;
-        
-        downloadAnalysisPdfBtn.disabled = false;
-        downloadAnalysisPdfBtn.textContent = 'Scarica PDF';
     } catch (error) {
-        console.error('Errore nella generazione PDF analisi:', error);
-        alert('Errore nella generazione del PDF: ' + error.message);
+        console.error('Errore nel pagamento:', error);
+        if (error.message !== 'Pagamento annullato') {
+            alert('Errore nel pagamento: ' + error.message);
+        }
         downloadAnalysisPdfBtn.disabled = false;
         downloadAnalysisPdfBtn.textContent = 'Scarica PDF';
     }
@@ -4083,6 +3906,85 @@ function initializeAuth() {
 }
 
 // Funzione per gestire il pagamento Stripe
+// Funzione per scaricare il PDF dell'analisi di mercato dopo che il pagamento è stato verificato
+async function downloadAnalysisPDFAfterPayment(documentType, sessionId) {
+    console.log(`📥 Inizio download PDF analisi dopo pagamento verificato (${documentType})`);
+    
+    if (!window.currentAnalysisData) {
+        alert('Errore: i dati dell\'analisi non sono disponibili. Ricarica la pagina.');
+        return;
+    }
+
+    const marketAnalysisJSON = window.lastMarketAnalysisJSON || window.currentAnalysisData.jsonData;
+    
+    if (!marketAnalysisJSON) {
+        alert('Errore: i dati JSON dell\'analisi non sono disponibili per la generazione del PDF.');
+        return;
+    }
+
+    try {
+        console.log('📄 Generazione PDF analisi tramite API backend...');
+        
+        // Ottieni il token di autenticazione Firebase
+        let idToken = null;
+        try {
+            if (!currentUser || !window.firebaseAuth) {
+                throw new Error('Utente non autenticato');
+            }
+            idToken = await currentUser.getIdToken(true);
+            console.log('✅ Token Firebase ottenuto');
+        } catch (tokenError) {
+            console.error('❌ Errore nell\'ottenere il token:', tokenError);
+            alert('Errore di autenticazione. Effettua nuovamente il login.');
+            return;
+        }
+        
+        // Aggiungi il sessionId al JSON per la verifica
+        const jsonWithPayment = {
+            ...marketAnalysisJSON,
+            _payment_session_id: sessionId
+        };
+        
+        const response = await fetch(`${API_BASE_URL}/api/generate-pdf-analysis`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${idToken}`
+            },
+            body: JSON.stringify({
+                marketAnalysisJson: jsonWithPayment
+            })
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ detail: 'Errore sconosciuto' }));
+            throw new Error(`Errore API: ${response.status} - ${errorData.detail || 'Errore sconosciuto'}`);
+        }
+        
+        // Ottieni il blob del PDF
+        const blob = await response.blob();
+        
+        // Crea un URL temporaneo e scarica il file
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'analisi-mercato.pdf';
+        document.body.appendChild(a);
+        a.click();
+        
+        // Pulisci
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        console.log('✅ PDF analisi scaricato con successo!');
+        alert('PDF dell\'analisi scaricato con successo!');
+        
+    } catch (error) {
+        console.error('Errore nella generazione PDF analisi:', error);
+        alert('Errore nella generazione del PDF: ' + error.message);
+    }
+}
+
 // Funzione per scaricare il PDF dopo che il pagamento è stato verificato
 async function downloadPDFAfterPayment(documentType, sessionId) {
     console.log(`📥 Inizio download PDF dopo pagamento verificato (${documentType})`);
@@ -5268,34 +5170,20 @@ async function generateMarketAnalysis() {
     if (!analysisResultState) analysisResultState = document.getElementById('analysisResultState');
     if (!analysisContent) analysisContent = document.getElementById('analysisContent');
     
-    // NON nascondere il wizard qui - rimane visibile fino al pagamento
-    // Il wizard verrà nascosto solo dopo il redirect da Stripe
+    // NUOVO FLUSSO: Genera il documento SUBITO senza pagamento
+    // Il pagamento avviene solo quando l'utente clicca "Scarica PDF"
     
-    // PRIMA: Richiedi il pagamento prima di generare il documento
-    try {
-        // Salva i dati del wizard in localStorage per recuperarli dopo il redirect
-        try {
-            const dataToSave = JSON.stringify(analysisWizardData);
-            localStorage.setItem('pendingMarketAnalysisData', dataToSave);
-            localStorage.setItem('pendingDocumentType', 'market-analysis');
-            console.log('✅ Dati analisi salvati in localStorage');
-        } catch (e) {
-            console.error('❌ ERRORE nel salvataggio localStorage:', e);
-            window.pendingMarketAnalysisData = analysisWizardData;
-        }
-        
-        await handlePayment('market-analysis');
-        // Se il pagamento è stato avviato, la funzione reindirizza a Stripe
-        // Il wizard rimane visibile durante il redirect
-        // Dopo il redirect, il wizard verrà nascosto e verrà mostrato il loading
-        return;
-    } catch (error) {
-        if (error.message !== 'Pagamento annullato') {
-            alert('Errore nel pagamento: ' + error.message);
-        }
-        // Se l'utente annulla, il wizard rimane visibile (non serve ripristinarlo)
-        return;
-    }
+    // Salva i dati del wizard in memoria per usarli dopo
+    window.currentAnalysisWizardData = JSON.parse(JSON.stringify(analysisWizardData));
+    
+    // Nascondi il wizard e mostra il loading
+    if (analysisWizardContainer) analysisWizardContainer.style.display = 'none';
+    if (analysisWizardNavigation) analysisWizardNavigation.style.display = 'none';
+    if (analysisLoadingState) analysisLoadingState.style.display = 'block';
+    if (analysisResultState) analysisResultState.style.display = 'none';
+    
+    // Genera l'analisi direttamente
+    await generateMarketAnalysisAfterPayment(analysisWizardData);
 }
 
 // Funzione per generare l'analisi di mercato dopo il pagamento verificato
